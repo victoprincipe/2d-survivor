@@ -99,7 +99,12 @@ Separado: `npm run dev:bot` e `npm run dev:worker`.
 
 ## Como enviar
 
-Escreva o prompt **diretamente no canal definido em `PROMPT_CHANNEL_ID`** (ou em `SUGGESTIONS_CHANNEL_ID`, se vazio). O bot lê a mensagem, cria o job e responde com o ID e a posição. A partir daí o fluxo é automático.
+Há duas formas:
+
+- **Chat:** escreva o prompt **diretamente no canal definido em `PROMPT_CHANNEL_ID`** (ou em `SUGGESTIONS_CHANNEL_ID`, se vazio). O bot lê a mensagem, cria o job e responde com o ID e a posição.
+- **Comando:** use `/implementar prompt:<texto>`. Não há modal; o prompt vai como opção do comando. Você também pode anexar uma imagem opcional na opção `imagem`.
+
+A partir daí o fluxo é automático.
 
 ## Imagens nos prompts
 
@@ -117,6 +122,7 @@ Você pode anexar até **3 imagens** (PNG, JPEG, GIF ou WebP) de até **8 MB** c
 
 | Comando | Quem | O que faz |
 |---|---|---|
+| `/implementar prompt:<texto>` | membros com quota | envia uma implementação sem modal; aceita uma imagem opcional |
 | `/fila` | todos | estado da fila, worker e repo local |
 | `/minhas-implementacoes` | todos | suas implementações |
 | `/ultimas-implementacoes` | todos | últimas do servidor |
@@ -186,7 +192,7 @@ bot/
   src/
     index.ts               # bot discord.js
     deploy-commands.ts     # registro dos slash commands
-    commands/              # fila, minhas, ultimas, reprocessar
+    commands/              # implementar, fila, minhas, ultimas, reprocessar
     events/                # interactionCreate, messageCreate
     services/              # quotas, moderação, permissões, notificações
     ui/                    # embeds

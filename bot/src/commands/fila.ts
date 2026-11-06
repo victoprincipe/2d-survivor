@@ -66,7 +66,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         value: next.length > 0 ? next.map(jobLine).join('\n') : '—',
       },
     )
-    .setFooter({ text: 'Escreva o prompt no canal de implementações' })
+    .setFooter({ text: 'Use /implementar ou escreva no canal de implementações' })
     .setTimestamp();
 
   await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
