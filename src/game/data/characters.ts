@@ -102,6 +102,7 @@ export const CHARACTERS: CharacterConfig[] = [
     iconName: 'Syringe',
     color: '#e2e8f0',
     portraitColor: '#1f2937',
+    sprite: '/dr-janelinha.png',
     statBonuses: {
       maxHp: 10,
       cooldownReduction: 0.1,
