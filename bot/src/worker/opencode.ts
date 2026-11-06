@@ -72,11 +72,26 @@ export async function runAgent(job: Job, worktree: string): Promise<AgentResult>
 
   args.push(buildMessage(job));
 
+  const jobHome = path.join(paths.data, 'agent-homes', `job-${job.id}`);
+  const configDir = path.join(jobHome, '.config', 'opencode');
+  const dataDir = path.join(jobHome, '.local', 'share', 'opencode');
+  fs.mkdirSync(configDir, { recursive: true });
+  fs.mkdirSync(dataDir, { recursive: true });
+  fs.copyFileSync(paths.agentConfigSource, path.join(configDir, 'opencode.json'));
+
+  const authSrc = path.join(paths.agentHome, '.local', 'share', 'opencode', 'auth.json');
+  if (fs.existsSync(authSrc)) {
+    const authDst = path.join(dataDir, 'auth.json');
+    fs.copyFileSync(authSrc, authDst);
+    fs.chmodSync(authDst, 0o600);
+  } else {
+    log.warn(`Job #${job.id}: auth.json não encontrado em ${authSrc}.`);
+  }
+
   const env = agentEnv();
-  const dbDir = path.join(paths.data, 'opencode-jobs');
-  fs.mkdirSync(dbDir, { recursive: true });
-  env.OPENCODE_DB = path.join(dbDir, `job-${job.id}.db`);
-  log.info(`Job #${job.id} cwd=${worktree} db=${env.OPENCODE_DB}`);
+  env.HOME = jobHome;
+  env.OPENCODE_DB = path.join(dataDir, 'opencode.db');
+  log.info(`Job #${job.id} HOME=${jobHome} cwd=${worktree}`);
 
   return new Promise<AgentResult>((resolve, reject) => {
     const child = spawn(agentConfig.bin, args, {
