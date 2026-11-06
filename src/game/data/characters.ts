@@ -35,7 +35,7 @@ export const CHARACTERS: CharacterConfig[] = [
     id: 'gennaro',
     name: 'Gennaro Belpaese',
     title: 'Mestre das Lâminas',
-    description: 'Arremessa adagas perfurantes na direção do movimento com extrema agilidade.',
+    description: 'Arremessa adagas perfurantes no inimigo mais próximo com extrema agilidade.',
     startingWeapon: 'knife',
     iconName: 'Swords',
     color: '#2a9d8f',

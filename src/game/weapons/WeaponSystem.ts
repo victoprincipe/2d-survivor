@@ -30,10 +30,10 @@ export interface WhipSlashEffect {
   y: number;
   width: number;
   height: number;
+  angle: number;
   life: number;
   maxLife: number;
   isEvolved: boolean;
-  direction: number; // 1 right, -1 left
 }
 
 export interface LightningStrikeEffect {
@@ -199,7 +199,7 @@ export class WeaponSystem {
     if (w.id === 'whip') {
       const baseCd = w.evolved ? 1.0 : 1.35;
       w.cooldownTimer = baseCd * cdFactor;
-      this.triggerWhip(w, player, grid, worldProps, vfx, sound, onEnemyKilled, onDropSpawn);
+      this.triggerWhip(w, player, enemies, grid, worldProps, vfx, sound, onEnemyKilled, onDropSpawn);
     } else if (w.id === 'wand') {
       const baseCd = w.evolved ? 0.35 : 1.1;
       w.cooldownTimer = baseCd * cdFactor;
@@ -207,7 +207,7 @@ export class WeaponSystem {
     } else if (w.id === 'knife') {
       const baseCd = w.evolved ? 0.3 : 0.95;
       w.cooldownTimer = baseCd * cdFactor;
-      this.triggerKnife(w, player, sound);
+      this.triggerKnife(w, player, enemies, sound);
     } else if (w.id === 'lightning') {
       const baseCd = w.evolved ? 1.8 : 2.8;
       w.cooldownTimer = baseCd * cdFactor;
@@ -215,9 +215,28 @@ export class WeaponSystem {
     }
   }
 
+  private findNearestEnemy(player: Player, enemies: Enemy[]): Enemy | null {
+    let nearest: Enemy | null = null;
+    let nearestDistSq = Infinity;
+
+    for (let i = 0; i < enemies.length; i++) {
+      const e = enemies[i];
+      const dx = e.x - player.x;
+      const dy = e.y - player.y;
+      const distSq = dx * dx + dy * dy;
+      if (distSq < nearestDistSq) {
+        nearestDistSq = distSq;
+        nearest = e;
+      }
+    }
+
+    return nearest;
+  }
+
   private triggerWhip(
     w: WeaponInstance,
     player: Player,
+    enemies: Enemy[],
     grid: SpatialGrid<Enemy>,
     worldProps: WorldSystem,
     vfx: VFXManager,
@@ -226,34 +245,39 @@ export class WeaponSystem {
     onDropSpawn: (drop: Drop) => void
   ): void {
     sound.playWhip();
-    const facing = player.facingX < 0 ? -1 : 1;
+    const nearest = this.findNearestEnemy(player, enemies);
+    const angle = nearest
+      ? Math.atan2(nearest.y - player.y, nearest.x - player.x)
+      : Math.atan2(player.facingY, player.facingX);
+    const dirX = Math.cos(angle);
+    const dirY = Math.sin(angle);
     const baseDamage = (w.evolved ? 48 : 22 + w.level * 6) * player.might;
     const slashWidth = w.evolved ? 160 : 110 + w.level * 10;
     const slashHeight = w.evolved ? 70 : 50;
 
     // Front slash
     this.whipSlashes.push({
-      x: player.x + (slashWidth / 2) * facing,
-      y: player.y,
+      x: player.x + (slashWidth / 2) * dirX,
+      y: player.y + (slashWidth / 2) * dirY,
       width: slashWidth,
       height: slashHeight,
+      angle,
       life: 0.16,
       maxLife: 0.16,
       isEvolved: w.evolved,
-      direction: facing,
     });
 
     // Back slash if level >= 3 or evolved
     if (w.level >= 3 || w.evolved) {
       this.whipSlashes.push({
-        x: player.x - (slashWidth / 2) * facing,
-        y: player.y,
+        x: player.x - (slashWidth / 2) * dirX,
+        y: player.y - (slashWidth / 2) * dirY,
         width: slashWidth,
         height: slashHeight,
+        angle: angle + Math.PI,
         life: 0.16,
         maxLife: 0.16,
         isEvolved: w.evolved,
-        direction: -facing,
       });
     }
 
@@ -263,10 +287,14 @@ export class WeaponSystem {
 
     for (let i = 0; i < targets.length; i++) {
       const e = targets[i];
-      const inFront = facing > 0 ? e.x >= player.x - 10 && e.x <= player.x + slashWidth : e.x <= player.x + 10 && e.x >= player.x - slashWidth;
-      const inBack = (w.level >= 3 || w.evolved) && (facing > 0 ? e.x <= player.x + 10 && e.x >= player.x - slashWidth : e.x >= player.x - 10 && e.x <= player.x + slashWidth);
+      const dx = e.x - player.x;
+      const dy = e.y - player.y;
+      const along = dx * dirX + dy * dirY;
+      const perpendicular = -dx * dirY + dy * dirX;
+      const inFront = along >= -10 && along <= slashWidth;
+      const inBack = (w.level >= 3 || w.evolved) && along <= 10 && along >= -slashWidth;
 
-      if ((inFront || inBack) && Math.abs(e.y - player.y) <= slashHeight / 2 + e.radius) {
+      if ((inFront || inBack) && Math.abs(perpendicular) <= slashHeight / 2 + e.radius) {
         const isCrit = w.evolved && Math.random() < 0.35;
         const finalDmg = isCrit ? baseDamage * 2.2 : baseDamage;
         w.totalDamageDealt += finalDmg;
@@ -290,7 +318,11 @@ export class WeaponSystem {
     // Damage nearby torches
     for (let i = 0; i < worldProps.torches.length; i++) {
       const t = worldProps.torches[i];
-      if (Math.abs(t.x - player.x) <= slashWidth && Math.abs(t.y - player.y) <= slashHeight) {
+      const dx = t.x - player.x;
+      const dy = t.y - player.y;
+      const along = dx * dirX + dy * dirY;
+      const perpendicular = -dx * dirY + dy * dirX;
+      if (Math.abs(along) <= slashWidth && Math.abs(perpendicular) <= slashHeight) {
         worldProps.damageTorch(t, onDropSpawn);
       }
     }
@@ -341,11 +373,14 @@ export class WeaponSystem {
     sound.playShoot();
   }
 
-  private triggerKnife(w: WeaponInstance, player: Player, sound: SoundEngine): void {
+  private triggerKnife(w: WeaponInstance, player: Player, enemies: Enemy[], sound: SoundEngine): void {
     const projectileCount = w.evolved ? 4 : 1 + (w.level >= 2 ? 1 : 0) + (w.level >= 4 ? 1 : 0);
     const speed = w.evolved ? 550 : 420;
     const baseDamage = (w.evolved ? 24 : 12 + w.level * 3) * player.might;
-    const baseAngle = Math.atan2(player.facingY, player.facingX);
+    const nearest = this.findNearestEnemy(player, enemies);
+    const baseAngle = nearest
+      ? Math.atan2(nearest.y - player.y, nearest.x - player.x)
+      : Math.atan2(player.facingY, player.facingX);
 
     for (let i = 0; i < projectileCount; i++) {
       const spread = (i - (projectileCount - 1) / 2) * 0.14;
@@ -386,9 +421,14 @@ export class WeaponSystem {
     const count = w.evolved ? 4 : 1 + (w.level >= 2 ? 1 : 0) + (w.level >= 4 ? 1 : 0);
     const baseDamage = (w.evolved ? 80 : 40 + w.level * 12) * player.might;
     const aoeRadius = w.evolved ? 65 : 45;
+    const sortedTargets = [...enemies].sort((a, b) => {
+      const da = (a.x - player.x) ** 2 + (a.y - player.y) ** 2;
+      const db = (b.x - player.x) ** 2 + (b.y - player.y) ** 2;
+      return da - db;
+    });
 
     for (let i = 0; i < count; i++) {
-      const target = enemies[Math.floor(Math.random() * enemies.length)];
+      const target = sortedTargets[i % sortedTargets.length];
       if (!target) continue;
 
       this.lightningStrikes.push({
@@ -584,9 +624,11 @@ export class WeaponSystem {
 
       ctx.save();
       ctx.globalAlpha = alpha;
+      ctx.translate(screen.x, screen.y);
+      ctx.rotate(s.angle);
       ctx.fillStyle = s.isEvolved ? '#dc2626' : '#f59e0b';
       ctx.beginPath();
-      ctx.ellipse(screen.x, screen.y, s.width / 2, s.height / 2, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, 0, s.width / 2, s.height / 2, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 2;

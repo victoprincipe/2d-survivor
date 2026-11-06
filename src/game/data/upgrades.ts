@@ -27,7 +27,7 @@ export const WEAPON_REGISTRY: Record<WeaponId, WeaponMeta> = {
   whip: {
     id: 'whip',
     name: 'Chicote',
-    description: 'Golpeia horizontalmente perfurando inimigos.',
+    description: 'Golpeia automaticamente na direção do inimigo mais próximo.',
     maxLevel: 5,
     iconName: 'Flame',
     synergyPassive: 'heart',
@@ -35,7 +35,7 @@ export const WEAPON_REGISTRY: Record<WeaponId, WeaponMeta> = {
     evolvedName: 'Lágrima Sangrenta',
     evolvedDescription: 'Golpes críticos devastadores que regeneram HP ao acertar.',
     levelDescriptions: [
-      'Golpeia horizontalmente perfurando inimigos.',
+      'Golpeia automaticamente na direção do inimigo mais próximo.',
       'Dano base +25% e área de corte ampliada.',
       'Atinge também para trás simultaneamente!',
       'Dano base +30% e recarga acelerada.',
@@ -63,7 +63,7 @@ export const WEAPON_REGISTRY: Record<WeaponId, WeaponMeta> = {
   knife: {
     id: 'knife',
     name: 'Facas de Arremesso',
-    description: 'Arremessa adagas perfurantes na direção que você anda/olha.',
+    description: 'Arremessa adagas perfurantes no inimigo mais próximo.',
     maxLevel: 5,
     iconName: 'Sword',
     synergyPassive: 'bracer',
@@ -71,7 +71,7 @@ export const WEAPON_REGISTRY: Record<WeaponId, WeaponMeta> = {
     evolvedName: 'Mil Lâminas',
     evolvedDescription: 'Torrente infinita de adagas de alta velocidade perfurando qualquer monstro.',
     levelDescriptions: [
-      'Dispara 1 adaga rápida na direção do movimento.',
+      'Dispara 1 adaga rápida no inimigo mais próximo.',
       'Dispara +1 adaga em leque.',
       'Projéteis perfuram 1 inimigo adicional.',
       'Dispara +1 adaga (total 3 em cone).',
@@ -117,7 +117,7 @@ export const WEAPON_REGISTRY: Record<WeaponId, WeaponMeta> = {
   lightning: {
     id: 'lightning',
     name: 'Anel do Trovão',
-    description: 'Relâmpagos caem dos céus acertando inimigos aleatórios na tela.',
+    description: 'Relâmpagos caem dos céus acertando os inimigos mais próximos.',
     maxLevel: 5,
     iconName: 'Zap',
     synergyPassive: 'wings',
@@ -125,7 +125,7 @@ export const WEAPON_REGISTRY: Record<WeaponId, WeaponMeta> = {
     evolvedName: 'Loop do Trovão',
     evolvedDescription: 'Tempestades de relâmpagos duplicados que provocam explosões em cadeia.',
     levelDescriptions: [
-      '1 relâmpago atinge um inimigo aleatório com dano massivo.',
+      '1 relâmpago atinge o inimigo mais próximo com dano massivo.',
       'Atinge +1 alvo simultâneo.',
       'Área de impacto elétrico aumentada em +30%.',
       'Atinge +1 alvo simultâneo (total 3).',
