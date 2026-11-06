@@ -107,7 +107,7 @@ O título exibido é derivado da primeira linha do prompt; não há campo separa
 
 - Conta com pelo menos 7 dias.
 - 1 job ativo por usuário.
-- 3 jobs por dia por usuário; 20 no total.
+- 5 jobs por dia por usuário; 20 no total.
 - Fila máxima de 20.
 - Prompt de 20 a 1500 caracteres.
 

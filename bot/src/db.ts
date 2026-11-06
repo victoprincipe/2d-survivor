@@ -247,6 +247,18 @@ function since24h(): string {
   return new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 }
 
+function quotaCutoff(): string {
+  const since = since24h();
+  const reset = getSetting('quota_reset_at');
+  return reset && reset > since ? reset : since;
+}
+
+export function resetQuota(): string {
+  const now = new Date().toISOString();
+  setSetting('quota_reset_at', now);
+  return now;
+}
+
 export function countActiveByAuthor(authorId: string): number {
   const row = getDb()
     .prepare(
@@ -260,14 +272,14 @@ export function countActiveByAuthor(authorId: string): number {
 export function countTodayByAuthor(authorId: string): number {
   const row = getDb()
     .prepare('SELECT COUNT(*) AS total FROM jobs WHERE author_id = ? AND created_at >= ?')
-    .get(authorId, since24h()) as { total: number };
+    .get(authorId, quotaCutoff()) as { total: number };
   return row.total;
 }
 
 export function countTodayGlobal(): number {
   const row = getDb()
     .prepare('SELECT COUNT(*) AS total FROM jobs WHERE created_at >= ?')
-    .get(since24h()) as { total: number };
+    .get(quotaCutoff()) as { total: number };
   return row.total;
 }
 

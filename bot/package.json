@@ -16,6 +16,7 @@
     "typecheck": "tsc --noEmit",
     "db:init": "tsx src/scripts/db-init.ts",
     "db:status": "tsx src/scripts/queue-status.ts",
+    "quota:reset": "tsx src/scripts/reset-quota.ts",
     "check:commands": "tsx src/scripts/validate-commands.ts"
   },
   "dependencies": {
