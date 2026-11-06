@@ -21,6 +21,8 @@ import {
   Play,
   ShoppingBag,
   Info,
+  Crosshair,
+  Swords,
 } from 'lucide-react';
 
 interface StartScreenProps {
@@ -42,6 +44,12 @@ const POWERUP_ICONS: Record<string, React.ReactNode> = {
   recovery: <Zap className="w-4 h-4 text-emerald-400" />,
   speed: <Feather className="w-4 h-4 text-sky-400" />,
   greed: <Coins className="w-4 h-4 text-amber-400" />,
+};
+
+const CHARACTER_ICONS: Record<string, React.ReactNode> = {
+  antonio: <Crosshair className="w-6 h-6 text-white/90 drop-shadow" />,
+  imelda: <Sparkles className="w-6 h-6 text-white/90 drop-shadow" />,
+  gennaro: <Swords className="w-6 h-6 text-white/90 drop-shadow" />,
 };
 
 export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame, onUpdateSave }) => {
@@ -162,14 +170,13 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
                     }`}
                   >
                     <div>
-                      {/* Character avatar circle */}
+                      {/* Character avatar with icon */}
                       <div
                         className="w-12 h-12 rounded-xl mb-3 flex items-center justify-center border shadow-inner"
                         style={{ backgroundColor: char.color, borderColor: char.portraitColor }}
                       >
-                        <div className="w-4 h-4 rounded-full bg-slate-900/60" />
+                        {CHARACTER_ICONS[char.id]}
                       </div>
-
                       <h3 className="font-black text-white text-base">{char.name}</h3>
                       <p className="text-amber-400 text-[11px] font-semibold mb-2">{char.title}</p>
                       <p className="text-slate-400 text-xs leading-relaxed">{char.description}</p>
