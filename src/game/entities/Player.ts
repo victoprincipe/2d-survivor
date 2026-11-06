@@ -35,9 +35,15 @@ export class Player {
   public isMoving: boolean = false;
 
   public character: CharacterConfig;
+  private spriteImage: HTMLImageElement | null = null;
 
   constructor(character: CharacterConfig, initialPowerUps: { might?: number; armor?: number; maxHp?: number; recovery?: number; speed?: number; greed?: number } = {}) {
     this.character = character;
+
+    if (character.sprite && typeof window !== 'undefined') {
+      this.spriteImage = new Image();
+      this.spriteImage.src = character.sprite;
+    }
 
     // Apply character base modifiers
     const b = character.statBonuses;
@@ -142,39 +148,47 @@ export class Player {
     const flip = this.facingX < 0 ? -1 : 1;
     ctx.scale(flip, 1);
 
-    // Cape / Back detail
-    ctx.fillStyle = '#1a1a24';
-    ctx.beginPath();
-    ctx.moveTo(-10, bob);
-    ctx.lineTo(-14, 14 + bob);
-    ctx.lineTo(-2, 10 + bob);
-    ctx.fill();
+    const sprite = this.spriteImage;
+    if (sprite && sprite.complete && sprite.naturalWidth > 0) {
+      // Character sprite
+      const spriteHeight = 52;
+      const spriteWidth = spriteHeight * (sprite.naturalWidth / sprite.naturalHeight);
+      ctx.drawImage(sprite, -spriteWidth / 2, 14 - spriteHeight + bob, spriteWidth, spriteHeight);
+    } else {
+      // Cape / Back detail
+      ctx.fillStyle = '#1a1a24';
+      ctx.beginPath();
+      ctx.moveTo(-10, bob);
+      ctx.lineTo(-14, 14 + bob);
+      ctx.lineTo(-2, 10 + bob);
+      ctx.fill();
 
-    // Body / Robe
-    ctx.fillStyle = this.character.color;
-    ctx.beginPath();
-    ctx.roundRect(-10, -6 + bob, 20, 20, 6);
-    ctx.fill();
+      // Body / Robe
+      ctx.fillStyle = this.character.color;
+      ctx.beginPath();
+      ctx.roundRect(-10, -6 + bob, 20, 20, 6);
+      ctx.fill();
 
-    // Belt / Trim
-    ctx.fillStyle = '#f4a261';
-    ctx.fillRect(-10, 4 + bob, 20, 3);
+      // Belt / Trim
+      ctx.fillStyle = '#f4a261';
+      ctx.fillRect(-10, 4 + bob, 20, 3);
 
-    // Head
-    ctx.fillStyle = '#ffdbac';
-    ctx.beginPath();
-    ctx.arc(0, -12 + bob, 9, 0, Math.PI * 2);
-    ctx.fill();
+      // Head
+      ctx.fillStyle = '#ffdbac';
+      ctx.beginPath();
+      ctx.arc(0, -12 + bob, 9, 0, Math.PI * 2);
+      ctx.fill();
 
-    // Hair / Hood
-    ctx.fillStyle = this.character.portraitColor;
-    ctx.beginPath();
-    ctx.arc(0, -14 + bob, 10, Math.PI * 0.8, Math.PI * 2.2);
-    ctx.fill();
+      // Hair / Hood
+      ctx.fillStyle = this.character.portraitColor;
+      ctx.beginPath();
+      ctx.arc(0, -14 + bob, 10, Math.PI * 0.8, Math.PI * 2.2);
+      ctx.fill();
 
-    // Eyes
-    ctx.fillStyle = '#111827';
-    ctx.fillRect(2, -14 + bob, 3, 3);
+      // Eyes
+      ctx.fillStyle = '#111827';
+      ctx.fillRect(2, -14 + bob, 3, 3);
+    }
 
     ctx.restore();
     ctx.globalAlpha = 1.0;
@@ -183,7 +197,7 @@ export class Player {
     const barWidth = 36;
     const barHeight = 5;
     const barX = screen.x - barWidth / 2;
-    const barY = screen.y - 30;
+    const barY = screen.y - (sprite ? 46 : 30);
 
     ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
     ctx.fillRect(barX, barY, barWidth, barHeight);

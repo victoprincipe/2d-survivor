@@ -35,6 +35,7 @@ export interface CharacterConfig {
   iconName: string;
   color: string;
   portraitColor: string;
+  sprite?: string;
   statBonuses: {
     maxHp?: number;
     speed?: number;

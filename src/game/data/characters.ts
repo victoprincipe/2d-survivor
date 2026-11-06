@@ -55,6 +55,7 @@ export const CHARACTERS: CharacterConfig[] = [
     iconName: 'Dumbbell',
     color: '#2d6a4f',
     portraitColor: '#1b4332',
+    sprite: '/kayrurururu.png',
     statBonuses: {
       maxHp: 25,
       might: 0.12,

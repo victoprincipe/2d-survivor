@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Image from 'next/image';
 import { CharacterConfig, SavedGameData } from '@/game/types';
 import { CHARACTERS } from '@/game/data/characters';
 import { POWER_UP_DEFINITIONS, getPowerUpCost, saveGameData } from '@/game/data/persistence';
@@ -181,7 +182,17 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
                         className="w-12 h-12 rounded-xl mb-3 flex items-center justify-center border shadow-inner"
                         style={{ backgroundColor: char.color, borderColor: char.portraitColor }}
                       >
-                        {CHARACTER_ICONS[char.iconName] ?? <Sword className="w-6 h-6 text-white/90 drop-shadow" />}
+                        {char.sprite ? (
+                          <Image
+                            src={char.sprite}
+                            alt={char.name}
+                            width={48}
+                            height={55}
+                            className="w-full h-full object-contain drop-shadow"
+                          />
+                        ) : (
+                          CHARACTER_ICONS[char.iconName] ?? <Sword className="w-6 h-6 text-white/90 drop-shadow" />
+                        )}
                       </div>
                       <h3 className="font-black text-white text-base">{char.name}</h3>
                       <p className="text-amber-400 text-[11px] font-semibold mb-2">{char.title}</p>
