@@ -83,7 +83,9 @@ cp .env.example .env
 | `AGENT_PLANNER_MODEL` | não | modelo do planejador; vazio usa `AGENT_MODEL` |
 | `MAX_PROMPT_IMAGES` | não | imagens por prompt (padrão: 3) |
 | `MAX_IMAGE_MB` | não | tamanho máximo por imagem (padrão: 8) |
-| `IMAGE_RETENTION_DAYS` | não | dias antes de apagar as imagens locais (padrão: 7) |
+| `MAX_PROMPT_AUDIOS` | não | áudios por prompt (padrão: 3) |
+| `MAX_AUDIO_MB` | não | tamanho máximo por áudio (padrão: 10) |
+| `IMAGE_RETENTION_DAYS` | não | dias antes de apagar os anexos locais (padrão: 7) |
 | `DAILY_PLAN_LIMIT` | não | planos por dia por usuário (padrão: 10) |
 | `MAX_ACTIVE_PLANS_PER_USER` | não | planos em andamento por usuário (padrão: 1) |
 | `PLAN_QUEUE_LIMIT` | não | planos na fila (padrão: 10) |
@@ -109,17 +111,18 @@ Use **`/implementar prompt:<texto>`** em qualquer canal do servidor. Não há mo
 
 A partir daí o fluxo é automático.
 
-## Imagens nos prompts
+## Imagens e áudios nos prompts
 
-Você pode anexar até **3 imagens** (PNG, JPEG, GIF ou WebP) de até **8 MB** cada. O texto é opcional quando há imagem.
+Você pode anexar até **3 imagens** (PNG, JPEG, GIF ou WebP) de até **8 MB** cada e até **3 áudios** (MP3, WAV, OGG/OPUS, M4A/AAC, FLAC ou WebM) de até **10 MB** cada. O texto é opcional quando há imagem ou áudio.
 
 - O bot baixa os anexos para `bot/data/assets/message-<id>/` e guarda os metadados no SQLite.
-- O worker copia as imagens para `.job-assets/` dentro do clone, anexa a primeira com `--file` e o agente lê as demais com a ferramenta `read`.
-- Jobs com imagem usam automaticamente `AGENT_VISION_MODEL` (padrão: `opencode/nemotron-3.5-super-vl-free`), porque modelos text-only rejeitam imagens.
+- O worker copia os anexos para `.job-assets/` dentro do clone; a primeira imagem é anexada com `--file` e o agente lê as demais com a ferramenta `read`.
+- Jobs com imagem usam automaticamente `AGENT_VISION_MODEL`, porque modelos text-only rejeitam imagens.
 - **Referência visual** (mockup, print, estilo): o agente usa como guia e não copia o arquivo.
-- **Asset do jogo** (sprite, ícone, fundo): o agente copia para `public/` e referencia no código; só isso entra no commit.
+- **Asset do jogo** (sprite, ícone, fundo, textura, música, efeito sonoro): o agente copia para `public/` e referencia no código; só isso entra no commit.
+- **Áudio como referência falada:** o modelo não ouve/transcreve áudio. Escreva no prompt o conteúdo ou a instrução; o arquivo fica disponível como asset/referência.
 - `.job-assets/` é excluído do git e apagado depois do job.
-- As pastas em `bot/data/assets/` são removidas após `IMAGE_RETENTION_DAYS` dias; depois disso, `/reprocessar` pede que você reenvie as imagens.
+- As pastas em `bot/data/assets/` são removidas após `IMAGE_RETENTION_DAYS` dias; depois disso, `/reprocessar` pede que você reenvie os anexos.
 
 ## Planejamento (`/planejar`)
 
@@ -139,9 +142,9 @@ O planejador não altera o código: a única escrita permitida é em `.plan-arti
 
 | Comando | Quem | O que faz |
 |---|---|---|
-| `/implementar prompt:<texto>` | membros com quota | envia uma implementação sem modal; aceita uma imagem opcional |
+| `/implementar prompt:<texto>` | membros com quota | envia uma implementação sem modal; aceita imagem e até 3 áudios opcionais |
 | `/implementar plano:<id>` | autor do plano ou `Manage Server` | implementa um plano aprovado |
-| `/planejar prompt:<texto>` | membros com quota | gera `PLAN.md`/`TASKS.md` para aprovação |
+| `/planejar prompt:<texto>` | membros com quota | gera `PLAN.md`/`TASKS.md` para aprovação; aceita imagem/áudios |
 | `/fila` | todos | estado da fila, worker e repo local |
 | `/minhas-implementacoes` | todos | suas implementações |
 | `/ultimas-implementacoes` | todos | últimas do servidor |
@@ -155,7 +158,7 @@ O título exibido é derivado da primeira linha do prompt; não há campo separa
 - 1 job ativo por usuário.
 - 15 jobs por dia por usuário; 20 no total.
 - Fila máxima de 20.
-- Prompt de 20 a 1500 caracteres; com imagens, o texto é opcional e pode ter até 1500 caracteres.
+- Prompt de 20 a 1500 caracteres; com imagens ou áudios, o texto é opcional e pode ter até 1500 caracteres.
 - Planejamentos: 10 por dia, 1 ativo por usuário e fila de 10 (não contam nos 15 jobs).
 
 ## Status
@@ -172,7 +175,7 @@ O título exibido é derivado da primeira linha do prompt; não há campo separa
 
 1. Clona `origin/master` em `../.2d-survivor-worktrees/job-<id>`.
 2. Cria a branch `implementacao/<id>`.
-3. Copia as imagens do job para `.job-assets/` (fora do git) e escolhe o modelo de visão quando houver imagem.
+3. Copia os anexos do job para `.job-assets/` (fora do git) e escolhe o modelo de visão quando houver imagem.
 4. Roda o OpenCode com `HOME`, banco e `PWD` isolados (não herda config global, MCPs nem modelo).
 5. Roda `npm run build` e depois `npm run lint`.
 6. Commita e envia a branch `implementacao/<id>` para o origin.
@@ -238,7 +241,7 @@ bot/
 - **Bot não responde**: rode `npm run deploy`; confira `applications.commands`.
 - **`auth.json do OpenCode não encontrado`**: rode `opencode auth login` e reinicie o worker.
 - **Comandos não aparecem**: rode `npm run deploy` e confira `GUILD_ID`; o bot precisa do escopo `applications.commands`.
-- **Imagem rejeitada**: confira formato (PNG/JPEG/GIF/WebP), tamanho (8 MB) e quantidade (3). Se o job falhar com “imagem não encontrada”, as imagens expiraram: reenvie o prompt.
+- **Imagem/áudio rejeitado**: confira formato, tamanho e quantidade. Se o job falhar com “anexo não encontrado”, os arquivos expiraram: reenvie o prompt.
 - **Job com imagem falha no modelo**: confira `AGENT_VISION_MODEL` (`opencode models`); modelos text-only não aceitam imagem.
 - **Plano falhou**: veja `bot/data/logs/plan-<id>-planner.log` e o erro na mensagem do plano. Ajuste `AGENT_PLANNER_MODEL` se o modelo não estiver gerando os artefatos.
 - **Build falha em todo job**: rode `npm run build` na raiz. Se for só lint antigo, use `LINT_STRICT=false`.

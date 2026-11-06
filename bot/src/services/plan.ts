@@ -5,11 +5,16 @@ import { paths } from '../config';
 import {
   JobAttachment,
   Plan,
+  attachmentKind,
   createPlan,
   getPlanQueuePosition,
 } from '../db';
 import { createLogger } from '../logger';
-import { downloadImages, validateImageMetadata } from './attachments';
+import {
+  downloadAttachments,
+  validateAudioMetadata,
+  validateImageMetadata,
+} from './attachments';
 import { cleanText, deriveTitle, validatePrompt } from './moderation';
 import { checkAccountAge, checkPlanQuota } from './quotas';
 import { truncate } from '../ui/embeds';
@@ -22,6 +27,7 @@ export interface SubmitPlanInput {
   authorCreatedAt: Date;
   prompt: string;
   images: Attachment[];
+  audios: Attachment[];
   hasRole: boolean;
   /** ID da interação; usado para nomear a pasta de assets. */
   submissionId: string;
@@ -39,6 +45,12 @@ export async function submitPlan(input: SubmitPlanInput): Promise<Plan | null> {
   const imageError = validateImageMetadata(input.images);
   if (imageError) {
     await input.reply(imageError);
+    return null;
+  }
+
+  const audioError = validateAudioMetadata(input.audios);
+  if (audioError) {
+    await input.reply(audioError);
     return null;
   }
 
@@ -66,13 +78,17 @@ export async function submitPlan(input: SubmitPlanInput): Promise<Plan | null> {
   }
 
   let attachments: JobAttachment[] = [];
-  if (input.images.length > 0) {
+  if (input.images.length > 0 || input.audios.length > 0) {
     try {
-      attachments = await downloadImages(input.submissionId, input.images);
+      attachments = await downloadAttachments(
+        input.submissionId,
+        input.images,
+        input.audios,
+      );
     } catch (error) {
-      log.error(`Falha ao baixar imagens do plano ${input.submissionId}: ${String(error)}`);
+      log.error(`Falha ao baixar anexos do plano ${input.submissionId}: ${String(error)}`);
       await input.reply(
-        `Não consegui baixar as imagens: ${truncate(String(error), 300)}`,
+        `Não consegui baixar os anexos: ${truncate(String(error), 300)}`,
       );
       return null;
     }
@@ -91,9 +107,17 @@ export async function submitPlan(input: SubmitPlanInput): Promise<Plan | null> {
     });
 
     const position = getPlanQueuePosition(plan.id);
-    const imageHint = attachments.length > 0 ? ` ${attachments.length} imagem(ns).` : '';
+    const imageCount = attachments.filter(
+      (attachment) => attachmentKind(attachment) === 'image',
+    ).length;
+    const audioCount = attachments.length - imageCount;
+    const parts: string[] = [];
+    if (imageCount > 0) parts.push(`${imageCount} imagem(ns)`);
+    if (audioCount > 0) parts.push(`${audioCount} áudio(s)`);
+    const attachmentHint =
+      parts.length > 0 ? ` ${parts.join(' e ')}.` : '';
     await input.reply(
-      `Plano #${plan.id} na fila — posição ${position}.${imageHint} O plano será publicado para aprovação.`,
+      `Plano #${plan.id} na fila — posição ${position}.${attachmentHint} O plano será publicado para aprovação.`,
     );
 
     return plan;

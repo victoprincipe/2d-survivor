@@ -24,6 +24,8 @@ export interface JobAttachment {
   size: number;
   /** URL original do CDN do Discord (pode expirar). */
   url?: string;
+  /** Tipo do anexo; ausente em registros antigos (inferido pelo contentType). */
+  kind?: 'image' | 'audio';
 }
 
 export interface Job {
@@ -219,6 +221,13 @@ export function jobAttachments(job: Job): JobAttachment[] {
 
 export function planAttachments(plan: Plan): JobAttachment[] {
   return parseAttachments(plan.attachments);
+}
+
+export function attachmentKind(attachment: JobAttachment): 'image' | 'audio' {
+  if (attachment.kind === 'image' || attachment.kind === 'audio') {
+    return attachment.kind;
+  }
+  return (attachment.contentType ?? '').startsWith('audio/') ? 'audio' : 'image';
 }
 
 export function getDb(): Database.Database {

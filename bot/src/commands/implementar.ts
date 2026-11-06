@@ -1,4 +1,5 @@
 import {
+  Attachment,
   ChatInputCommandInteraction,
   MessageFlags,
   PermissionFlagsBits,
@@ -31,6 +32,24 @@ export const data = new SlashCommandBuilder()
       .setName('imagem')
       .setDescription('Imagem de referência ou asset (opcional, até 8 MB)')
       .setRequired(false),
+  )
+  .addAttachmentOption((option) =>
+    option
+      .setName('audio')
+      .setDescription('Áudio de referência ou asset (opcional, até 10 MB)')
+      .setRequired(false),
+  )
+  .addAttachmentOption((option) =>
+    option
+      .setName('audio2')
+      .setDescription('Segundo áudio opcional (até 10 MB)')
+      .setRequired(false),
+  )
+  .addAttachmentOption((option) =>
+    option
+      .setName('audio3')
+      .setDescription('Terceiro áudio opcional (até 10 MB)')
+      .setRequired(false),
   );
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -39,10 +58,13 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   const planId = interaction.options.getInteger('plano');
   const prompt = (interaction.options.getString('prompt') ?? '').trim();
   const image = interaction.options.getAttachment('imagem');
+  const audios = ['audio', 'audio2', 'audio3']
+    .map((name) => interaction.options.getAttachment(name))
+    .filter((attachment): attachment is Attachment => attachment !== null);
 
-  if (!planId && prompt.length < 20) {
+  if (!planId && prompt.length < 20 && !image && audios.length === 0) {
     await interaction.editReply(
-      'Informe um prompt com pelo menos 20 caracteres ou use `plano:<id>` com um plano aprovado.',
+      'Informe um prompt com pelo menos 20 caracteres, anexe uma imagem/áudio ou use `plano:<id>`.',
     );
     return;
   }
@@ -76,6 +98,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     authorCreatedAt: interaction.user.createdAt,
     prompt,
     images: image ? [image] : [],
+    audios,
     hasRole: await hasSubmitterRoleForInteraction(interaction),
     planId: plan?.id,
     titleOverride: plan ? `Plano #${plan.id} — ${plan.title}` : undefined,

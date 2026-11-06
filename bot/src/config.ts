@@ -60,6 +60,11 @@ export const imageConfig = {
   retentionDays: Math.max(1, readInt('IMAGE_RETENTION_DAYS', 7)),
 };
 
+export const audioConfig = {
+  maxCount: Math.min(10, Math.max(1, readInt('MAX_PROMPT_AUDIOS', 3))),
+  maxBytes: Math.max(1, readInt('MAX_AUDIO_MB', 10)) * 1024 * 1024,
+};
+
 export const planConfig = {
   dailyUserLimit: Math.max(1, readInt('DAILY_PLAN_LIMIT', 10)),
   maxActivePerUser: Math.max(1, readInt('MAX_ACTIVE_PLANS_PER_USER', 1)),

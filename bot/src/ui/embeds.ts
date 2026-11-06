@@ -9,7 +9,9 @@ import {
   JobStatus,
   Plan,
   PlanStatus,
+  attachmentKind,
   jobAttachments,
+  planAttachments,
 } from '../db';
 import { shortSha } from '../git';
 
@@ -112,13 +114,30 @@ export function jobEmbed(job: Job): EmbedBuilder {
   }
 
   if (attachments.length > 0) {
-    const names = attachments
-      .map((attachment) => truncate(attachment.name, 40))
-      .join(', ');
-    fields.push({
-      name: `Imagens (${attachments.length})`,
-      value: truncate(names, 1000),
-    });
+    const images = attachments.filter(
+      (attachment) => attachmentKind(attachment) === 'image',
+    );
+    const audios = attachments.filter(
+      (attachment) => attachmentKind(attachment) === 'audio',
+    );
+    if (images.length > 0) {
+      fields.push({
+        name: `Imagens (${images.length})`,
+        value: truncate(
+          images.map((attachment) => truncate(attachment.name, 40)).join(', '),
+          1000,
+        ),
+      });
+    }
+    if (audios.length > 0) {
+      fields.push({
+        name: `Áudios (${audios.length})`,
+        value: truncate(
+          audios.map((attachment) => truncate(attachment.name, 40)).join(', '),
+          1000,
+        ),
+      });
+    }
   }
 
   if (job.summary) {
@@ -145,7 +164,10 @@ export function jobEmbed(job: Job): EmbedBuilder {
     .setFooter({ text: `job #${job.id} • ${job.kind}` })
     .setTimestamp(new Date(job.created_at));
 
-  const thumbnail = attachments.find((attachment) => attachment.url)?.url;
+  const thumbnail = attachments.find(
+    (attachment) =>
+      attachmentKind(attachment) === 'image' && Boolean(attachment.url),
+  )?.url;
   if (thumbnail && /^https?:\/\//i.test(thumbnail)) {
     embed.setThumbnail(thumbnail);
   }
@@ -165,6 +187,18 @@ export function planEmbed(plan: Plan): EmbedBuilder {
       name: 'Artefatos',
       value: '`PLAN.md` e `TASKS.md` anexados nesta mensagem.',
     });
+  }
+
+  const inputs = planAttachments(plan);
+  if (inputs.length > 0) {
+    const images = inputs.filter(
+      (attachment) => attachmentKind(attachment) === 'image',
+    ).length;
+    const audios = inputs.length - images;
+    const parts: string[] = [];
+    if (images > 0) parts.push(`${images} imagem(ns)`);
+    if (audios > 0) parts.push(`${audios} áudio(s)`);
+    fields.push({ name: 'Anexos de entrada', value: parts.join(' e ') });
   }
 
   if (plan.reviewed_at) {

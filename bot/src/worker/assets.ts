@@ -52,8 +52,8 @@ export function copyAssets(
   for (const attachment of attachments) {
     if (!fs.existsSync(attachment.file)) {
       throw new Error(
-        `Imagem "${attachment.name}" do ${label} não encontrada em ${attachment.file}. ` +
-          'Ela pode ter expirado; reenvie o prompt com as imagens.',
+        `Anexo "${attachment.name}" do ${label} não encontrado em ${attachment.file}. ` +
+          'Ele pode ter expirado; reenvie o prompt com os anexos.',
       );
     }
 

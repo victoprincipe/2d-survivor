@@ -1,4 +1,5 @@
 import {
+  Attachment,
   ChatInputCommandInteraction,
   MessageFlags,
   SlashCommandBuilder,
@@ -23,6 +24,24 @@ export const data = new SlashCommandBuilder()
       .setName('imagem')
       .setDescription('Imagem de referência (opcional, até 8 MB)')
       .setRequired(false),
+  )
+  .addAttachmentOption((option) =>
+    option
+      .setName('audio')
+      .setDescription('Áudio de referência ou asset (opcional, até 10 MB)')
+      .setRequired(false),
+  )
+  .addAttachmentOption((option) =>
+    option
+      .setName('audio2')
+      .setDescription('Segundo áudio opcional (até 10 MB)')
+      .setRequired(false),
+  )
+  .addAttachmentOption((option) =>
+    option
+      .setName('audio3')
+      .setDescription('Terceiro áudio opcional (até 10 MB)')
+      .setRequired(false),
   );
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -30,6 +49,9 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
   const prompt = interaction.options.getString('prompt', true);
   const image = interaction.options.getAttachment('imagem');
+  const audios = ['audio', 'audio2', 'audio3']
+    .map((name) => interaction.options.getAttachment(name))
+    .filter((attachment): attachment is Attachment => attachment !== null);
 
   await submitPlan({
     authorId: interaction.user.id,
@@ -37,6 +59,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     authorCreatedAt: interaction.user.createdAt,
     prompt,
     images: image ? [image] : [],
+    audios,
     hasRole: await hasSubmitterRoleForInteraction(interaction),
     submissionId: interaction.id,
     reply: async (content) => {

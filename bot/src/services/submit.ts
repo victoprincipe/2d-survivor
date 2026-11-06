@@ -4,12 +4,17 @@ import { Attachment, Client, TextChannel } from 'discord.js';
 import { discordConfig, paths } from '../config';
 import {
   JobAttachment,
+  attachmentKind,
   createJob,
   getQueuePosition,
   updateJob,
 } from '../db';
 import { createLogger } from '../logger';
-import { downloadImages, validateImageMetadata } from './attachments';
+import {
+  downloadAttachments,
+  validateAudioMetadata,
+  validateImageMetadata,
+} from './attachments';
 import { cleanText, deriveTitle, validatePrompt } from './moderation';
 import { checkAccountAge, checkSubmissionQuota } from './quotas';
 import { jobEmbed, truncate } from '../ui/embeds';
@@ -23,6 +28,7 @@ export interface SubmitImplementationInput {
   authorCreatedAt: Date;
   prompt: string;
   images: Attachment[];
+  audios: Attachment[];
   hasRole: boolean;
   /** Plano aprovado que originou a implementação. */
   planId?: number;
@@ -49,15 +55,22 @@ export async function submitImplementation(
 ): Promise<SubmissionResult | null> {
   const prompt = cleanText(input.prompt);
   const images = input.images;
+  const audios = input.audios;
 
-  if (prompt.length === 0 && images.length === 0 && !input.planId) {
-    await input.reply('Escreva uma descrição ou anexe uma imagem.');
+  if (prompt.length === 0 && images.length === 0 && audios.length === 0 && !input.planId) {
+    await input.reply('Escreva uma descrição ou anexe uma imagem/áudio.');
     return null;
   }
 
   const imageError = validateImageMetadata(images);
   if (imageError) {
     await input.reply(imageError);
+    return null;
+  }
+
+  const audioError = validateAudioMetadata(audios);
+  if (audioError) {
+    await input.reply(audioError);
     return null;
   }
 
@@ -78,20 +91,24 @@ export async function submitImplementation(
     return null;
   }
 
-  const validation = validatePrompt(prompt, images.length, Boolean(input.planId));
+  const validation = validatePrompt(
+    prompt,
+    images.length,
+    Boolean(input.planId) || audios.length > 0,
+  );
   if (!validation.ok) {
     await input.reply(validation.reason ?? 'Implementação inválida.');
     return null;
   }
 
   let attachments: JobAttachment[] = [];
-  if (images.length > 0) {
+  if (images.length > 0 || audios.length > 0) {
     try {
-      attachments = await downloadImages(input.submissionId, images);
+      attachments = await downloadAttachments(input.submissionId, images, audios);
     } catch (error) {
-      log.error(`Falha ao baixar imagens do envio ${input.submissionId}: ${String(error)}`);
+      log.error(`Falha ao baixar anexos do envio ${input.submissionId}: ${String(error)}`);
       await input.reply(
-        `Não consegui baixar as imagens: ${truncate(String(error), 300)}`,
+        `Não consegui baixar os anexos: ${truncate(String(error), 300)}`,
       );
       return null;
     }
@@ -145,12 +162,17 @@ export async function submitImplementation(
 
     const position = getQueuePosition(job.id);
     const threadHint = threadId ? ` Acompanhe: <#${threadId}>.` : '';
-    const imageHint =
-      attachments.length > 0
-        ? ` ${attachments.length} imagem(ns) anexada(s).`
-        : '';
+    const imageCount = attachments.filter(
+      (attachment) => attachmentKind(attachment) === 'image',
+    ).length;
+    const audioCount = attachments.length - imageCount;
+    const parts: string[] = [];
+    if (imageCount > 0) parts.push(`${imageCount} imagem(ns)`);
+    if (audioCount > 0) parts.push(`${audioCount} áudio(s)`);
+    const attachmentHint =
+      parts.length > 0 ? ` ${parts.join(' e ')} anexado(s).` : '';
     await input.reply(
-      `Implementação #${job.id} na fila — posição ${position}.${imageHint}${threadHint}`,
+      `Implementação #${job.id} na fila — posição ${position}.${attachmentHint}${threadHint}`,
     );
 
     return {
