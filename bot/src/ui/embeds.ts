@@ -1,5 +1,16 @@
-import { EmbedBuilder } from 'discord.js';
-import { Job, JobStatus, jobAttachments } from '../db';
+import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  EmbedBuilder,
+} from 'discord.js';
+import {
+  Job,
+  JobStatus,
+  Plan,
+  PlanStatus,
+  jobAttachments,
+} from '../db';
 import { shortSha } from '../git';
 
 const STATUS_LABEL: Record<JobStatus, string> = {
@@ -24,6 +35,26 @@ const STATUS_COLOR: Record<JobStatus, number> = {
   reverted: 0x9b59b6,
 };
 
+const PLAN_STATUS_LABEL: Record<PlanStatus, string> = {
+  queued: 'Na fila',
+  running: 'Planejando',
+  ready: 'Aguardando aprovação',
+  approved: 'Aprovado',
+  rejected: 'Rejeitado',
+  failed: 'Falhou',
+  cancelled: 'Cancelado',
+};
+
+const PLAN_STATUS_COLOR: Record<PlanStatus, number> = {
+  queued: 0x95a5a6,
+  running: 0x3498db,
+  ready: 0xf1c40f,
+  approved: 0x2ecc71,
+  rejected: 0xe74c3c,
+  failed: 0xe74c3c,
+  cancelled: 0x7f8c8d,
+};
+
 export function truncate(value: string, max: number): string {
   return value.length <= max ? value : `${value.slice(0, Math.max(0, max - 1))}…`;
 }
@@ -34,6 +65,14 @@ export function statusLabel(status: JobStatus): string {
 
 export function statusColor(status: JobStatus): number {
   return STATUS_COLOR[status] ?? 0x95a5a6;
+}
+
+export function planStatusLabel(status: PlanStatus): string {
+  return PLAN_STATUS_LABEL[status] ?? status;
+}
+
+export function planStatusColor(status: PlanStatus): number {
+  return PLAN_STATUS_COLOR[status] ?? 0x95a5a6;
 }
 
 export function discordTimestamp(iso: string | null): string {
@@ -68,6 +107,10 @@ export function jobEmbed(job: Job): EmbedBuilder {
     },
   ];
 
+  if (job.plan_id !== null) {
+    fields.push({ name: 'Plano', value: `#${job.plan_id}`, inline: true });
+  }
+
   if (attachments.length > 0) {
     const names = attachments
       .map((attachment) => truncate(attachment.name, 40))
@@ -94,7 +137,9 @@ export function jobEmbed(job: Job): EmbedBuilder {
     .setDescription(
       job.prompt
         ? truncate(job.prompt, 3500)
-        : '(sem descrição — use as imagens como referência)',
+        : job.plan_id !== null
+          ? `(implementação do plano #${job.plan_id})`
+          : '(sem descrição — use as imagens como referência)',
     )
     .addFields(fields)
     .setFooter({ text: `job #${job.id} • ${job.kind}` })
@@ -106,6 +151,63 @@ export function jobEmbed(job: Job): EmbedBuilder {
   }
 
   return embed;
+}
+
+export function planEmbed(plan: Plan): EmbedBuilder {
+  const fields: Array<{ name: string; value: string; inline?: boolean }> = [
+    { name: 'Autor', value: `<@${plan.author_id}>`, inline: true },
+    { name: 'Status', value: planStatusLabel(plan.status), inline: true },
+    { name: 'Criado', value: discordTimestamp(plan.created_at), inline: true },
+  ];
+
+  if (plan.plan_md && plan.tasks_md) {
+    fields.push({
+      name: 'Artefatos',
+      value: '`PLAN.md` e `TASKS.md` anexados nesta mensagem.',
+    });
+  }
+
+  if (plan.reviewed_at) {
+    const who = plan.reviewed_by ? `<@${plan.reviewed_by}>` : '—';
+    fields.push({
+      name: 'Revisão',
+      value: `${who} ${discordTimestamp(plan.reviewed_at)}`,
+    });
+  }
+
+  if (plan.error) {
+    fields.push({ name: 'Erro', value: truncate(plan.error, 1000) });
+  }
+
+  const hint =
+    plan.status === 'ready'
+      ? '\n\nUse os botões **Aprovar** ou **Rejeitar** abaixo.'
+      : plan.status === 'approved'
+        ? `\n\nPlano aprovado. Use \`/implementar plano:${plan.id}\` para implementar.`
+        : '';
+
+  return new EmbedBuilder()
+    .setColor(planStatusColor(plan.status))
+    .setTitle(truncate(`Plano #${plan.id} — ${plan.title}`, 250))
+    .setDescription(truncate(`${plan.prompt}${hint}`, 3800))
+    .addFields(fields)
+    .setFooter({ text: `plano #${plan.id}` })
+    .setTimestamp(new Date(plan.created_at));
+}
+
+export function planComponents(planId: number): ActionRowBuilder<ButtonBuilder>[] {
+  return [
+    new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`plan:approve:${planId}`)
+        .setLabel('Aprovar')
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
+        .setCustomId(`plan:reject:${planId}`)
+        .setLabel('Rejeitar')
+        .setStyle(ButtonStyle.Danger),
+    ),
+  ];
 }
 
 export function jobLine(job: Job): string {

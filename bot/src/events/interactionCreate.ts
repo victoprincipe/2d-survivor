@@ -1,6 +1,7 @@
 import { Events, Interaction, MessageFlags } from 'discord.js';
 import { commandMap } from '../commands';
 import { createLogger } from '../logger';
+import { handlePlanButton } from './planButtons';
 
 const log = createLogger('interaction');
 
@@ -25,6 +26,18 @@ export async function execute(interaction: Interaction): Promise<void> {
       }
 
       await command.execute(interaction);
+      return;
+    }
+
+    if (interaction.isButton()) {
+      const match = /^plan:(approve|reject):(\d+)$/.exec(interaction.customId);
+      if (match) {
+        await handlePlanButton(
+          interaction,
+          match[1] as 'approve' | 'reject',
+          Number(match[2]),
+        );
+      }
       return;
     }
   } catch (error) {

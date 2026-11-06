@@ -50,12 +50,21 @@ export const paths = {
   agentConfig: path.join(dataDir, 'agent-home', '.config', 'opencode', 'opencode.json'),
   opencodeDb: path.join(dataDir, 'opencode-worker.db'),
   assets: path.join(dataDir, 'assets'),
+  plans: path.join(dataDir, 'plans'),
+  plannerConfigSource: path.join(botDir, 'agent', 'planner.json'),
 };
 
 export const imageConfig = {
   maxCount: Math.min(10, Math.max(1, readInt('MAX_PROMPT_IMAGES', 3))),
   maxBytes: Math.max(1, readInt('MAX_IMAGE_MB', 8)) * 1024 * 1024,
   retentionDays: Math.max(1, readInt('IMAGE_RETENTION_DAYS', 7)),
+};
+
+export const planConfig = {
+  dailyUserLimit: Math.max(1, readInt('DAILY_PLAN_LIMIT', 10)),
+  maxActivePerUser: Math.max(1, readInt('MAX_ACTIVE_PLANS_PER_USER', 1)),
+  queueLimit: Math.max(1, readInt('PLAN_QUEUE_LIMIT', 10)),
+  timeoutMs: Math.max(1, readInt('PLAN_TIMEOUT_MIN', 10)) * 60_000,
 };
 
 export const discordConfig = {
@@ -91,6 +100,7 @@ export const agentConfig = {
     'AGENT_VISION_MODEL',
     'opencode/nemotron-3.5-super-vl-free',
   ),
+  plannerModel: readString('AGENT_PLANNER_MODEL'),
 };
 
 function missing(names: string[]): string[] {

@@ -23,13 +23,17 @@ export function cleanText(value: string): string {
     .trim();
 }
 
-export function validatePrompt(prompt: string, imageCount = 0): ValidationResult {
+export function validatePrompt(
+  prompt: string,
+  imageCount = 0,
+  allowEmpty = false,
+): ValidationResult {
   if (prompt.length > 1500) {
     return { ok: false, reason: 'A descrição precisa ter no máximo 1500 caracteres.' };
   }
 
-  // Com imagens, a descrição é opcional; sem imagens, o texto é obrigatório.
-  if (imageCount === 0 && prompt.length < 20) {
+  // Com imagens ou com um plano aprovado, a descrição é opcional.
+  if (!allowEmpty && imageCount === 0 && prompt.length < 20) {
     return { ok: false, reason: 'A descrição precisa ter entre 20 e 1500 caracteres.' };
   }
 

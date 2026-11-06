@@ -1,8 +1,13 @@
 import { REST, Routes } from 'discord.js';
 import { discordConfig } from '../config';
-import { Job } from '../db';
+import { Job, Plan, updatePlan } from '../db';
 import { createLogger } from '../logger';
-import { jobEmbed, truncate } from '../ui/embeds';
+import {
+  jobEmbed,
+  planComponents,
+  planEmbed,
+  truncate,
+} from '../ui/embeds';
 
 const log = createLogger('notify');
 let rest: REST | null = null;
@@ -69,4 +74,50 @@ export async function updateJobMessage(job: Job): Promise<void> {
 export async function notifyJob(job: Job, content: string): Promise<void> {
   await postToJob(job, content);
   await updateJobMessage(job);
+}
+
+export async function postPlanMessage(plan: Plan): Promise<void> {
+  const channelId = discordConfig.suggestionsChannelId;
+  if (!channelId) return;
+
+  const message = (await getRest().post(Routes.channelMessages(channelId), {
+    body: {
+      embeds: [planEmbed(plan).toJSON()],
+      components: planComponents(plan.id).map((component) => component.toJSON()),
+      allowed_mentions: { parse: [] },
+    },
+    files: [
+      {
+        name: 'PLAN.md',
+        data: Buffer.from(plan.plan_md ?? ''),
+        contentType: 'text/markdown',
+      },
+      {
+        name: 'TASKS.md',
+        data: Buffer.from(plan.tasks_md ?? ''),
+        contentType: 'text/markdown',
+      },
+    ],
+  })) as { id: string; channel_id: string };
+
+  updatePlan(plan.id, {
+    channel_id: message.channel_id,
+    message_id: message.id,
+  });
+}
+
+export async function postPlanFailure(plan: Plan): Promise<void> {
+  const channelId = plan.channel_id ?? discordConfig.suggestionsChannelId;
+  if (!channelId) return;
+
+  try {
+    await getRest().post(Routes.channelMessages(channelId), {
+      body: {
+        content: `Falha ao gerar o plano **#${plan.id}**: ${truncate(plan.error ?? 'erro desconhecido', 1200)}`,
+        allowed_mentions: { parse: [] },
+      },
+    });
+  } catch (error) {
+    log.warn(`Falha ao postar erro do plano #${plan.id}: ${String(error)}`);
+  }
 }

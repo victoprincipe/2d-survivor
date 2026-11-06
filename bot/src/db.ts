@@ -33,6 +33,7 @@ export interface Job {
   author_name: string;
   title: string;
   prompt: string;
+  plan_id: number | null;
   status: JobStatus;
   channel_id: string | null;
   message_id: string | null;
@@ -61,6 +62,45 @@ export interface NewJob {
   authorName: string;
   title: string;
   prompt: string;
+  planId?: number;
+  attachments?: JobAttachment[];
+}
+
+export type PlanStatus =
+  | 'queued'
+  | 'running'
+  | 'ready'
+  | 'approved'
+  | 'rejected'
+  | 'failed'
+  | 'cancelled';
+
+export interface Plan {
+  id: number;
+  author_id: string;
+  author_name: string;
+  title: string;
+  prompt: string;
+  status: PlanStatus;
+  channel_id: string | null;
+  message_id: string | null;
+  plan_md: string | null;
+  tasks_md: string | null;
+  error: string | null;
+  attachments: string | null;
+  worktree: string | null;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+}
+
+export interface NewPlan {
+  authorId: string;
+  authorName: string;
+  title: string;
+  prompt: string;
   attachments?: JobAttachment[];
 }
 
@@ -76,6 +116,7 @@ function initSchema(db: Database.Database): void {
       author_name   TEXT NOT NULL,
       title         TEXT NOT NULL,
       prompt        TEXT NOT NULL,
+      plan_id       INTEGER,
       status        TEXT NOT NULL DEFAULT 'queued'
                     CHECK (status IN ('queued','running','done','failed','cancelled','interrupted','needs_review','reverted')),
       channel_id    TEXT,
@@ -102,6 +143,31 @@ function initSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_jobs_status_id ON jobs (status, id);
     CREATE INDEX IF NOT EXISTS idx_jobs_author ON jobs (author_id, created_at);
 
+    CREATE TABLE IF NOT EXISTS plans (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      author_id     TEXT NOT NULL,
+      author_name   TEXT NOT NULL,
+      title         TEXT NOT NULL,
+      prompt        TEXT NOT NULL,
+      status        TEXT NOT NULL DEFAULT 'queued'
+                    CHECK (status IN ('queued','running','ready','approved','rejected','failed','cancelled')),
+      channel_id    TEXT,
+      message_id    TEXT,
+      plan_md       TEXT,
+      tasks_md      TEXT,
+      error         TEXT,
+      attachments   TEXT,
+      worktree      TEXT,
+      created_at    TEXT NOT NULL,
+      started_at    TEXT,
+      finished_at   TEXT,
+      reviewed_by   TEXT,
+      reviewed_at   TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_plans_status_id ON plans (status, id);
+    CREATE INDEX IF NOT EXISTS idx_plans_author ON plans (author_id, created_at);
+
     CREATE TABLE IF NOT EXISTS settings (
       key   TEXT PRIMARY KEY,
       value TEXT NOT NULL
@@ -110,7 +176,7 @@ function initSchema(db: Database.Database): void {
 
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('queue_paused', '1');
 
-  // Migração para bancos criados antes do suporte a imagens.
+  // Migração para bancos criados antes do suporte a imagens/planos.
   const columns = db.prepare('PRAGMA table_info(jobs)').all() as Array<{ name: string }>;
   if (!columns.some((column) => column.name === 'attachments')) {
     try {
@@ -120,13 +186,20 @@ function initSchema(db: Database.Database): void {
       if (!String(error).includes('duplicate column name')) throw error;
     }
   }
+  if (!columns.some((column) => column.name === 'plan_id')) {
+    try {
+      db.exec('ALTER TABLE jobs ADD COLUMN plan_id INTEGER');
+    } catch (error) {
+      if (!String(error).includes('duplicate column name')) throw error;
+    }
+  }
 }
 
-export function jobAttachments(job: Job): JobAttachment[] {
-  if (!job.attachments) return [];
+export function parseAttachments(value: string | null): JobAttachment[] {
+  if (!value) return [];
 
   try {
-    const parsed = JSON.parse(job.attachments) as unknown;
+    const parsed = JSON.parse(value) as unknown;
     if (!Array.isArray(parsed)) return [];
     return parsed.filter(
       (item): item is JobAttachment =>
@@ -138,6 +211,14 @@ export function jobAttachments(job: Job): JobAttachment[] {
   } catch {
     return [];
   }
+}
+
+export function jobAttachments(job: Job): JobAttachment[] {
+  return parseAttachments(job.attachments);
+}
+
+export function planAttachments(plan: Plan): JobAttachment[] {
+  return parseAttachments(plan.attachments);
 }
 
 export function getDb(): Database.Database {
@@ -193,14 +274,15 @@ export function createJob(input: NewJob): Job {
   const now = new Date().toISOString();
   const result = getDb()
     .prepare(
-      `INSERT INTO jobs (author_id, author_name, title, prompt, attachments, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO jobs (author_id, author_name, title, prompt, plan_id, attachments, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       input.authorId,
       input.authorName,
       input.title,
       input.prompt,
+      input.planId ?? null,
       input.attachments && input.attachments.length > 0
         ? JSON.stringify(input.attachments)
         : null,
@@ -216,6 +298,7 @@ const JOB_COLUMNS = new Set([
   'author_name',
   'title',
   'prompt',
+  'plan_id',
   'status',
   'channel_id',
   'message_id',
@@ -433,4 +516,138 @@ export function queueLimits(): {
     dailyGlobalLimit: queueConfig.dailyGlobalLimit,
     queueLimit: queueConfig.queueLimit,
   };
+}
+
+export function getPlan(id: number): Plan | undefined {
+  return getDb().prepare('SELECT * FROM plans WHERE id = ?').get(id) as Plan | undefined;
+}
+
+export function requirePlan(id: number): Plan {
+  const plan = getPlan(id);
+  if (!plan) throw new Error(`Plano #${id} não encontrado.`);
+  return plan;
+}
+
+export function createPlan(input: NewPlan): Plan {
+  const now = new Date().toISOString();
+  const result = getDb()
+    .prepare(
+      `INSERT INTO plans (author_id, author_name, title, prompt, attachments, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      input.authorId,
+      input.authorName,
+      input.title,
+      input.prompt,
+      input.attachments && input.attachments.length > 0
+        ? JSON.stringify(input.attachments)
+        : null,
+      now,
+    );
+
+  return requirePlan(Number(result.lastInsertRowid));
+}
+
+const PLAN_COLUMNS = new Set([
+  'author_id',
+  'author_name',
+  'title',
+  'prompt',
+  'status',
+  'channel_id',
+  'message_id',
+  'plan_md',
+  'tasks_md',
+  'error',
+  'attachments',
+  'worktree',
+  'created_at',
+  'started_at',
+  'finished_at',
+  'reviewed_by',
+  'reviewed_at',
+]);
+
+export function updatePlan(id: number, patch: Partial<Plan>): Plan {
+  const entries = Object.entries(patch).filter(
+    ([key, value]) => PLAN_COLUMNS.has(key) && value !== undefined,
+  ) as [string, string | number | null][];
+
+  if (entries.length > 0) {
+    const assignments = entries.map(([key]) => `${key} = ?`).join(', ');
+    getDb()
+      .prepare(`UPDATE plans SET ${assignments} WHERE id = ?`)
+      .run(...entries.map(([, value]) => value), id);
+  }
+
+  return requirePlan(id);
+}
+
+export function claimNextPlan(): Plan | undefined {
+  const now = new Date().toISOString();
+  return getDb()
+    .prepare(
+      `UPDATE plans
+          SET status = 'running',
+              started_at = ?,
+              finished_at = NULL,
+              error = NULL,
+              worktree = NULL
+        WHERE id = (
+          SELECT id FROM plans
+           WHERE status = 'queued'
+           ORDER BY id ASC
+           LIMIT 1
+        )
+          AND status = 'queued'
+      RETURNING *`,
+    )
+    .get(now) as Plan | undefined;
+}
+
+export function countQueuedPlans(): number {
+  const row = getDb()
+    .prepare("SELECT COUNT(*) AS total FROM plans WHERE status = 'queued'")
+    .get() as { total: number };
+  return row.total;
+}
+
+export function getPlanQueuePosition(id: number): number {
+  const row = getDb()
+    .prepare("SELECT COUNT(*) AS total FROM plans WHERE status = 'queued' AND id <= ?")
+    .get(id) as { total: number };
+  return row.total;
+}
+
+export function countActivePlansByAuthor(authorId: string): number {
+  const row = getDb()
+    .prepare(
+      `SELECT COUNT(*) AS total FROM plans
+        WHERE author_id = ? AND status IN ('queued','running')`,
+    )
+    .get(authorId) as { total: number };
+  return row.total;
+}
+
+export function countTodayPlansByAuthor(authorId: string): number {
+  const row = getDb()
+    .prepare('SELECT COUNT(*) AS total FROM plans WHERE author_id = ? AND created_at >= ?')
+    .get(authorId, quotaCutoff()) as { total: number };
+  return row.total;
+}
+
+export function recoverRunningPlans(): Plan[] {
+  const db = getDb();
+  const running = db.prepare("SELECT * FROM plans WHERE status = 'running'").all() as Plan[];
+  if (running.length > 0) {
+    db.prepare(
+      `UPDATE plans
+          SET status = 'failed',
+              finished_at = ?,
+              error = 'Worker reiniciado durante o planejamento.'
+        WHERE status = 'running'`,
+    ).run(new Date().toISOString());
+  }
+  return running;
 }

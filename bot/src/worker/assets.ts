@@ -1,7 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { imageConfig, paths } from '../config';
-import { Job, jobAttachments } from '../db';
+import {
+  Job,
+  JobAttachment,
+  Plan,
+  jobAttachments,
+  planAttachments,
+} from '../db';
 import { createLogger } from '../logger';
 
 const log = createLogger('assets');
@@ -24,12 +30,15 @@ function ensureExcluded(worktree: string): void {
 }
 
 /**
- * Copia as imagens do job para .job-assets/ dentro do clone.
+ * Copia anexos para .job-assets/ dentro do clone.
  * O diretório é excluído do git; só o que o agente copiar para public/ entra
  * no commit. Retorna os caminhos relativos para citar no prompt.
  */
-export function copyJobAssets(job: Job, worktree: string): string[] {
-  const attachments = jobAttachments(job);
+export function copyAssets(
+  attachments: JobAttachment[],
+  worktree: string,
+  label: string,
+): string[] {
   if (attachments.length === 0) return [];
 
   ensureExcluded(worktree);
@@ -43,7 +52,7 @@ export function copyJobAssets(job: Job, worktree: string): string[] {
   for (const attachment of attachments) {
     if (!fs.existsSync(attachment.file)) {
       throw new Error(
-        `Imagem "${attachment.name}" do job #${job.id} não encontrada em ${attachment.file}. ` +
+        `Imagem "${attachment.name}" do ${label} não encontrada em ${attachment.file}. ` +
           'Ela pode ter expirado; reenvie o prompt com as imagens.',
       );
     }
@@ -54,8 +63,16 @@ export function copyJobAssets(job: Job, worktree: string): string[] {
     relativePaths.push(`${JOB_ASSETS_DIR}/${name}`);
   }
 
-  log.info(`Job #${job.id}: ${relativePaths.length} imagem(ns) em ${destDir}`);
+  log.info(`${label}: ${relativePaths.length} imagem(ns) em ${destDir}`);
   return relativePaths;
+}
+
+export function copyJobAssets(job: Job, worktree: string): string[] {
+  return copyAssets(jobAttachments(job), worktree, `Job #${job.id}`);
+}
+
+export function copyPlanAssets(plan: Plan, worktree: string): string[] {
+  return copyAssets(planAttachments(plan), worktree, `Plano #${plan.id}`);
 }
 
 export function removeJobAssets(worktree: string): void {

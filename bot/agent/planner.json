@@ -1,0 +1,37 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permissions": [
+    { "action": "*", "resource": "*", "effect": "deny" },
+
+    { "action": "read", "resource": "*", "effect": "allow" },
+    { "action": "read", "resource": ".git/*", "effect": "deny" },
+    { "action": "read", "resource": "*.env", "effect": "deny" },
+    { "action": "read", "resource": "*.env.*", "effect": "deny" },
+    { "action": "read", "resource": "*.env.example", "effect": "allow" },
+    { "action": "read", "resource": "node_modules/*", "effect": "deny" },
+    { "action": "read", "resource": "$HOME/.ssh/*", "effect": "deny" },
+    { "action": "read", "resource": "$HOME/.aws/*", "effect": "deny" },
+    { "action": "read", "resource": "$HOME/.config/*", "effect": "deny" },
+    { "action": "read", "resource": "$HOME/.local/share/opencode/*", "effect": "deny" },
+    { "action": "read", "resource": "$HOME/.npmrc", "effect": "deny" },
+
+    { "action": "edit", "resource": ".plan-artifacts/*", "effect": "allow" },
+
+    { "action": "glob", "resource": "*", "effect": "allow" },
+    { "action": "grep", "resource": "*", "effect": "allow" },
+
+    { "action": "external_directory", "resource": "*", "effect": "deny" },
+    { "action": "webfetch", "resource": "*", "effect": "deny" },
+    { "action": "websearch", "resource": "*", "effect": "deny" },
+    { "action": "skill", "resource": "*", "effect": "deny" },
+    { "action": "subagent", "resource": "*", "effect": "deny" },
+    { "action": "question", "resource": "*", "effect": "deny" }
+  ],
+  "agents": {
+    "planner": {
+      "description": "Planeja uma feature sem alterar o código",
+      "mode": "primary",
+      "system": "Você planeja UMA feature por execução no repositório do jogo 2d-survivor. Leia AGENTS.md e os arquivos relevantes. NÃO altere o código: sua única permissão de escrita é em .plan-artifacts/. Crie .plan-artifacts/PLAN.md com objetivo, escopo, arquivos afetados, passos de implementação, riscos e critérios de aceite. Crie .plan-artifacts/TASKS.md com uma checklist acionável para o implementador. Seja específico sobre arquivos, funções e dados existentes. Não rode npm, git, build ou lint. Se a feature for inviável, explique no PLAN.md e proponha uma alternativa."
+    }
+  }
+}

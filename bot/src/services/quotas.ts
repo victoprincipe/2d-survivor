@@ -1,9 +1,12 @@
-import { queueConfig } from '../config';
+import { planConfig, queueConfig } from '../config';
 import {
   countActiveByAuthor,
+  countActivePlansByAuthor,
   countQueued,
+  countQueuedPlans,
   countTodayByAuthor,
   countTodayGlobal,
+  countTodayPlansByAuthor,
 } from '../db';
 
 export interface QuotaResult {
@@ -40,6 +43,31 @@ export function checkSubmissionQuota(userId: string): QuotaResult {
 
   if (countTodayByAuthor(userId) >= queueConfig.dailyUserLimit) {
     return { ok: false, reason: `Você atingiu o limite de ${queueConfig.dailyUserLimit} implementações por dia.` };
+  }
+
+  return { ok: true };
+}
+
+export function checkPlanQuota(userId: string): QuotaResult {
+  if (countQueuedPlans() >= planConfig.queueLimit) {
+    return {
+      ok: false,
+      reason: `A fila de planejamento está cheia (${planConfig.queueLimit} planos). Tente de novo mais tarde.`,
+    };
+  }
+
+  if (countActivePlansByAuthor(userId) >= planConfig.maxActivePerUser) {
+    return {
+      ok: false,
+      reason: `Você já tem ${planConfig.maxActivePerUser} plano(s) em andamento. Aguarde ele terminar.`,
+    };
+  }
+
+  if (countTodayPlansByAuthor(userId) >= planConfig.dailyUserLimit) {
+    return {
+      ok: false,
+      reason: `Você atingiu o limite de ${planConfig.dailyUserLimit} planos por dia.`,
+    };
   }
 
   return { ok: true };

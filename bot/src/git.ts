@@ -108,6 +108,22 @@ export function pushJobBranch(dir: string, branch: string): string {
   return git(['push', '--force', 'origin', branch], dir);
 }
 
+export function createPlanRepo(id: number): { dir: string; base: string } {
+  const dir = `${paths.worktrees}/plan-${id}`;
+
+  worktreeRemove(dir);
+  fs.mkdirSync(paths.worktrees, { recursive: true });
+
+  const origin = gitTry(['remote', 'get-url', 'origin'], paths.repo).stdout;
+  if (!origin) {
+    throw new Error('Remote "origin" não configurado no repo principal.');
+  }
+
+  git(['clone', '--branch', queueConfig.mainBranch, origin, dir], paths.repo);
+  const base = git(['rev-parse', 'HEAD'], dir);
+  return { dir, base };
+}
+
 export function pushMasterFromClone(dir: string, branch: string): string {
   return git(['push', 'origin', `HEAD:${branch}`], dir);
 }

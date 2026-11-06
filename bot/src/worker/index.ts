@@ -4,14 +4,18 @@ import path from 'node:path';
 import { requireWorkerConfig, paths, queueConfig } from '../config';
 import {
   claimNextJob,
+  claimNextPlan,
   getDb,
   recoverRunningJobs,
+  recoverRunningPlans,
   updateJob,
+  updatePlan,
 } from '../db';
 import { worktreeRemove } from '../git';
 import { createLogger } from '../logger';
 import { cleanupOldAssets } from './assets';
 import { processJob } from './job';
+import { processPlan } from './plan';
 
 const log = createLogger('worker');
 
@@ -22,6 +26,7 @@ getDb();
 fs.mkdirSync(paths.logs, { recursive: true });
 fs.mkdirSync(paths.worktrees, { recursive: true });
 fs.mkdirSync(paths.assets, { recursive: true });
+fs.mkdirSync(paths.plans, { recursive: true });
 
 function prepareAgentHome(): void {
   fs.mkdirSync(path.join(paths.agentHome, '.config', 'opencode'), { recursive: true });
@@ -51,6 +56,15 @@ function cleanupRecovered(): void {
     }
     log.warn(`Job #${job.id} estava rodando quando o worker parou; marcado como interrompido.`);
   }
+
+  const recoveredPlans = recoverRunningPlans();
+  for (const plan of recoveredPlans) {
+    if (plan.worktree) {
+      worktreeRemove(plan.worktree);
+      updatePlan(plan.id, { worktree: null });
+    }
+    log.warn(`Plano #${plan.id} estava rodando quando o worker parou; marcado como falho.`);
+  }
 }
 
 function cleanupStaleWorktrees(): void {
@@ -62,6 +76,17 @@ function cleanupStaleWorktrees(): void {
     if (row.worktree) {
       worktreeRemove(row.worktree);
       updateJob(row.id, { worktree: null });
+    }
+  }
+
+  const planRows = getDb()
+    .prepare("SELECT * FROM plans WHERE worktree IS NOT NULL")
+    .all() as Array<{ id: number; worktree: string | null }>;
+
+  for (const row of planRows) {
+    if (row.worktree) {
+      worktreeRemove(row.worktree);
+      updatePlan(row.id, { worktree: null });
     }
   }
 }
@@ -77,17 +102,28 @@ async function main(): Promise<void> {
 
   while (!stopping) {
     const job = claimNextJob();
-    if (!job) {
-      await sleep(queueConfig.pollMs);
+    if (job) {
+      log.info(`Processando job #${job.id} (${job.kind}, tentativa ${job.attempts})...`);
+      try {
+        await processJob(job);
+      } catch (error) {
+        log.error(`Falha não tratada no job #${job.id}: ${String(error)}`);
+      }
       continue;
     }
 
-    log.info(`Processando job #${job.id} (${job.kind}, tentativa ${job.attempts})...`);
-    try {
-      await processJob(job);
-    } catch (error) {
-      log.error(`Falha não tratada no job #${job.id}: ${String(error)}`);
+    const plan = claimNextPlan();
+    if (plan) {
+      log.info(`Processando plano #${plan.id}...`);
+      try {
+        await processPlan(plan);
+      } catch (error) {
+        log.error(`Falha não tratada no plano #${plan.id}: ${String(error)}`);
+      }
+      continue;
     }
+
+    await sleep(queueConfig.pollMs);
   }
 
   log.info('Worker encerrado.');

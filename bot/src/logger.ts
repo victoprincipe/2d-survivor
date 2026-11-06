@@ -41,6 +41,11 @@ export function jobLogPath(jobId: number, suffix = ''): string {
   return path.join(paths.logs, `job-${jobId}${suffix}.log`);
 }
 
+export function planLogPath(planId: number, suffix = ''): string {
+  ensureLogDir();
+  return path.join(paths.logs, `plan-${planId}${suffix}.log`);
+}
+
 export function appendJobLog(jobId: number, line: string, suffix = ''): void {
   fs.appendFileSync(jobLogPath(jobId, suffix), line.endsWith('\n') ? line : `${line}\n`);
 }

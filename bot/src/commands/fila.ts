@@ -4,9 +4,10 @@ import {
   MessageFlags,
   SlashCommandBuilder,
 } from 'discord.js';
-import { queueConfig } from '../config';
+import { planConfig, queueConfig } from '../config';
 import {
   countQueued,
+  countQueuedPlans,
   countTodayGlobal,
   getRunningJob,
   listQueued,
@@ -22,6 +23,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   const repo = getRepoState();
   const running = getRunningJob();
   const queued = countQueued();
+  const plansQueued = countQueuedPlans();
   const next = listQueued(5);
   const today = countTodayGlobal();
 
@@ -42,6 +44,11 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       {
         name: 'Na fila',
         value: `${queued}/${queueConfig.queueLimit}`,
+        inline: true,
+      },
+      {
+        name: 'Planos na fila',
+        value: `${plansQueued}/${planConfig.queueLimit}`,
         inline: true,
       },
       {

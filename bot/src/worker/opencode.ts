@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { agentConfig, paths, queueConfig } from '../config';
-import { Job, jobAttachments } from '../db';
+import { Job, Plan, getPlan, jobAttachments } from '../db';
 import { createLogger, jobLogPath } from '../logger';
 import { copyJobAssets } from './assets';
 import { agentEnv } from './env';
@@ -11,8 +11,23 @@ import { AgentError } from './errors';
 
 const log = createLogger('agent');
 
-function buildMessage(job: Job, assetPaths: string[], imageNames: string[]): string {
+function buildMessage(
+  job: Job,
+  assetPaths: string[],
+  imageNames: string[],
+  plan: Plan | null,
+): string {
   const nonce = `IMPLEMENTACAO_${crypto.randomUUID().replace(/-/g, '')}`;
+  const planSection = plan
+    ? `
+
+Plano aprovado #${plan.id} — ${plan.title}:
+${plan.plan_md ?? ''}
+
+Tarefas do plano:
+${plan.tasks_md ?? ''}
+`
+    : '';
   const imageList =
     assetPaths.length === 0
       ? ''
@@ -44,6 +59,7 @@ Título: ${job.title}
 
 Descrição:
 ${job.prompt || '(sem descrição; use as imagens como referência)'}
+${planSection}
 ${imageList}
 </${nonce}>
 
@@ -81,6 +97,11 @@ export async function runAgent(job: Job, worktree: string): Promise<AgentResult>
   fs.writeFileSync(logPath, `# OpenCode — job #${job.id}\n`);
 
   const attachments = jobAttachments(job);
+  const plan = job.plan_id != null ? (getPlan(job.plan_id) ?? null) : null;
+  if (job.plan_id != null && !plan) {
+    throw new AgentError(`Plano #${job.plan_id} não encontrado para o job #${job.id}.`, logPath);
+  }
+
   let assetPaths: string[] = [];
   try {
     assetPaths = copyJobAssets(job, worktree);
@@ -119,6 +140,7 @@ export async function runAgent(job: Job, worktree: string): Promise<AgentResult>
       job,
       assetPaths,
       attachments.map((attachment) => attachment.name),
+      plan,
     ),
   );
 
