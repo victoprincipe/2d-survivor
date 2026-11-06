@@ -21,6 +21,7 @@ import {
   Compass,
   Crosshair,
   BowArrow,
+  Utensils,
 } from 'lucide-react';
 
 interface HUDProps {
@@ -38,6 +39,7 @@ const WEAPON_ICONS: Record<string, React.ReactNode> = {
   bible: <BookOpen className="w-4 h-4 text-indigo-400" />,
   garlic: <Shield className="w-4 h-4 text-yellow-300" />,
   lightning: <Zap className="w-4 h-4 text-cyan-300" />,
+  derson_combo: <Utensils className="w-4 h-4 text-amber-300" />,
 };
 
 const PASSIVE_ICONS: Record<string, React.ReactNode> = {

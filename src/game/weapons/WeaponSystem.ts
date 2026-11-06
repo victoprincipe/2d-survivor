@@ -11,7 +11,7 @@ import { WorldSystem } from '../systems/WorldProps';
 
 export interface Projectile {
   id: number;
-  type: 'wand' | 'knife' | 'bow';
+  type: 'wand' | 'knife' | 'bow' | 'cheese_bread' | 'coffee' | 'cake';
   x: number;
   y: number;
   vx: number;
@@ -23,6 +23,14 @@ export interface Projectile {
   weaponId: WeaponId;
   isEvolved: boolean;
   hitEnemyIds: Set<number>;
+  spiral?: {
+    originX: number;
+    originY: number;
+    angle: number;
+    radius: number;
+    angularSpeed: number;
+    radialSpeed: number;
+  };
 }
 
 export interface WhipSlashEffect {
@@ -216,6 +224,10 @@ export class WeaponSystem {
       const baseCd = w.evolved ? 1.8 : 2.8;
       w.cooldownTimer = baseCd * cdFactor;
       this.triggerLightning(w, player, enemies, grid, vfx, sound, onEnemyKilled);
+    } else if (w.id === 'derson_combo') {
+      const baseCd = w.evolved ? 0.55 : 0.9;
+      w.cooldownTimer = baseCd * cdFactor;
+      this.triggerDersonCombo(w, player, grid, sound);
     }
   }
 
@@ -417,6 +429,110 @@ export class WeaponSystem {
     sound.playShoot();
   }
 
+  private triggerDersonCombo(w: WeaponInstance, player: Player, grid: SpatialGrid<Enemy>, sound: SoundEngine): void {
+    const nearby = grid.queryRadius(player.x, player.y, 480);
+    let closest: Enemy | undefined;
+    let closestDist = Infinity;
+
+    for (let i = 0; i < nearby.length; i++) {
+      const dx = nearby[i].x - player.x;
+      const dy = nearby[i].y - player.y;
+      const dist = dx * dx + dy * dy;
+      if (dist < closestDist) {
+        closestDist = dist;
+        closest = nearby[i];
+      }
+    }
+
+    const facingAngle = Math.atan2(player.facingY, player.facingX);
+    const aimAngle = closest ? Math.atan2(closest.y - player.y, closest.x - player.x) : facingAngle;
+    const roll = Math.random();
+
+    if (roll < 1 / 3) {
+      // Pão de queijo: rápido, fraco e sem perfuração.
+      const speed = w.evolved ? 820 : 700;
+      const baseDamage = (w.evolved ? 16 : 6 + w.level * 2) * player.might;
+
+      this.projectiles.push({
+        id: this.nextProjId++,
+        type: 'cheese_bread',
+        x: player.x,
+        y: player.y,
+        vx: Math.cos(aimAngle) * speed,
+        vy: Math.sin(aimAngle) * speed,
+        radius: 6,
+        damage: baseDamage,
+        pierce: 1,
+        life: 1.2,
+        weaponId: 'derson_combo',
+        isEvolved: w.evolved,
+        hitEnemyIds: new Set(),
+      });
+
+      sound.playShoot();
+    } else if (roll < 2 / 3) {
+      // Café: percorre uma espiral e perfura inimigos.
+      const baseDamage = (w.evolved ? 22 : 10 + w.level * 3) * player.might;
+      // Nos níveis baixos o café atravessa apenas 1 inimigo (pierce 2 no total).
+      const pierce = w.evolved ? 6 : 1 + (w.level >= 5 ? 3 : w.level >= 3 ? 2 : 1);
+      const startAngle = aimAngle + Math.PI * 0.25;
+      const radialSpeed = w.evolved ? 210 : 150 + w.level * 8;
+
+      this.projectiles.push({
+        id: this.nextProjId++,
+        type: 'coffee',
+        x: player.x,
+        y: player.y,
+        vx: Math.cos(startAngle) * radialSpeed,
+        vy: Math.sin(startAngle) * radialSpeed,
+        radius: 9,
+        damage: baseDamage,
+        pierce,
+        life: 1.7,
+        weaponId: 'derson_combo',
+        isEvolved: w.evolved,
+        hitEnemyIds: new Set(),
+        spiral: {
+          originX: player.x,
+          originY: player.y,
+          angle: startAngle,
+          radius: 10,
+          angularSpeed: 6 + w.level * 0.35,
+          radialSpeed,
+        },
+      });
+
+      sound.playShoot();
+    } else {
+      // Bolo: três fatias em leque na direção em que o Derson está olhando.
+      const spread = w.evolved ? 0.26 : 0.18;
+      const speed = w.evolved ? 500 : 430;
+      const baseDamage = (w.evolved ? 18 : 8 + w.level * 2) * player.might;
+
+      for (let i = 0; i < 3; i++) {
+        const angle = facingAngle + (i - 1) * spread;
+
+        this.projectiles.push({
+          id: this.nextProjId++,
+          type: 'cake',
+          x: player.x,
+          y: player.y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          radius: 8,
+          damage: baseDamage,
+          pierce: 1,
+          life: 1.3,
+          weaponId: 'derson_combo',
+          isEvolved: w.evolved,
+          hitEnemyIds: new Set(),
+        });
+      }
+
+      sound.playKnife();
+    }
+  }
+
   private triggerLightning(
     w: WeaponInstance,
     player: Player,
@@ -549,8 +665,19 @@ export class WeaponSystem {
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       const p = this.projectiles[i];
       p.life -= dt;
-      p.x += p.vx * dt;
-      p.y += p.vy * dt;
+
+      if (p.spiral) {
+        const s = p.spiral;
+        s.angle += s.angularSpeed * dt;
+        s.radius += s.radialSpeed * dt;
+        p.x = s.originX + Math.cos(s.angle) * s.radius;
+        p.y = s.originY + Math.sin(s.angle) * s.radius;
+        p.vx = -Math.sin(s.angle) * s.radius * s.angularSpeed + Math.cos(s.angle) * s.radialSpeed;
+        p.vy = Math.cos(s.angle) * s.radius * s.angularSpeed + Math.sin(s.angle) * s.radialSpeed;
+      } else {
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+      }
 
       if (p.life <= 0) {
         this.projectiles.splice(i, 1);
@@ -573,7 +700,19 @@ export class WeaponSystem {
         const knockY = p.vy > 0 ? 1 : -1;
         const dead = enemy.takeDamage(p.damage, knockX, knockY, 140);
         vfx.addDamageNumber(enemy.x, enemy.y, p.damage, p.isEvolved);
-        vfx.addSparks(p.x, p.y, p.type === 'wand' ? '#38bdf8' : p.type === 'bow' ? '#a3e635' : '#e2e8f0', 3);
+        const sparkColor =
+          p.type === 'wand'
+            ? '#38bdf8'
+            : p.type === 'bow'
+              ? '#a3e635'
+              : p.type === 'cheese_bread'
+                ? '#facc15'
+                : p.type === 'coffee'
+                  ? '#b45309'
+                  : p.type === 'cake'
+                    ? '#f9a8d4'
+                    : '#e2e8f0';
+        vfx.addSparks(p.x, p.y, sparkColor, 3);
         hitSomeone = true;
 
         if (dead) onEnemyKilled(enemy);
@@ -718,6 +857,40 @@ export class WeaponSystem {
         ctx.lineTo(-7, 4);
         ctx.closePath();
         ctx.fill();
+      } else if (p.type === 'cheese_bread') {
+        ctx.fillStyle = p.isEvolved ? '#fde68a' : '#f6c453';
+        ctx.beginPath();
+        ctx.arc(0, 0, p.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#c98a2b';
+        ctx.beginPath();
+        ctx.arc(-2, -1, 1.3, 0, Math.PI * 2);
+        ctx.arc(2, 2, 1.1, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (p.type === 'coffee') {
+        ctx.fillStyle = p.isEvolved ? '#7c2d12' : '#5b3a29';
+        ctx.beginPath();
+        ctx.arc(0, 0, p.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#f5e6d3';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(0, 0, p.radius * 0.62, 0.2, Math.PI * 1.4);
+        ctx.stroke();
+      } else if (p.type === 'cake') {
+        ctx.fillStyle = p.isEvolved ? '#fbcfe8' : '#f9a8d4';
+        ctx.beginPath();
+        ctx.moveTo(0, -p.radius);
+        ctx.lineTo(p.radius, p.radius * 0.7);
+        ctx.lineTo(-p.radius, p.radius * 0.7);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#fff1f2';
+        ctx.fillRect(-p.radius * 0.72, -p.radius * 0.15, p.radius * 1.44, 2);
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath();
+        ctx.arc(0, -p.radius * 0.7, 2.2, 0, Math.PI * 2);
+        ctx.fill();
       }
 
       ctx.restore();
@@ -753,7 +926,7 @@ export class WeaponSystem {
 
   generateUpgradeOptions(): UpgradeOption[] {
     const options: UpgradeOption[] = [];
-    const allWeaponIds: WeaponId[] = ['whip', 'wand', 'knife', 'bow', 'bible', 'garlic', 'lightning'];
+    const allWeaponIds: WeaponId[] = ['whip', 'wand', 'knife', 'bow', 'bible', 'garlic', 'lightning', 'derson_combo'];
     const allPassiveIds: PassiveId[] = ['spinach', 'wings', 'heart', 'tome', 'magnet', 'bracer'];
 
     // 1. Check for possible Evolutions first

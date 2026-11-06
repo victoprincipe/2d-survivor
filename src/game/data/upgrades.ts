@@ -150,6 +150,24 @@ export const WEAPON_REGISTRY: Record<WeaponId, WeaponMeta> = {
       'Dano aumentado em +50% com explosão residual.',
     ],
   },
+  derson_combo: {
+    id: 'derson_combo',
+    name: 'Combo do Derson',
+    description: 'Arremessa aleatoriamente pão de queijo, café em espiral ou fatias de bolo.',
+    maxLevel: 5,
+    iconName: 'Utensils',
+    synergyPassive: 'bracer',
+    evolvedId: 'derson_banquet',
+    evolvedName: 'Banquete do Derson',
+    evolvedDescription: 'O entregador serve um banquete completo com petiscos mais fortes e perfurantes.',
+    levelDescriptions: [
+      'Sorteia entre pão de queijo veloz, café em espiral ou 3 fatias de bolo em leque.',
+      'Petiscos causam mais dano.',
+      'O café atravessa 1 inimigo adicional.',
+      'Mais dano e leque do bolo mais aberto.',
+      'O café atravessa mais inimigos e os petiscos ficam velozes.',
+    ],
+  },
 };
 
 export const PASSIVE_REGISTRY: Record<PassiveId, PassiveMeta> = {

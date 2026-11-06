@@ -2,6 +2,22 @@ import { CharacterConfig } from '../types';
 
 export const CHARACTERS: CharacterConfig[] = [
   {
+    id: 'derson',
+    name: 'Derson',
+    title: 'Motoboy Gourmet',
+    description: 'Entregador destemido que arremessa pão de queijo, café e fatias de bolo contra a horda.',
+    startingWeapon: 'derson_combo',
+    iconName: 'Bike',
+    color: '#c1121f',
+    portraitColor: '#6a040f',
+    sprite: '/derson.svg',
+    statBonuses: {
+      maxHp: 10,
+      speed: 0.1,
+      pickupRadius: 15,
+    },
+  },
+  {
     id: 'antonio',
     name: 'Antonio Belpaese',
     title: 'Caçador de Vampiros',

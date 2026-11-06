@@ -17,6 +17,7 @@ import {
   Crosshair,
   Crown,
   BowArrow,
+  Utensils,
 } from 'lucide-react';
 
 interface LevelUpModalProps {
@@ -38,6 +39,7 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   Compass: <Compass className="w-8 h-8 text-amber-400" />,
   Crosshair: <Crosshair className="w-8 h-8 text-red-400" />,
   BowArrow: <BowArrow className="w-8 h-8 text-lime-400" />,
+  Utensils: <Utensils className="w-8 h-8 text-amber-300" />,
 };
 
 export const LevelUpModal: React.FC<LevelUpModalProps> = ({ options, onSelect }) => {
