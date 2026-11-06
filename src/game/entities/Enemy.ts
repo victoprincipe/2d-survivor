@@ -82,6 +82,9 @@ export class Enemy {
         break;
     }
 
+    // Reduce all monster movement speed by 10%
+    this.speed *= 0.9;
+
     this.hp = this.maxHp;
   }
 
