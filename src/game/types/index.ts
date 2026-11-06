@@ -1,8 +1,9 @@
-export type WeaponId = 'wand' | 'whip' | 'knife' | 'bible' | 'garlic' | 'lightning';
+export type WeaponId = 'wand' | 'whip' | 'knife' | 'bow' | 'bible' | 'garlic' | 'lightning';
 export type EvolvedWeaponId =
   | 'holy_wand'
   | 'bloody_tear'
   | 'thousand_edge'
+  | 'arrow_storm'
   | 'unholy_vespers'
   | 'soul_eater'
   | 'thunder_loop';

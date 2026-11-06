@@ -11,7 +11,7 @@ import { WorldSystem } from '../systems/WorldProps';
 
 export interface Projectile {
   id: number;
-  type: 'wand' | 'knife';
+  type: 'wand' | 'knife' | 'bow';
   x: number;
   y: number;
   vx: number;
@@ -208,6 +208,10 @@ export class WeaponSystem {
       const baseCd = w.evolved ? 0.3 : 0.95;
       w.cooldownTimer = baseCd * cdFactor;
       this.triggerKnife(w, player, sound);
+    } else if (w.id === 'bow') {
+      const baseCd = w.evolved ? 0.45 : 1.15;
+      w.cooldownTimer = baseCd * cdFactor;
+      this.triggerBow(w, player, grid, sound);
     } else if (w.id === 'lightning') {
       const baseCd = w.evolved ? 1.8 : 2.8;
       w.cooldownTimer = baseCd * cdFactor;
@@ -371,6 +375,48 @@ export class WeaponSystem {
     sound.playKnife();
   }
 
+  private triggerBow(w: WeaponInstance, player: Player, grid: SpatialGrid<Enemy>, sound: SoundEngine): void {
+    const nearby = grid.queryRadius(player.x, player.y, 520);
+    nearby.sort((a, b) => {
+      const da = (a.x - player.x) ** 2 + (a.y - player.y) ** 2;
+      const db = (b.x - player.x) ** 2 + (b.y - player.y) ** 2;
+      return da - db;
+    });
+
+    const projectileCount = w.evolved ? 3 : 1 + (w.level >= 4 ? 1 : 0);
+    const speed = w.evolved ? 760 : 560;
+    const baseDamage = (w.evolved ? 32 : 15 + w.level * 4) * player.might;
+    const pierce = w.evolved ? 4 : 1 + (w.level >= 3 ? 1 : 0) + (w.level >= 5 ? 1 : 0);
+    const baseAngle = nearby[0]
+      ? Math.atan2(nearby[0].y - player.y, nearby[0].x - player.x)
+      : Math.atan2(player.facingY, player.facingX);
+
+    for (let i = 0; i < projectileCount; i++) {
+      const target = nearby[i];
+      const angle = target
+        ? Math.atan2(target.y - player.y, target.x - player.x)
+        : baseAngle + (i - (projectileCount - 1) / 2) * 0.16;
+
+      this.projectiles.push({
+        id: this.nextProjId++,
+        type: 'bow',
+        x: player.x,
+        y: player.y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        radius: 5,
+        damage: baseDamage,
+        pierce,
+        life: 1.4,
+        weaponId: 'bow',
+        isEvolved: w.evolved,
+        hitEnemyIds: new Set(),
+      });
+    }
+
+    sound.playShoot();
+  }
+
   private triggerLightning(
     w: WeaponInstance,
     player: Player,
@@ -527,7 +573,7 @@ export class WeaponSystem {
         const knockY = p.vy > 0 ? 1 : -1;
         const dead = enemy.takeDamage(p.damage, knockX, knockY, 140);
         vfx.addDamageNumber(enemy.x, enemy.y, p.damage, p.isEvolved);
-        vfx.addSparks(p.x, p.y, p.type === 'wand' ? '#38bdf8' : '#e2e8f0', 3);
+        vfx.addSparks(p.x, p.y, p.type === 'wand' ? '#38bdf8' : p.type === 'bow' ? '#a3e635' : '#e2e8f0', 3);
         hitSomeone = true;
 
         if (dead) onEnemyKilled(enemy);
@@ -651,6 +697,27 @@ export class WeaponSystem {
         ctx.lineTo(-6, 4);
         ctx.closePath();
         ctx.fill();
+      } else if (p.type === 'bow') {
+        ctx.strokeStyle = p.isEvolved ? '#fbbf24' : '#d9f99d';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(-12, 0);
+        ctx.lineTo(8, 0);
+        ctx.stroke();
+        ctx.fillStyle = p.isEvolved ? '#f59e0b' : '#84cc16';
+        ctx.beginPath();
+        ctx.moveTo(14, 0);
+        ctx.lineTo(6, -4);
+        ctx.lineTo(6, 4);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = p.isEvolved ? '#fbbf24' : '#d9f99d';
+        ctx.beginPath();
+        ctx.moveTo(-12, 0);
+        ctx.lineTo(-7, -4);
+        ctx.lineTo(-7, 4);
+        ctx.closePath();
+        ctx.fill();
       }
 
       ctx.restore();
@@ -686,7 +753,7 @@ export class WeaponSystem {
 
   generateUpgradeOptions(): UpgradeOption[] {
     const options: UpgradeOption[] = [];
-    const allWeaponIds: WeaponId[] = ['whip', 'wand', 'knife', 'bible', 'garlic', 'lightning'];
+    const allWeaponIds: WeaponId[] = ['whip', 'wand', 'knife', 'bow', 'bible', 'garlic', 'lightning'];
     const allPassiveIds: PassiveId[] = ['spinach', 'wings', 'heart', 'tome', 'magnet', 'bracer'];
 
     // 1. Check for possible Evolutions first

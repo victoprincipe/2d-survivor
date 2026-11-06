@@ -47,6 +47,21 @@ export const CHARACTERS: CharacterConfig[] = [
     },
   },
   {
+    id: 'kayrurururu',
+    name: 'Kayrurururu',
+    title: 'Fisiculturista do Amazonas',
+    description: 'Gigante da selva amazônica. Usa a força dos treinos para disparar flechas com um arco imenso.',
+    startingWeapon: 'bow',
+    iconName: 'Dumbbell',
+    color: '#2d6a4f',
+    portraitColor: '#1b4332',
+    statBonuses: {
+      maxHp: 25,
+      might: 0.12,
+      armor: 1,
+    },
+  },
+  {
     id: 'bianca',
     name: 'Bianca Rossa',
     title: 'Guardiã do Alho',
