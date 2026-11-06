@@ -11,7 +11,7 @@ import {
   getRunningJob,
   listQueued,
 } from '../db';
-import { assertRepoReady, getRepoState } from '../git';
+import { getRepoState } from '../git';
 import { discordTimestamp, jobLine, truncate } from '../ui/embeds';
 
 export const data = new SlashCommandBuilder()
@@ -20,7 +20,6 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
   const repo = getRepoState();
-  const ready = assertRepoReady();
   const running = getRunningJob();
   const queued = countQueued();
   const next = listQueued(5);
@@ -28,11 +27,16 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
   const embed = new EmbedBuilder()
     .setTitle('Fila de implementações')
-    .setColor(ready.ok ? 0x2ecc71 : 0xe67e22)
+    .setColor(0x2ecc71)
     .addFields(
       {
         name: 'Estado',
-        value: ready.ok ? 'Ativa' : 'Aguardando repo limpo',
+        value: 'Ativa',
+        inline: true,
+      },
+      {
+        name: 'Worker',
+        value: `origin/${queueConfig.mainBranch}`,
         inline: true,
       },
       {
@@ -46,9 +50,9 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         inline: true,
       },
       {
-        name: 'Repo',
+        name: 'Repo local',
         value: `${repo.branch} @ \`${repo.shortHead}\` • ${
-          repo.clean ? 'limpo' : `sujo (${repo.dirtyFiles.length})`
+          repo.clean ? 'limpo' : `sujo (${repo.dirtyFiles.length}) — WIP não bloqueia`
         }`,
       },
       {
@@ -64,10 +68,6 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     )
     .setFooter({ text: 'Use /implementar para enviar uma ideia' })
     .setTimestamp();
-
-  if (!ready.ok && ready.reason) {
-    embed.addFields({ name: 'Aviso', value: ready.reason });
-  }
 
   await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 }

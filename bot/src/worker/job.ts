@@ -9,14 +9,11 @@ import {
   updateJob,
 } from '../db';
 import {
-  assertRepoReady,
   commitAll,
   createJobRepo,
-  createTag,
   getDiffStats,
   hasChanges,
   pushJobBranch,
-  revParse,
   worktreeRemove,
 } from '../git';
 import { createLogger } from '../logger';
@@ -30,13 +27,10 @@ import {
   AgentError,
   GateError,
   NeedsReviewError,
-  PostMergeError,
   PushError,
-  RepoNotReadyError,
 } from './errors';
 import { runGate } from './gate';
 import { runAgent } from './opencode';
-import { rollbackJob } from './rollback';
 import { prepareNodeModules } from './workspace';
 
 const log = createLogger('job');
@@ -93,9 +87,9 @@ function preserveWork(job: Job, reason: string): string | null {
     if (fresh?.branch) {
       try {
         pushJobBranch(worktree, fresh.branch);
-        log.warn(`Branch ${fresh.branch} preservada no repo principal.`);
+        log.warn(`Branch ${fresh.branch} enviada para o origin.`);
       } catch (error) {
-        log.warn(`Não consegui preservar a branch ${fresh.branch}: ${String(error)}`);
+        log.warn(`Não consegui enviar a branch ${fresh.branch} para o origin: ${String(error)}`);
       }
     }
     return sha;
@@ -145,13 +139,7 @@ function nowIso(): string {
 
 async function handleExecute(job: Job): Promise<void> {
   try {
-    const ready = assertRepoReady();
-    if (!ready.ok) {
-      throw new RepoNotReadyError(ready.reason ?? 'Repo não está pronto.');
-    }
-
-    const baseSha = revParse(queueConfig.mainBranch);
-    const { dir, branch } = createJobRepo(job.id, baseSha);
+    const { dir, branch, base: baseSha } = createJobRepo(job.id);
     log.info(`Job #${job.id} repo isolado: ${dir}`);
     updateJob(job.id, { branch, worktree: dir, base_sha: baseSha });
     prepareNodeModules(dir);
@@ -195,15 +183,11 @@ async function handleExecute(job: Job): Promise<void> {
 
     pushJobBranch(dir, branch);
 
-    createTag(`pre-job-${job.id}`, baseSha);
-    createTag(`job-${job.id}`, commitSha);
-
     const reasons = reviewReasons(stats);
     if (reasons.length > 0) {
       throw new NeedsReviewError(reasons.join('; '));
     }
 
-    cleanupWorktree(job);
     await applyJob(requireJob(job.id));
 
     const done = updateJob(job.id, {
@@ -213,9 +197,7 @@ async function handleExecute(job: Job): Promise<void> {
       review_reason: null,
       worktree: null,
     });
-    const message = queueConfig.gitPush
-      ? `Job **#${job.id}** aplicado e enviado para \`${queueConfig.gitRemote}/${queueConfig.mainBranch}\`.`
-      : `Job **#${job.id}** aplicado na \`${queueConfig.mainBranch}\`.`;
+    const message = `Job **#${job.id}** aplicado e enviado para \`origin/${queueConfig.mainBranch}\`.`;
     await postEmbedToJob(done, message);
     await updateJobMessage(done);
   } catch (error) {
@@ -230,48 +212,7 @@ async function handleExecute(job: Job): Promise<void> {
   }
 }
 
-async function handleApply(job: Job): Promise<void> {
-  await applyJob(job);
-
-  const done = updateJob(job.id, {
-    status: 'done',
-    finished_at: nowIso(),
-    error: null,
-    review_reason: null,
-    worktree: null,
-  });
-  await postEmbedToJob(done, `Job **#${job.id}** aplicado na \`${queueConfig.mainBranch}\`.`);
-  await updateJobMessage(done);
-}
-
-async function handleRollback(job: Job): Promise<void> {
-  const result = await rollbackJob(job);
-
-  const final = updateJob(job.id, {
-    status: 'reverted',
-    finished_at: nowIso(),
-    error: result.note ?? null,
-    review_reason: null,
-  });
-  await postEmbedToJob(final, `Rollback do job **#${job.id}** aplicado na \`${queueConfig.mainBranch}\`.`);
-  await updateJobMessage(final);
-}
-
 async function handleFailure(job: Job, error: unknown): Promise<void> {
-  const fresh = getJob(job.id) ?? job;
-
-  if (error instanceof RepoNotReadyError) {
-    updateJob(job.id, {
-      status: 'queued',
-      started_at: null,
-      heartbeat_at: null,
-      attempts: Math.max(0, fresh.attempts - 1),
-      error: null,
-    });
-    await postToJob(job, `Repo ocupado; o job **#${job.id}** continua na fila. ${error.message}`);
-    return;
-  }
-
   let status: Job['status'] = 'failed';
   let patch: Partial<Job> = {
     finished_at: nowIso(),
@@ -284,15 +225,10 @@ async function handleFailure(job: Job, error: unknown): Promise<void> {
       finished_at: nowIso(),
       error: `Bloqueado para revisão: ${error.message}`,
     };
-  } else if (error instanceof PostMergeError) {
-    patch = {
-      finished_at: nowIso(),
-      error: `${error.message}${error.reverted ? ' (revertido automaticamente)' : ` (NÃO revertido; verifique a ${queueConfig.mainBranch})`}`,
-    };
   } else if (error instanceof PushError) {
     patch = {
       finished_at: nowIso(),
-      error: `${error.message} O commit local foi mantido; faça o push manualmente.`,
+      error: error.message,
     };
   } else if (error instanceof AgentError || error instanceof GateError) {
     patch = {
@@ -307,8 +243,8 @@ async function handleFailure(job: Job, error: unknown): Promise<void> {
 
   const hint =
     error instanceof PushError
-      ? 'O commit local foi mantido, mas o push falhou. Verifique o remote e faça o push manualmente.'
-      : `Job #${job.id} falhou. A branch \`implementacao/${job.id}\` foi mantida para inspeção.`;
+      ? `O push para a master falhou, mas a branch \`implementacao/${job.id}\` foi enviada para o origin.`
+      : `Job #${job.id} falhou. A branch \`implementacao/${job.id}\` foi enviada para o origin para inspeção.`;
 
   await postEmbedToJob(final, hint);
   await updateJobMessage(final);
@@ -326,13 +262,7 @@ export async function processJob(job: Job): Promise<void> {
   await updateJobMessage(job);
 
   try {
-    if (job.kind === 'rollback') {
-      await handleRollback(job);
-    } else if (job.kind === 'apply') {
-      await handleApply(job);
-    } else {
-      await handleExecute(job);
-    }
+    await handleExecute(job);
   } catch (error) {
     await handleFailure(job, error);
   } finally {

@@ -81,24 +81,31 @@ export function assertRepoReady(): { ok: boolean; reason?: string } {
   return { ok: true };
 }
 
-export function createJobRepo(id: number, base: string): { dir: string; branch: string } {
+export function createJobRepo(id: number): { dir: string; branch: string; base: string } {
   const branch = `implementacao/${id}`;
   const dir = `${paths.worktrees}/job-${id}`;
 
   worktreeRemove(dir);
   fs.mkdirSync(paths.worktrees, { recursive: true });
 
-  // Clone completo (com .git próprio) para o OpenCode não resolver o
-  // projeto para o repo principal via o .git de um worktree linkado.
-  git(['clone', '--local', paths.repo, dir]);
-  // Sem origin: o OpenCode não deve seguir o caminho do repo principal.
-  gitTry(['remote', 'remove', 'origin'], dir);
+  const origin = gitTry(['remote', 'get-url', 'origin'], paths.repo).stdout;
+  if (!origin) {
+    throw new Error('Remote "origin" não configurado no repo principal.');
+  }
+
+  // Clone do origin: o job parte do que já foi publicado, não do checkout local.
+  git(['clone', '--branch', queueConfig.mainBranch, origin, dir], paths.repo);
+  const base = git(['rev-parse', 'HEAD'], dir);
   git(['checkout', '-B', branch, base], dir);
-  return { dir, branch };
+  return { dir, branch, base };
 }
 
 export function pushJobBranch(dir: string, branch: string): string {
-  return git(['push', '--force', paths.repo, branch], dir);
+  return git(['push', '--force', 'origin', branch], dir);
+}
+
+export function pushMasterFromClone(dir: string, branch: string): string {
+  return git(['push', 'origin', `HEAD:${branch}`], dir);
 }
 
 export function worktreeRemove(dir: string): void {

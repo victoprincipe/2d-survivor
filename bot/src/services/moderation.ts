@@ -23,19 +23,26 @@ export function cleanText(value: string): string {
     .trim();
 }
 
-export function validateSuggestion(title: string, prompt: string): ValidationResult {
-  if (title.length < 5 || title.length > 100) {
-    return { ok: false, reason: 'O título precisa ter entre 5 e 100 caracteres.' };
-  }
+export function validatePrompt(prompt: string): ValidationResult {
   if (prompt.length < 20 || prompt.length > 1500) {
     return { ok: false, reason: 'A descrição precisa ter entre 20 e 1500 caracteres.' };
   }
 
   for (const { pattern, reason } of BLOCKED_PATTERNS) {
-    if (pattern.test(`${title}\n${prompt}`)) {
+    if (pattern.test(prompt)) {
       return { ok: false, reason: `Implementação bloqueada: ${reason}.` };
     }
   }
 
   return { ok: true };
+}
+
+export function deriveTitle(prompt: string): string {
+  const firstLine = prompt
+    .split('\n')
+    .map((line) => line.trim())
+    .find((line) => line.length > 0);
+
+  const title = firstLine ?? 'Implementação';
+  return title.length > 100 ? `${title.slice(0, 99)}…` : title;
 }

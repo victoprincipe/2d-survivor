@@ -6,7 +6,7 @@ import {
 import { discordConfig } from '../config';
 import { createJob, getQueuePosition, updateJob } from '../db';
 import { createLogger } from '../logger';
-import { cleanText, validateSuggestion } from '../services/moderation';
+import { cleanText, deriveTitle, validatePrompt } from '../services/moderation';
 import { hasSubmitterRole } from '../services/permissions';
 import { checkAccountAge, checkSubmissionQuota } from '../services/quotas';
 import { jobEmbed, truncate } from '../ui/embeds';
@@ -40,14 +40,15 @@ export async function handleModalSubmit(interaction: ModalSubmitInteraction): Pr
     return;
   }
 
-  const title = cleanText(interaction.fields.getTextInputValue('titulo')).replace(/\s+/g, ' ');
   const prompt = cleanText(interaction.fields.getTextInputValue('descricao'));
 
-  const validation = validateSuggestion(title, prompt);
+  const validation = validatePrompt(prompt);
   if (!validation.ok) {
     await interaction.editReply(validation.reason ?? 'Implementação inválida.');
     return;
   }
+
+  const title = deriveTitle(prompt);
 
   let jobId: number | null = null;
 

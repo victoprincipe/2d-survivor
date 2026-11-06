@@ -49,16 +49,6 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     .addComponents(
       new ActionRowBuilder<TextInputBuilder>().addComponents(
         new TextInputBuilder()
-          .setCustomId('titulo')
-          .setLabel('Título')
-          .setPlaceholder('Ex.: Adicionar uma arma de gelo')
-          .setStyle(TextInputStyle.Short)
-          .setMinLength(5)
-          .setMaxLength(100)
-          .setRequired(true),
-      ),
-      new ActionRowBuilder<TextInputBuilder>().addComponents(
-        new TextInputBuilder()
           .setCustomId('descricao')
           .setLabel('Descreva a implementação')
           .setPlaceholder('O que deve mudar no jogo? Seja específico.')

@@ -1,76 +1,72 @@
 # Bot de implementações — 2d-survivor
 
-Bot de Discord que recebe ideias de melhoria, coloca em uma fila FIFO e executa uma por vez com o **OpenCode** em um worktree isolado. Se o build e o lint passarem, o worker faz o merge na `master`, roda a verificação de novo e faz **commit + push** para o remote configurado.
+Bot de Discord que recebe ideias de melhoria, coloca em uma fila FIFO e executa uma por vez com o **OpenCode**. Cada job roda em um clone isolado, passa por build/lint e, se estiver verde, é enviado para `origin/master` com commit automático.
 
 ## Como funciona
 
 ```
-/implementar → modal → SQLite (queued)
-                            │
-                            ▼
-                  worker pega o menor id
-                            │
-                            ▼
-            git worktree a partir da master
-                            │
-                            ▼
-          opencode run --standalone --auto
-                            │
-                            ▼
-                 npm run build && npm run lint
-                            │
-                    ┌───────┴────────┐
-                  falhou           passou
-                    │                │
-               failed, master    diff check
-               intacta              │
-                             ┌─────┴─────┐
-                          suspeito      ok
-                             │           │
-                       failed, branch  commit + FF na master
-                       mantida            │
-                                          ▼
-                              build/lint de novo (verificação)
-                                          │
-                                   falhou ┴ passou
-                                      │       │
-                                  revert   push origin master
-                                              │
-                                            done
+/implementar → modal (só o prompt) → SQLite (queued)
+                                         │
+                                         ▼
+                               worker pega o menor id
+                                         │
+                                         ▼
+                     git clone origin/master → job-N
+                                         │
+                                         ▼
+                       opencode run (HOME/DB isolados)
+                                         │
+                                         ▼
+                              npm run build && npm run lint
+                                         │
+                                 ┌───────┴────────┐
+                               falhou           passou
+                                 │                │
+                            failed, branch    commit
+                            enviada pro          │
+                            origin               ▼
+                                      push implementacao/N
+                                                 │
+                                                 ▼
+                                       push HEAD:master
+                                                 │
+                                               done
 ```
 
-O worker e o bot são processos separados e compartilham o SQLite em WAL. O bot fica online; o worker pode ser reiniciado sem derrubar o bot.
+O bot e o worker são processos separados e compartilham o SQLite em WAL. O bot fica online; o worker pode ser reiniciado sem derrubar o bot.
+
+## O que não bloqueia
+
+O worker **não olha o estado do seu checkout local**. Ele clona `origin/master` para cada job. Portanto:
+
+- arquivos não commitados no seu repo **não bloqueiam** a fila;
+- eles também **não entram** no job (o job parte do que está publicado);
+- para incluir seu WIP, commite e dê push antes de enfileirar.
+
+O `/fila` mostra o estado do checkout local só como informação.
 
 ## Pré-requisitos
 
-- Node.js 22+ (testado com 23.9).
-- `npm install` na raiz do jogo já feito.
-- OpenCode autenticado (`opencode auth login`) e um modelo escolhido em `AGENT_MODEL` (rode `opencode models` para listar).
-- Git disponível no PATH e um remote configurado (`origin`) com permissão de push.
-- O `gh` CLI autenticado e `gh auth setup-git` executado, ou credenciais git já configuradas.
-
-> O `HOME` do agente é isolado do seu config global, então o modelo padrão do OpenCode **não** é herdado. Defina `AGENT_MODEL` com um modelo bom para código; sem isso ele pode usar um modelo free/fraco.
+- Node.js 22+.
+- `npm install` na raiz do jogo (o worker hardlinka o `node_modules`).
+- OpenCode autenticado (`opencode auth login`) e um modelo em `AGENT_MODEL` (rode `opencode models`).
+- Remote `origin` configurado no repo principal.
+- `gh auth setup-git` ou credenciais git já configuradas para o push.
 
 ## 1. Criar o app no Discord
 
-1. Acesse <https://discord.com/developers/applications> → **New Application**.
+1. <https://discord.com/developers/applications> → **New Application**.
 2. Em **Bot**, copie o **Token**.
-3. Em **Privileged Gateway Intents**, deixe apenas **Guilds** (Message Content não é necessário).
-4. Em **OAuth2 → URL Generator**, marque:
-   - Scopes: `bot`, `applications.commands`
-   - Permissions: View Channels, Send Messages, Embed Links, Read Message History, Add Reactions, Create Public Threads, Send Messages in Threads
-5. Abra a URL gerada e convide o bot para o servidor.
+3. Em **Privileged Gateway Intents**, deixe apenas **Guilds**.
+4. Em **OAuth2 → URL Generator**, marque `bot` + `applications.commands` e as permissões: View Channels, Send Messages, Embed Links, Read Message History, Add Reactions, Create Public Threads, Send Messages in Threads.
+5. Convide o bot e copie o ID do canal de implementações.
 
-No Discord, copie o ID do canal onde as implementações serão publicadas (`SUGGESTIONS_CHANNEL_ID`).
-
-## 2. Configurar o bot
+## 2. Configurar
 
 ```bash
 cd bot
 cp .env.example .env
 ```
-
-Preencha o `.env`:
 
 | Variável | Obrigatória | Descrição |
 |---|---|---|
@@ -78,18 +74,13 @@ Preencha o `.env`:
 | `CLIENT_ID` | sim (deploy) | Application ID |
 | `GUILD_ID` | sim (deploy) | ID do servidor |
 | `SUGGESTIONS_CHANNEL_ID` | sim | canal onde os jobs são publicados |
-| `SUBMITTER_ROLE_ID` | não | se preenchido, só esse cargo envia implementações |
-| `REPO_PATH` | não | caminho do repo do jogo; padrão: pasta pai de `bot/` |
+| `SUBMITTER_ROLE_ID` | não | se preenchido, só esse cargo envia |
+| `REPO_PATH` | não | caminho do repo; padrão: pasta pai de `bot/` |
 | `MAIN_BRANCH` | não | padrão `master` |
-| `GIT_REMOTE` | não | padrão `origin` |
-| `GIT_PUSH` | não | padrão `true`; se `false`, só faz merge local |
-| `AGENT_MODEL` | não | formato `provider/model`; use um modelo forte para código |
-| `LINT_STRICT` | não | `true` por padrão; use `false` se o repo já tiver lint quebrado |
-| `POST_MERGE_VERIFY` | não | `true` por padrão; roda build/lint em worktree separado após o merge |
+| `AGENT_MODEL` | não | ex.: `opencode/deepseek-v4.1-flash-free` |
+| `LINT_STRICT` | não | `true` por padrão |
 
-As demais variáveis têm padrões seguros e estão comentadas no `.env.example`.
-
-## 3. Instalar, registrar comandos e rodar
+## 3. Instalar, registrar e rodar
 
 ```bash
 cd bot
@@ -98,67 +89,69 @@ npm run deploy
 npm run dev
 ```
 
-`npm run dev` sobe o bot e o worker juntos (`concurrently`). Para rodar separado:
-
-```bash
-npm run dev:bot
-npm run dev:worker
-```
+Separado: `npm run dev:bot` e `npm run dev:worker`.
 
 ## Comandos
 
 | Comando | Quem | O que faz |
 |---|---|---|
-| `/implementar` | membros com quota | abre o modal e enfileira |
-| `/fila` | todos | estado da fila, repo, job atual e próximos |
-| `/minhas-implementacoes` | todos | suas implementações e status |
-| `/ultimas-implementacoes` | todos | últimas implementações do servidor |
+| `/implementar` | membros com quota | abre o modal **só com o prompt** |
+| `/fila` | todos | estado da fila, worker e repo local |
+| `/minhas-implementacoes` | todos | suas implementações |
+| `/ultimas-implementacoes` | todos | últimas do servidor |
+| `/reprocessar <id>` | autor ou `Manage Server` | recoloca uma falha na fila |
+
+O título exibido é derivado da primeira linha do prompt; não há campo separado de título.
 
 ## Quotas padrão
 
 - Conta com pelo menos 7 dias.
-- 1 job ativo por usuário (`queued` ou `running`).
-- 3 jobs por dia por usuário.
-- 20 jobs por dia no total.
+- 1 job ativo por usuário.
+- 3 jobs por dia por usuário; 20 no total.
 - Fila máxima de 20.
 - Prompt de 20 a 1500 caracteres.
 
-Tudo ajustável no `.env`.
-
-## Status dos jobs
+## Status
 
 | Status | Significado |
 |---|---|
 | `queued` | na fila |
 | `running` | worker executando |
-| `done` | aplicado na master e enviado para o remote |
-| `failed` | agente, gate, diff ou push falhou; a branch `implementacao/<id>` é mantida |
-| `interrupted` | worker caiu no meio; reenvie a implementação |
+| `done` | commit enviado para `origin/master` |
+| `failed` | agente, gate, diff ou push falhou; a branch `implementacao/<id>` fica no origin |
+| `interrupted` | worker caiu no meio; use `/reprocessar <id>` |
+
+## O que o worker faz
+
+1. Clona `origin/master` em `../.2d-survivor-worktrees/job-<id>`.
+2. Cria a branch `implementacao/<id>`.
+3. Roda o OpenCode com `HOME`, banco e `PWD` isolados (não herda config global, MCPs nem modelo).
+4. Roda `npm run build` e depois `npm run lint`.
+5. Commita e envia a branch `implementacao/<id>` para o origin.
+6. Se o diff estiver dentro dos limites, envia `HEAD:master` para o origin.
+7. Remove o clone. A branch permanece no origin para inspeção.
+
+Diff acima de 20 arquivos/800 linhas, arquivos removidos ou caminhos protegidos fazem o job falhar sem push na master — a branch continua no origin. Se o push da master falhar (por exemplo, o origin avançou), o job falha e a branch também fica no origin.
 
 ## Segurança
 
-O worker roda o OpenCode com um `HOME` próprio (`bot/data/agent-home`):
+O worker roda o OpenCode com um `HOME` próprio por job:
 
-- A config global do seu OpenCode, MCPs, skills e aprovações salvas **não** são carregadas.
-- Só a `auth.json` do OpenCode é copiada para lá.
-- A config do agente fica em `bot/agent/opencode.json` (copiada para o `HOME` isolado no startup).
-- Leitura de `.env`, `.ssh`, `.aws`, `.config`, `.npmrc` e do próprio auth é negada.
-- O agente não pode editar `bot/`, `.github/`, `AGENTS.md`, `package.json`, lockfiles ou configs.
-- O agente não pode rodar `git commit/push/checkout/reset`, `rm`, `sudo`, `curl`, `wget`, `ssh` ou instalar dependências.
-- O gate (`npm run build` / `npm run lint`) roda com outro `HOME` vazio e sem chaves de provedor, para que código do build não leia credenciais.
-- Diff acima de 20 arquivos/800 linhas, arquivos removidos ou caminhos protegidos fazem o job falhar sem push.
-- Antes do merge, o worker confere que a master continua no mesmo SHA e limpa; depois do merge, roda build/lint de novo e faz `git revert` automático se falhar.
-- O push é feito depois da verificação; se falhar, o commit local é mantido e o job é reportado como falho.
+- só `auth.json` e a config do agente são copiados; config global, MCPs, skills e aprovações não são herdados;
+- leitura de `.env`, `.ssh`, `.aws`, `.config`, `.npmrc` e do auth é negada;
+- o agente não pode editar `bot/`, `.github/`, `AGENTS.md`, manifests/lockfiles ou configs;
+- o agente não roda `git commit/push/checkout/reset`, `rm`, `sudo`, `curl`, `wget`, `ssh` nem instala dependências;
+- o gate roda com outro `HOME` vazio e sem chaves de provedor;
+- o agente nunca edita o seu checkout local; ele trabalha no clone.
 
-**Risco residual:** sem Docker, o shell do agente roda com o seu usuário. As permissões são defesa em profundidade, não uma jaula de kernel. Para um servidor público, use Docker.
+**Risco residual:** sem Docker, o shell do agente roda com o seu usuário. As permissões são defesa em profundidade, não uma jaula de kernel.
 
 ## Operação
 
-- O worker precisa da `master` **checada e limpa**. Enquanto um job roda, não edite o repo principal; se editar, o merge falha e o job fica `failed`.
-- O worker parte do **HEAD** da master. Commite o jogo e o bot antes de usar a fila; `git stash` não serve, porque o worktree não enxerga alterações não commitadas.
-- Para trabalhar em paralelo, use outro clone.
-- O worker faz push para `GIT_REMOTE`/`MAIN_BRANCH` depois de cada job verde.
-- Para inspecionar: `npm run db:status`.
+- O worker precisa de `origin` acessível; se o push falhar, veja `/fila` e os logs.
+- O checkout local pode ficar sujo; isso não bloqueia.
+- Se quiser incluir WIP, commite e faça push antes de `/implementar`.
+- Para inspecionar: `npm run db:status`; logs em `bot/data/logs/`.
 - Reinicie o worker depois de mudar `.env` ou `bot/agent/opencode.json`.
 
 ## Estrutura
@@ -169,22 +162,21 @@ bot/
   src/
     index.ts               # bot discord.js
     deploy-commands.ts     # registro dos slash commands
-    commands/              # /implementar, /fila, /minhas, /ultimas
+    commands/              # implementar, fila, minhas, ultimas, reprocessar
     events/                # interactionCreate
     handlers/              # modal de implementação
     services/              # quotas, moderação, permissões, notificações
     ui/                    # embeds
-    worker/                # loop, opencode, gate, apply, rollback
+    worker/                # loop, opencode, gate, apply
     scripts/               # db-init, db:status, check:commands
-  data/                    # SQLite, logs, agent-home (gitignored)
+  data/                    # SQLite, logs, homes do agente (gitignored)
 ```
 
 ## Troubleshooting
 
-- **`Variáveis ausentes no bot/.env`**: preencha `DISCORD_TOKEN` e `SUGGESTIONS_CHANNEL_ID`.
-- **Bot não responde**: rode `npm run deploy` e confira se o bot foi convidado com `applications.commands`.
-- **Fila parada**: `/fila` mostra o motivo. Normalmente é repo sujo ou branch diferente de `master`.
+- **`Variáveis ausentes no bot/.env`**: preencha token e canal.
+- **Bot não responde**: rode `npm run deploy`; confira `applications.commands`.
 - **`auth.json do OpenCode não encontrado`**: rode `opencode auth login` e reinicie o worker.
-- **Build falha em todo job**: o repo pode já estar quebrado na master; rode `npm run build` na raiz. Se for só lint antigo, use `LINT_STRICT=false`.
-- **Push falha**: confira `git remote -v`, `gh auth status` e rode `gh auth setup-git`. O commit local fica na `master`; você pode fazer o push manualmente.
-- **Modelo fraco**: defina `AGENT_MODEL` com um modelo bom para código.
+- **Build falha em todo job**: rode `npm run build` na raiz. Se for só lint antigo, use `LINT_STRICT=false`.
+- **Push falha**: confira `git remote -v`, `gh auth status` e `gh auth setup-git`.
+- **Modelo fraco**: ajuste `AGENT_MODEL` (`opencode models`).

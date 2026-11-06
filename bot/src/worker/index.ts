@@ -8,7 +8,7 @@ import {
   recoverRunningJobs,
   updateJob,
 } from '../db';
-import { assertRepoReady, worktreeRemove } from '../git';
+import { worktreeRemove } from '../git';
 import { createLogger } from '../logger';
 import { processJob } from './job';
 
@@ -68,30 +68,11 @@ cleanupRecovered();
 cleanupStaleWorktrees();
 
 let stopping = false;
-let lastNotice = '';
-let lastNoticeAt = 0;
-
-function notice(message: string): void {
-  const now = Date.now();
-  if (message === lastNotice && now - lastNoticeAt < 60_000) return;
-  lastNotice = message;
-  lastNoticeAt = now;
-  log.warn(message);
-}
 
 async function main(): Promise<void> {
   log.info('Worker iniciado. Aguardando jobs...');
 
   while (!stopping) {
-    const ready = assertRepoReady();
-    if (!ready.ok) {
-      notice(`Fila parada: ${ready.reason}`);
-      await sleep(queueConfig.pollMs);
-      continue;
-    }
-
-    lastNotice = '';
-
     const job = claimNextJob();
     if (!job) {
       await sleep(queueConfig.pollMs);

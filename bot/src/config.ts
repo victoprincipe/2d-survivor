@@ -62,8 +62,6 @@ export const discordConfig = {
 
 export const queueConfig = {
   mainBranch: readString('MAIN_BRANCH', 'master'),
-  gitRemote: readString('GIT_REMOTE', 'origin'),
-  gitPush: readBool('GIT_PUSH', true),
   maxActivePerUser: readInt('MAX_ACTIVE_PER_USER', 1),
   dailyUserLimit: readInt('DAILY_USER_LIMIT', 3),
   dailyGlobalLimit: readInt('DAILY_GLOBAL_LIMIT', 20),
@@ -74,7 +72,6 @@ export const queueConfig = {
   jobTimeoutMs: readInt('JOB_TIMEOUT_MIN', 20) * 60_000,
   buildTimeoutMs: readInt('BUILD_TIMEOUT_MIN', 10) * 60_000,
   lintTimeoutMs: readInt('LINT_TIMEOUT_MIN', 5) * 60_000,
-  postMergeVerify: readBool('POST_MERGE_VERIFY', true),
   lintStrict: readBool('LINT_STRICT', true),
   pollMs: Math.max(500, readInt('WORKER_POLL_MS', 2000)),
 };
