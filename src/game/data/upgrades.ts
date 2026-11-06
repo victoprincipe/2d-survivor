@@ -168,6 +168,24 @@ export const WEAPON_REGISTRY: Record<WeaponId, WeaponMeta> = {
       'O café atravessa mais inimigos e os petiscos ficam velozes.',
     ],
   },
+  syringe: {
+    id: 'syringe',
+    name: 'Seringas',
+    description: 'Dispara seringas tranquilizantes nos inimigos mais próximos.',
+    maxLevel: 5,
+    iconName: 'Syringe',
+    synergyPassive: 'tome',
+    evolvedId: 'supreme_serum',
+    evolvedName: 'Soro Supremo',
+    evolvedDescription: 'Seringas gigantes de soro que perfuram e enfraquecem hordas inteiras.',
+    levelDescriptions: [
+      'Dispara 1 seringa certeira no inimigo mais próximo.',
+      'Dispara +1 seringa simultânea.',
+      'As seringas perfuram 1 inimigo adicional.',
+      'Dispara +1 seringa simultânea (total 3).',
+      'Seringas mais rápidas, dano +35% e perfuração ampliada.',
+    ],
+  },
 };
 
 export const PASSIVE_REGISTRY: Record<PassiveId, PassiveMeta> = {

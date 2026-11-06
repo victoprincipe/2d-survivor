@@ -93,4 +93,19 @@ export const CHARACTERS: CharacterConfig[] = [
       speed: 0.05,
     },
   },
+  {
+    id: 'dr_janelinha',
+    name: 'Dr. Janelinha',
+    title: 'Médico de Campo',
+    description: 'Médico corajoso que aplica seringas tranquilizantes nos monstros antes que eles o alcancem.',
+    startingWeapon: 'syringe',
+    iconName: 'Syringe',
+    color: '#e2e8f0',
+    portraitColor: '#1f2937',
+    statBonuses: {
+      maxHp: 10,
+      cooldownReduction: 0.1,
+      pickupRadius: 15,
+    },
+  },
 ];

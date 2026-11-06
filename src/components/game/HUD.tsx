@@ -22,6 +22,7 @@ import {
   Crosshair,
   BowArrow,
   Utensils,
+  Syringe,
 } from 'lucide-react';
 
 interface HUDProps {
@@ -40,6 +41,7 @@ const WEAPON_ICONS: Record<string, React.ReactNode> = {
   garlic: <Shield className="w-4 h-4 text-yellow-300" />,
   lightning: <Zap className="w-4 h-4 text-cyan-300" />,
   derson_combo: <Utensils className="w-4 h-4 text-amber-300" />,
+  syringe: <Syringe className="w-4 h-4 text-cyan-300" />,
 };
 
 const PASSIVE_ICONS: Record<string, React.ReactNode> = {

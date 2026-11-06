@@ -6,7 +6,8 @@ export type WeaponId =
   | 'bible'
   | 'garlic'
   | 'lightning'
-  | 'derson_combo';
+  | 'derson_combo'
+  | 'syringe';
 export type EvolvedWeaponId =
   | 'holy_wand'
   | 'bloody_tear'
@@ -15,7 +16,8 @@ export type EvolvedWeaponId =
   | 'unholy_vespers'
   | 'soul_eater'
   | 'thunder_loop'
-  | 'derson_banquet';
+  | 'derson_banquet'
+  | 'supreme_serum';
 
 export type PassiveId = 'spinach' | 'wings' | 'heart' | 'tome' | 'magnet' | 'bracer';
 

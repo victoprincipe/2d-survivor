@@ -28,6 +28,7 @@ import {
   Dumbbell,
   Bike,
   Utensils,
+  Syringe,
 } from 'lucide-react';
 
 interface StartScreenProps {
@@ -43,6 +44,7 @@ const WEAPON_ICONS: Record<string, React.ReactNode> = {
   bow: <BowArrow className="w-5 h-5 text-lime-400" />,
   garlic: <Shield className="w-5 h-5 text-emerald-400" />,
   derson_combo: <Utensils className="w-5 h-5 text-amber-400" />,
+  syringe: <Syringe className="w-5 h-5 text-cyan-400" />,
 };
 
 const POWERUP_ICONS: Record<string, React.ReactNode> = {
@@ -61,6 +63,7 @@ const CHARACTER_ICONS: Record<string, React.ReactNode> = {
   Shield: <Shield className="w-6 h-6 text-white/90 drop-shadow" />,
   Dumbbell: <Dumbbell className="w-6 h-6 text-white/90 drop-shadow" />,
   Bike: <Bike className="w-6 h-6 text-white/90 drop-shadow" />,
+  Syringe: <Syringe className="w-6 h-6 text-white/90 drop-shadow" />,
 };
 
 export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame, onUpdateSave }) => {

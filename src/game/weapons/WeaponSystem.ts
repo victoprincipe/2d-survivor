@@ -11,7 +11,7 @@ import { WorldSystem } from '../systems/WorldProps';
 
 export interface Projectile {
   id: number;
-  type: 'wand' | 'knife' | 'bow' | 'cheese_bread' | 'coffee' | 'cake';
+  type: 'wand' | 'knife' | 'bow' | 'cheese_bread' | 'coffee' | 'cake' | 'syringe';
   x: number;
   y: number;
   vx: number;
@@ -228,6 +228,10 @@ export class WeaponSystem {
       const baseCd = w.evolved ? 0.55 : 0.9;
       w.cooldownTimer = baseCd * cdFactor;
       this.triggerDersonCombo(w, player, grid, sound);
+    } else if (w.id === 'syringe') {
+      const baseCd = w.evolved ? 0.5 : 0.95;
+      w.cooldownTimer = baseCd * cdFactor;
+      this.triggerSyringe(w, player, grid, sound);
     }
   }
 
@@ -421,6 +425,48 @@ export class WeaponSystem {
         pierce,
         life: 1.4,
         weaponId: 'bow',
+        isEvolved: w.evolved,
+        hitEnemyIds: new Set(),
+      });
+    }
+
+    sound.playShoot();
+  }
+
+  private triggerSyringe(w: WeaponInstance, player: Player, grid: SpatialGrid<Enemy>, sound: SoundEngine): void {
+    const nearby = grid.queryRadius(player.x, player.y, 500);
+    nearby.sort((a, b) => {
+      const da = (a.x - player.x) ** 2 + (a.y - player.y) ** 2;
+      const db = (b.x - player.x) ** 2 + (b.y - player.y) ** 2;
+      return da - db;
+    });
+
+    const projectileCount = w.evolved ? 4 : 1 + (w.level >= 2 ? 1 : 0) + (w.level >= 4 ? 1 : 0);
+    const speed = w.evolved ? 620 : 460;
+    const baseDamage = (w.evolved ? 32 : 13 + w.level * 4) * player.might;
+    const pierce = w.evolved ? 4 : 1 + (w.level >= 3 ? 1 : 0) + (w.level >= 5 ? 1 : 0);
+    const baseAngle = nearby[0]
+      ? Math.atan2(nearby[0].y - player.y, nearby[0].x - player.x)
+      : Math.atan2(player.facingY, player.facingX);
+
+    for (let i = 0; i < projectileCount; i++) {
+      const target = nearby[i];
+      const angle = target
+        ? Math.atan2(target.y - player.y, target.x - player.x)
+        : baseAngle + (i - (projectileCount - 1) / 2) * 0.16;
+
+      this.projectiles.push({
+        id: this.nextProjId++,
+        type: 'syringe',
+        x: player.x,
+        y: player.y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        radius: 5,
+        damage: baseDamage,
+        pierce,
+        life: 1.4,
+        weaponId: 'syringe',
         isEvolved: w.evolved,
         hitEnemyIds: new Set(),
       });
@@ -711,7 +757,9 @@ export class WeaponSystem {
                   ? '#b45309'
                   : p.type === 'cake'
                     ? '#f9a8d4'
-                    : '#e2e8f0';
+                    : p.type === 'syringe'
+                      ? '#22d3ee'
+                      : '#e2e8f0';
         vfx.addSparks(p.x, p.y, sparkColor, 3);
         hitSomeone = true;
 
@@ -857,6 +905,24 @@ export class WeaponSystem {
         ctx.lineTo(-7, 4);
         ctx.closePath();
         ctx.fill();
+      } else if (p.type === 'syringe') {
+        // Corpo da seringa
+        ctx.fillStyle = p.isEvolved ? '#22d3ee' : '#e0f2fe';
+        ctx.fillRect(-10, -4, 16, 8);
+        // Soro
+        ctx.fillStyle = p.isEvolved ? '#0891b2' : '#67e8f9';
+        ctx.fillRect(-8, -3, 10, 6);
+        // Êmbolo
+        ctx.fillStyle = '#64748b';
+        ctx.fillRect(-14, -5, 4, 10);
+        ctx.fillRect(-18, -2, 4, 4);
+        // Agulha
+        ctx.strokeStyle = '#94a3b8';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(6, 0);
+        ctx.lineTo(16, 0);
+        ctx.stroke();
       } else if (p.type === 'cheese_bread') {
         ctx.fillStyle = p.isEvolved ? '#fde68a' : '#f6c453';
         ctx.beginPath();
@@ -926,7 +992,7 @@ export class WeaponSystem {
 
   generateUpgradeOptions(): UpgradeOption[] {
     const options: UpgradeOption[] = [];
-    const allWeaponIds: WeaponId[] = ['whip', 'wand', 'knife', 'bow', 'bible', 'garlic', 'lightning', 'derson_combo'];
+    const allWeaponIds: WeaponId[] = ['whip', 'wand', 'knife', 'bow', 'bible', 'garlic', 'lightning', 'derson_combo', 'syringe'];
     const allPassiveIds: PassiveId[] = ['spinach', 'wings', 'heart', 'tome', 'magnet', 'bracer'];
 
     // 1. Check for possible Evolutions first
