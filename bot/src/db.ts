@@ -15,6 +15,17 @@ export type JobStatus =
 
 export type JobKind = 'execute' | 'apply' | 'rollback';
 
+export interface JobAttachment {
+  /** Nome original enviado no Discord. */
+  name: string;
+  /** Caminho absoluto do arquivo no disco do bot. */
+  file: string;
+  contentType: string;
+  size: number;
+  /** URL original do CDN do Discord (pode expirar). */
+  url?: string;
+}
+
 export interface Job {
   id: number;
   kind: JobKind;
@@ -41,6 +52,8 @@ export interface Job {
   started_at: string | null;
   finished_at: string | null;
   heartbeat_at: string | null;
+  /** JSON serializado de JobAttachment[]; use jobAttachments() para ler. */
+  attachments: string | null;
 }
 
 export interface NewJob {
@@ -48,6 +61,7 @@ export interface NewJob {
   authorName: string;
   title: string;
   prompt: string;
+  attachments?: JobAttachment[];
 }
 
 let instance: Database.Database | null = null;
@@ -81,7 +95,8 @@ function initSchema(db: Database.Database): void {
       created_at    TEXT NOT NULL,
       started_at    TEXT,
       finished_at   TEXT,
-      heartbeat_at  TEXT
+      heartbeat_at  TEXT,
+      attachments   TEXT
     );
 
     CREATE INDEX IF NOT EXISTS idx_jobs_status_id ON jobs (status, id);
@@ -94,6 +109,35 @@ function initSchema(db: Database.Database): void {
   `);
 
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('queue_paused', '1');
+
+  // Migração para bancos criados antes do suporte a imagens.
+  const columns = db.prepare('PRAGMA table_info(jobs)').all() as Array<{ name: string }>;
+  if (!columns.some((column) => column.name === 'attachments')) {
+    try {
+      db.exec('ALTER TABLE jobs ADD COLUMN attachments TEXT');
+    } catch (error) {
+      // Bot e worker podem migrar ao mesmo tempo; a segunda alteração é inofensiva.
+      if (!String(error).includes('duplicate column name')) throw error;
+    }
+  }
+}
+
+export function jobAttachments(job: Job): JobAttachment[] {
+  if (!job.attachments) return [];
+
+  try {
+    const parsed = JSON.parse(job.attachments) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (item): item is JobAttachment =>
+        typeof item === 'object' &&
+        item !== null &&
+        typeof (item as JobAttachment).file === 'string' &&
+        typeof (item as JobAttachment).name === 'string',
+    );
+  } catch {
+    return [];
+  }
 }
 
 export function getDb(): Database.Database {
@@ -149,10 +193,19 @@ export function createJob(input: NewJob): Job {
   const now = new Date().toISOString();
   const result = getDb()
     .prepare(
-      `INSERT INTO jobs (author_id, author_name, title, prompt, created_at)
-       VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO jobs (author_id, author_name, title, prompt, attachments, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
     )
-    .run(input.authorId, input.authorName, input.title, input.prompt, now);
+    .run(
+      input.authorId,
+      input.authorName,
+      input.title,
+      input.prompt,
+      input.attachments && input.attachments.length > 0
+        ? JSON.stringify(input.attachments)
+        : null,
+      now,
+    );
 
   return requireJob(Number(result.lastInsertRowid));
 }
@@ -182,6 +235,7 @@ const JOB_COLUMNS = new Set([
   'started_at',
   'finished_at',
   'heartbeat_at',
+  'attachments',
 ]);
 
 export function updateJob(id: number, patch: Partial<Job>): Job {

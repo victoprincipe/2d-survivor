@@ -10,6 +10,7 @@ import {
 } from '../db';
 import { worktreeRemove } from '../git';
 import { createLogger } from '../logger';
+import { cleanupOldAssets } from './assets';
 import { processJob } from './job';
 
 const log = createLogger('worker');
@@ -20,6 +21,7 @@ requireWorkerConfig();
 getDb();
 fs.mkdirSync(paths.logs, { recursive: true });
 fs.mkdirSync(paths.worktrees, { recursive: true });
+fs.mkdirSync(paths.assets, { recursive: true });
 
 function prepareAgentHome(): void {
   fs.mkdirSync(path.join(paths.agentHome, '.config', 'opencode'), { recursive: true });
@@ -66,6 +68,7 @@ function cleanupStaleWorktrees(): void {
 
 cleanupRecovered();
 cleanupStaleWorktrees();
+cleanupOldAssets();
 
 let stopping = false;
 

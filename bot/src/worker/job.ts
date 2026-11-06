@@ -31,6 +31,7 @@ import {
 } from './errors';
 import { runGate } from './gate';
 import { runAgent } from './opencode';
+import { removeJobAssets } from './assets';
 import { prepareNodeModules } from './workspace';
 
 const log = createLogger('job');
@@ -81,6 +82,7 @@ function preserveWork(job: Job, reason: string): string | null {
 
   try {
     removeLocalSecrets(worktree);
+    removeJobAssets(worktree);
     if (!hasChanges(worktree)) return null;
     const sha = commitAll(worktree, `wip(job-${job.id}): ${reason}`);
     log.warn(`Trabalho do job #${job.id} preservado em ${sha.slice(0, 8)}.`);
@@ -147,6 +149,8 @@ async function handleExecute(job: Job): Promise<void> {
     await postToJob(job, `Executando **#${job.id}** em \`${branch}\`...`);
 
     const agent = await runAgent(job, dir);
+    // As imagens já foram usadas pelo agente; não devem entrar no commit.
+    removeJobAssets(dir);
     const summary = readSummary(dir);
     updateJob(job.id, { summary, log_path: agent.logPath });
 

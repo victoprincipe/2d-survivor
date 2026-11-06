@@ -49,6 +49,13 @@ export const paths = {
   agentConfigSource: path.join(botDir, 'agent', 'opencode.json'),
   agentConfig: path.join(dataDir, 'agent-home', '.config', 'opencode', 'opencode.json'),
   opencodeDb: path.join(dataDir, 'opencode-worker.db'),
+  assets: path.join(dataDir, 'assets'),
+};
+
+export const imageConfig = {
+  maxCount: Math.min(10, Math.max(1, readInt('MAX_PROMPT_IMAGES', 3))),
+  maxBytes: Math.max(1, readInt('MAX_IMAGE_MB', 8)) * 1024 * 1024,
+  retentionDays: Math.max(1, readInt('IMAGE_RETENTION_DAYS', 7)),
 };
 
 export const discordConfig = {
@@ -82,6 +89,10 @@ export const agentConfig = {
   bin: readString('OPENCODE_BIN', 'opencode'),
   name: readString('AGENT_NAME', 'implementer'),
   model: readString('AGENT_MODEL'),
+  visionModel: readString(
+    'AGENT_VISION_MODEL',
+    'opencode/nemotron-3.5-super-vl-free',
+  ),
 };
 
 function missing(names: string[]): string[] {

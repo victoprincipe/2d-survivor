@@ -1,5 +1,5 @@
 import { EmbedBuilder } from 'discord.js';
-import { Job, JobStatus } from '../db';
+import { Job, JobStatus, jobAttachments } from '../db';
 import { shortSha } from '../git';
 
 const STATUS_LABEL: Record<JobStatus, string> = {
@@ -43,6 +43,7 @@ export function discordTimestamp(iso: string | null): string {
 }
 
 export function jobEmbed(job: Job): EmbedBuilder {
+  const attachments = jobAttachments(job);
   const fields: Array<{ name: string; value: string; inline?: boolean }> = [
     { name: 'Autor', value: `<@${job.author_id}>`, inline: true },
     { name: 'Status', value: statusLabel(job.status), inline: true },
@@ -67,6 +68,16 @@ export function jobEmbed(job: Job): EmbedBuilder {
     },
   ];
 
+  if (attachments.length > 0) {
+    const names = attachments
+      .map((attachment) => truncate(attachment.name, 40))
+      .join(', ');
+    fields.push({
+      name: `Imagens (${attachments.length})`,
+      value: truncate(names, 1000),
+    });
+  }
+
   if (job.summary) {
     fields.push({ name: 'Resumo', value: truncate(job.summary, 1000) });
   }
@@ -77,13 +88,24 @@ export function jobEmbed(job: Job): EmbedBuilder {
     fields.push({ name: 'Erro', value: truncate(job.error, 1000) });
   }
 
-  return new EmbedBuilder()
+  const embed = new EmbedBuilder()
     .setColor(statusColor(job.status))
     .setTitle(truncate(`Implementação #${job.id} — ${job.title}`, 250))
-    .setDescription(truncate(job.prompt, 3500))
+    .setDescription(
+      job.prompt
+        ? truncate(job.prompt, 3500)
+        : '(sem descrição — use as imagens como referência)',
+    )
     .addFields(fields)
     .setFooter({ text: `job #${job.id} • ${job.kind}` })
     .setTimestamp(new Date(job.created_at));
+
+  const thumbnail = attachments.find((attachment) => attachment.url)?.url;
+  if (thumbnail && /^https?:\/\//i.test(thumbnail)) {
+    embed.setThumbnail(thumbnail);
+  }
+
+  return embed;
 }
 
 export function jobLine(job: Job): string {

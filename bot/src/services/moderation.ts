@@ -23,8 +23,13 @@ export function cleanText(value: string): string {
     .trim();
 }
 
-export function validatePrompt(prompt: string): ValidationResult {
-  if (prompt.length < 20 || prompt.length > 1500) {
+export function validatePrompt(prompt: string, imageCount = 0): ValidationResult {
+  if (prompt.length > 1500) {
+    return { ok: false, reason: 'A descrição precisa ter no máximo 1500 caracteres.' };
+  }
+
+  // Com imagens, a descrição é opcional; sem imagens, o texto é obrigatório.
+  if (imageCount === 0 && prompt.length < 20) {
     return { ok: false, reason: 'A descrição precisa ter entre 20 e 1500 caracteres.' };
   }
 
@@ -37,12 +42,16 @@ export function validatePrompt(prompt: string): ValidationResult {
   return { ok: true };
 }
 
-export function deriveTitle(prompt: string): string {
+export function deriveTitle(prompt: string, imageNames: string[] = []): string {
   const firstLine = prompt
     .split('\n')
     .map((line) => line.trim())
     .find((line) => line.length > 0);
 
-  const title = firstLine ?? 'Implementação';
+  const fallback =
+    imageNames.length > 0
+      ? `Imagens: ${imageNames.join(', ')}`
+      : 'Implementação';
+  const title = firstLine ?? fallback;
   return title.length > 100 ? `${title.slice(0, 99)}…` : title;
 }

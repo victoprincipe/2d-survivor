@@ -80,6 +80,10 @@ cp .env.example .env
 | `MAIN_BRANCH` | não | padrão `master` |
 | `GIT_AUTHOR_EMAIL` | não | e-mail verificado usado nos commits do worker (padrão: noreply do GitHub) |
 | `AGENT_MODEL` | não | ex.: `opencode/deepseek-v4.1-flash-free` |
+| `AGENT_VISION_MODEL` | não | modelo com visão para jobs com imagem (padrão: `opencode/nemotron-3.5-super-vl-free`) |
+| `MAX_PROMPT_IMAGES` | não | imagens por prompt (padrão: 3) |
+| `MAX_IMAGE_MB` | não | tamanho máximo por imagem (padrão: 8) |
+| `IMAGE_RETENTION_DAYS` | não | dias antes de apagar as imagens locais (padrão: 7) |
 | `LINT_STRICT` | não | `true` por padrão |
 
 ## 3. Instalar, registrar e rodar
@@ -96,6 +100,18 @@ Separado: `npm run dev:bot` e `npm run dev:worker`.
 ## Como enviar
 
 Escreva o prompt **diretamente no canal definido em `PROMPT_CHANNEL_ID`** (ou em `SUGGESTIONS_CHANNEL_ID`, se vazio). O bot lê a mensagem, cria o job e responde com o ID e a posição. A partir daí o fluxo é automático.
+
+## Imagens nos prompts
+
+Você pode anexar até **3 imagens** (PNG, JPEG, GIF ou WebP) de até **8 MB** cada. O texto é opcional quando há imagem.
+
+- O bot baixa os anexos para `bot/data/assets/message-<id>/` e guarda os metadados no SQLite.
+- O worker copia as imagens para `.job-assets/` dentro do clone, anexa a primeira com `--file` e o agente lê as demais com a ferramenta `read`.
+- Jobs com imagem usam automaticamente `AGENT_VISION_MODEL` (padrão: `opencode/nemotron-3.5-super-vl-free`), porque modelos text-only rejeitam imagens.
+- **Referência visual** (mockup, print, estilo): o agente usa como guia e não copia o arquivo.
+- **Asset do jogo** (sprite, ícone, fundo): o agente copia para `public/` e referencia no código; só isso entra no commit.
+- `.job-assets/` é excluído do git e apagado depois do job.
+- As pastas em `bot/data/assets/` são removidas após `IMAGE_RETENTION_DAYS` dias; depois disso, `/reprocessar` pede que você reenvie as imagens.
 
 ## Comandos
 
@@ -114,7 +130,7 @@ O título exibido é derivado da primeira linha do prompt; não há campo separa
 - 1 job ativo por usuário.
 - 5 jobs por dia por usuário; 20 no total.
 - Fila máxima de 20.
-- Prompt de 20 a 1500 caracteres.
+- Prompt de 20 a 1500 caracteres; com imagens, o texto é opcional e pode ter até 1500 caracteres.
 
 ## Status
 
@@ -130,11 +146,12 @@ O título exibido é derivado da primeira linha do prompt; não há campo separa
 
 1. Clona `origin/master` em `../.2d-survivor-worktrees/job-<id>`.
 2. Cria a branch `implementacao/<id>`.
-3. Roda o OpenCode com `HOME`, banco e `PWD` isolados (não herda config global, MCPs nem modelo).
-4. Roda `npm run build` e depois `npm run lint`.
-5. Commita e envia a branch `implementacao/<id>` para o origin.
-6. Se o diff estiver dentro dos limites, envia `HEAD:master` para o origin.
-7. Remove o clone. A branch permanece no origin para inspeção.
+3. Copia as imagens do job para `.job-assets/` (fora do git) e escolhe o modelo de visão quando houver imagem.
+4. Roda o OpenCode com `HOME`, banco e `PWD` isolados (não herda config global, MCPs nem modelo).
+5. Roda `npm run build` e depois `npm run lint`.
+6. Commita e envia a branch `implementacao/<id>` para o origin.
+7. Se o diff estiver dentro dos limites, envia `HEAD:master` para o origin.
+8. Remove o clone. A branch permanece no origin para inspeção.
 
 Diff acima de 20 arquivos/800 linhas, arquivos removidos ou caminhos protegidos fazem o job falhar sem push na master — a branch continua no origin. Se o push da master falhar (por exemplo, o origin avançou), o job falha e a branch também fica no origin.
 
@@ -173,9 +190,9 @@ bot/
     events/                # interactionCreate, messageCreate
     services/              # quotas, moderação, permissões, notificações
     ui/                    # embeds
-    worker/                # loop, opencode, gate, apply
+    worker/                # loop, opencode, gate, apply, assets
     scripts/               # db-init, db:status, check:commands
-  data/                    # SQLite, logs, homes do agente (gitignored)
+  data/                    # SQLite, logs, homes do agente, assets (gitignored)
 ```
 
 ## Troubleshooting
@@ -184,6 +201,8 @@ bot/
 - **Bot não responde**: rode `npm run deploy`; confira `applications.commands`.
 - **`auth.json do OpenCode não encontrado`**: rode `opencode auth login` e reinicie o worker.
 - **Mensagens não são lidas**: confira se o **Message Content Intent** está habilitado no Developer Portal e se `PROMPT_CHANNEL_ID` aponta para o canal certo.
+- **Imagem rejeitada**: confira formato (PNG/JPEG/GIF/WebP), tamanho (8 MB) e quantidade (3). Se o job falhar com “imagem não encontrada”, as imagens expiraram: reenvie o prompt.
+- **Job com imagem falha no modelo**: confira `AGENT_VISION_MODEL` (`opencode models`); modelos text-only não aceitam imagem.
 - **Build falha em todo job**: rode `npm run build` na raiz. Se for só lint antigo, use `LINT_STRICT=false`.
 - **Push falha**: confira `git remote -v`, `gh auth status` e `gh auth setup-git`.
 - **Modelo fraco**: ajuste `AGENT_MODEL` (`opencode models`).
