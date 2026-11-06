@@ -42,9 +42,12 @@ function runStep(
 
   return new Promise<StepResult>((resolve) => {
     const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+    const env = gateEnv();
+    env.PWD = cwd;
+    delete env.OLDPWD;
     const child = spawn(npm, args, {
       cwd,
-      env: gateEnv(),
+      env,
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true,
     });

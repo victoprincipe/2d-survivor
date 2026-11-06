@@ -91,6 +91,9 @@ export async function runAgent(job: Job, worktree: string): Promise<AgentResult>
   const env = agentEnv();
   env.HOME = jobHome;
   env.OPENCODE_DB = path.join(dataDir, 'opencode.db');
+  // O OpenCode usa PWD para descobrir a localização do projeto.
+  env.PWD = worktree;
+  delete env.OLDPWD;
   log.info(`Job #${job.id} HOME=${jobHome} cwd=${worktree}`);
 
   return new Promise<AgentResult>((resolve, reject) => {
