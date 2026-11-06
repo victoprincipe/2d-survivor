@@ -16,7 +16,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
   if (jobs.length === 0) {
     await interaction.reply({
-      content: 'Você ainda não enviou nenhuma implementação. Use `/implementar`.',
+      content: 'Você ainda não enviou nenhuma implementação. Escreva o prompt no canal de implementações.',
       flags: MessageFlags.Ephemeral,
     });
     return;

@@ -5,7 +5,7 @@ Bot de Discord que recebe ideias de melhoria, coloca em uma fila FIFO e executa 
 ## Como funciona
 
 ```
-/implementar → modal (só o prompt) → SQLite (queued)
+mensagem no canal de prompts → SQLite (queued)
                                          │
                                          ▼
                                worker pega o menor id
@@ -57,7 +57,7 @@ O `/fila` mostra o estado do checkout local só como informação.
 
 1. <https://discord.com/developers/applications> → **New Application**.
 2. Em **Bot**, copie o **Token**.
-3. Em **Privileged Gateway Intents**, deixe apenas **Guilds**.
+3. Em **Privileged Gateway Intents**, habilite **Message Content** e mantenha **Guilds**. O bot também usa o intent normal **GuildMessages**.
 4. Em **OAuth2 → URL Generator**, marque `bot` + `applications.commands` e as permissões: View Channels, Send Messages, Embed Links, Read Message History, Add Reactions, Create Public Threads, Send Messages in Threads.
 5. Convide o bot e copie o ID do canal de implementações.
 
@@ -74,6 +74,7 @@ cp .env.example .env
 | `CLIENT_ID` | sim (deploy) | Application ID |
 | `GUILD_ID` | sim (deploy) | ID do servidor |
 | `SUGGESTIONS_CHANNEL_ID` | sim | canal onde os jobs são publicados |
+| `PROMPT_CHANNEL_ID` | não | canal onde os usuários escrevem o prompt; se vazio, usa `SUGGESTIONS_CHANNEL_ID` |
 | `SUBMITTER_ROLE_ID` | não | se preenchido, só esse cargo envia |
 | `REPO_PATH` | não | caminho do repo; padrão: pasta pai de `bot/` |
 | `MAIN_BRANCH` | não | padrão `master` |
@@ -92,11 +93,14 @@ npm run dev
 
 Separado: `npm run dev:bot` e `npm run dev:worker`.
 
+## Como enviar
+
+Escreva o prompt **diretamente no canal definido em `PROMPT_CHANNEL_ID`** (ou em `SUGGESTIONS_CHANNEL_ID`, se vazio). O bot lê a mensagem, cria o job e responde com o ID e a posição. A partir daí o fluxo é automático.
+
 ## Comandos
 
 | Comando | Quem | O que faz |
 |---|---|---|
-| `/implementar` | membros com quota | abre o modal **só com o prompt** |
 | `/fila` | todos | estado da fila, worker e repo local |
 | `/minhas-implementacoes` | todos | suas implementações |
 | `/ultimas-implementacoes` | todos | últimas do servidor |
@@ -151,7 +155,7 @@ O worker roda o OpenCode com um `HOME` próprio por job:
 
 - O worker precisa de `origin` acessível; se o push falhar, veja `/fila` e os logs.
 - O checkout local pode ficar sujo; isso não bloqueia.
-- Se quiser incluir WIP, commite e faça push antes de `/implementar`.
+- Se quiser incluir WIP, commite e faça push antes de enviar o prompt.
 - O worker faz push para `origin`/`master` depois de cada job.
 - Os commits do worker usam `GIT_AUTHOR_NAME`/`GIT_AUTHOR_EMAIL`. Mantenha o e-mail verificado no GitHub; o padrão é o noreply `6431486+victoprincipe@users.noreply.github.com`.
 - Para inspecionar: `npm run db:status`; logs em `bot/data/logs/`.
@@ -165,9 +169,8 @@ bot/
   src/
     index.ts               # bot discord.js
     deploy-commands.ts     # registro dos slash commands
-    commands/              # implementar, fila, minhas, ultimas, reprocessar
-    events/                # interactionCreate
-    handlers/              # modal de implementação
+    commands/              # fila, minhas, ultimas, reprocessar
+    events/                # interactionCreate, messageCreate
     services/              # quotas, moderação, permissões, notificações
     ui/                    # embeds
     worker/                # loop, opencode, gate, apply
@@ -180,6 +183,7 @@ bot/
 - **`Variáveis ausentes no bot/.env`**: preencha token e canal.
 - **Bot não responde**: rode `npm run deploy`; confira `applications.commands`.
 - **`auth.json do OpenCode não encontrado`**: rode `opencode auth login` e reinicie o worker.
+- **Mensagens não são lidas**: confira se o **Message Content Intent** está habilitado no Developer Portal e se `PROMPT_CHANNEL_ID` aponta para o canal certo.
 - **Build falha em todo job**: rode `npm run build` na raiz. Se for só lint antigo, use `LINT_STRICT=false`.
 - **Push falha**: confira `git remote -v`, `gh auth status` e `gh auth setup-git`.
 - **Modelo fraco**: ajuste `AGENT_MODEL` (`opencode models`).

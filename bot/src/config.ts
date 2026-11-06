@@ -56,6 +56,8 @@ export const discordConfig = {
   clientId: readString('CLIENT_ID'),
   guildId: readString('GUILD_ID'),
   suggestionsChannelId: readString('SUGGESTIONS_CHANNEL_ID'),
+  promptChannelId:
+    readString('PROMPT_CHANNEL_ID') || readString('SUGGESTIONS_CHANNEL_ID'),
   modRoleId: readString('MOD_ROLE_ID') || null,
   submitterRoleId: readString('SUBMITTER_ROLE_ID') || null,
 };

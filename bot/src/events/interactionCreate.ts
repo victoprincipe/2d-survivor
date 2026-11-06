@@ -1,6 +1,5 @@
 import { Events, Interaction, MessageFlags } from 'discord.js';
 import { commandMap } from '../commands';
-import { handleModalSubmit } from '../handlers/modalSubmit';
 import { createLogger } from '../logger';
 
 const log = createLogger('interaction');
@@ -27,10 +26,6 @@ export async function execute(interaction: Interaction): Promise<void> {
 
       await command.execute(interaction);
       return;
-    }
-
-    if (interaction.isModalSubmit()) {
-      await handleModalSubmit(interaction);
     }
   } catch (error) {
     log.error(`Erro em interação: ${String(error)}`);

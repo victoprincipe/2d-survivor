@@ -4,4 +4,4 @@ import { getDb } from '../db';
 getDb();
 
 console.log(`Banco: ${paths.db}`);
-console.log('Fila ativa. Use /implementar no Discord.');
+console.log('Fila ativa. Envie o prompt no canal de implementações.');

@@ -3,7 +3,6 @@ import type {
   SlashCommandBuilder,
   SlashCommandOptionsOnlyBuilder,
 } from 'discord.js';
-import * as implementar from './implementar';
 import * as fila from './fila';
 import * as minhasImplementacoes from './minhas-implementacoes';
 import * as ultimasImplementacoes from './ultimas-implementacoes';
@@ -15,7 +14,6 @@ export interface Command {
 }
 
 export const commands: Command[] = [
-  implementar,
   fila,
   minhasImplementacoes,
   ultimasImplementacoes,

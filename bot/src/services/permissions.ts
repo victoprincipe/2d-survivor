@@ -1,15 +1,13 @@
-import {
-  ChatInputCommandInteraction,
-  ModalSubmitInteraction,
-} from 'discord.js';
+import { Message } from 'discord.js';
 import { discordConfig } from '../config';
 
-type GuildInteraction = ChatInputCommandInteraction | ModalSubmitInteraction;
-
-export function hasSubmitterRole(interaction: GuildInteraction): boolean {
+export async function hasSubmitterRoleForMessage(message: Message): Promise<boolean> {
   if (!discordConfig.submitterRoleId) return true;
-  const member = interaction.member;
-  if (!member || !('roles' in member)) return false;
-  if (Array.isArray(member.roles)) return member.roles.includes(discordConfig.submitterRoleId);
-  return member.roles.cache.has(discordConfig.submitterRoleId);
+  if (!message.inGuild()) return false;
+
+  const member =
+    message.member ??
+    (await message.guild.members.fetch(message.author.id).catch(() => null));
+
+  return member?.roles.cache.has(discordConfig.submitterRoleId) ?? false;
 }
