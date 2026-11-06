@@ -14,10 +14,14 @@ export class GitError extends Error {
 
 const COMMIT_ENV = {
   ...process.env,
-  GIT_AUTHOR_NAME: '2d-survivor bot',
-  GIT_AUTHOR_EMAIL: 'bot@2d-survivor.local',
-  GIT_COMMITTER_NAME: '2d-survivor bot',
-  GIT_COMMITTER_EMAIL: 'bot@2d-survivor.local',
+  GIT_AUTHOR_NAME: process.env.GIT_AUTHOR_NAME ?? '2d-survivor bot',
+  GIT_AUTHOR_EMAIL:
+    process.env.GIT_AUTHOR_EMAIL ??
+    '6431486+victoprincipe@users.noreply.github.com',
+  GIT_COMMITTER_NAME: process.env.GIT_COMMITTER_NAME ?? '2d-survivor bot',
+  GIT_COMMITTER_EMAIL:
+    process.env.GIT_COMMITTER_EMAIL ??
+    '6431486+victoprincipe@users.noreply.github.com',
   GIT_TERMINAL_PROMPT: '0',
 };
 

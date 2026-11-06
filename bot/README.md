@@ -77,6 +77,7 @@ cp .env.example .env
 | `SUBMITTER_ROLE_ID` | não | se preenchido, só esse cargo envia |
 | `REPO_PATH` | não | caminho do repo; padrão: pasta pai de `bot/` |
 | `MAIN_BRANCH` | não | padrão `master` |
+| `GIT_AUTHOR_EMAIL` | não | e-mail verificado usado nos commits do worker (padrão: noreply do GitHub) |
 | `AGENT_MODEL` | não | ex.: `opencode/deepseek-v4.1-flash-free` |
 | `LINT_STRICT` | não | `true` por padrão |
 
@@ -151,6 +152,8 @@ O worker roda o OpenCode com um `HOME` próprio por job:
 - O worker precisa de `origin` acessível; se o push falhar, veja `/fila` e os logs.
 - O checkout local pode ficar sujo; isso não bloqueia.
 - Se quiser incluir WIP, commite e faça push antes de `/implementar`.
+- O worker faz push para `origin`/`master` depois de cada job.
+- Os commits do worker usam `GIT_AUTHOR_NAME`/`GIT_AUTHOR_EMAIL`. Mantenha o e-mail verificado no GitHub; o padrão é o noreply `6431486+victoprincipe@users.noreply.github.com`.
 - Para inspecionar: `npm run db:status`; logs em `bot/data/logs/`.
 - Reinicie o worker depois de mudar `.env` ou `bot/agent/opencode.json`.
 
