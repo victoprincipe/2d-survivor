@@ -31,6 +31,7 @@ export interface CharacterConfig {
   title: string;
   description: string;
   startingWeapon: WeaponId;
+  iconName: string;
   color: string;
   portraitColor: string;
   statBonuses: {

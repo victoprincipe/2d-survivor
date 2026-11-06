@@ -47,9 +47,9 @@ const POWERUP_ICONS: Record<string, React.ReactNode> = {
 };
 
 const CHARACTER_ICONS: Record<string, React.ReactNode> = {
-  antonio: <Crosshair className="w-6 h-6 text-white/90 drop-shadow" />,
-  imelda: <Sparkles className="w-6 h-6 text-white/90 drop-shadow" />,
-  gennaro: <Swords className="w-6 h-6 text-white/90 drop-shadow" />,
+  Crosshair: <Crosshair className="w-6 h-6 text-white/90 drop-shadow" />,
+  Sparkles: <Sparkles className="w-6 h-6 text-white/90 drop-shadow" />,
+  Swords: <Swords className="w-6 h-6 text-white/90 drop-shadow" />,
 };
 
 export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame, onUpdateSave }) => {
@@ -175,7 +175,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
                         className="w-12 h-12 rounded-xl mb-3 flex items-center justify-center border shadow-inner"
                         style={{ backgroundColor: char.color, borderColor: char.portraitColor }}
                       >
-                        {CHARACTER_ICONS[char.id]}
+                        {CHARACTER_ICONS[char.iconName] ?? <Sword className="w-6 h-6 text-white/90 drop-shadow" />}
                       </div>
                       <h3 className="font-black text-white text-base">{char.name}</h3>
                       <p className="text-amber-400 text-[11px] font-semibold mb-2">{char.title}</p>

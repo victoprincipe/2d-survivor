@@ -7,6 +7,7 @@ export const CHARACTERS: CharacterConfig[] = [
     title: 'Caçador de Vampiros',
     description: 'Especialista no chicote tradicional. Possui mais vida e força bruta.',
     startingWeapon: 'whip',
+    iconName: 'Crosshair',
     color: '#e63946',
     portraitColor: '#800f2f',
     statBonuses: {
@@ -21,6 +22,7 @@ export const CHARACTERS: CharacterConfig[] = [
     title: 'Maga Arcana',
     description: 'Estudiosa das artes místicas. Ganha mais experiência e recarrega feitiços mais rápido.',
     startingWeapon: 'wand',
+    iconName: 'Sparkles',
     color: '#4361ee',
     portraitColor: '#1d3557',
     statBonuses: {
@@ -35,6 +37,7 @@ export const CHARACTERS: CharacterConfig[] = [
     title: 'Mestre das Lâminas',
     description: 'Arremessa adagas perfurantes na direção do movimento com extrema agilidade.',
     startingWeapon: 'knife',
+    iconName: 'Swords',
     color: '#2a9d8f',
     portraitColor: '#264653',
     statBonuses: {
