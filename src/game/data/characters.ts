@@ -46,4 +46,19 @@ export const CHARACTERS: CharacterConfig[] = [
       pickupRadius: 20,
     },
   },
+  {
+    id: 'bianca',
+    name: 'Bianca Rossa',
+    title: 'Guardiã do Alho',
+    description: 'Defensora incansável das aldeias. Sua aura de alho repele hordas enquanto resiste a golpes pesados.',
+    startingWeapon: 'garlic',
+    iconName: 'Shield',
+    color: '#9d4edd',
+    portraitColor: '#3c096c',
+    statBonuses: {
+      maxHp: 30,
+      armor: 2,
+      speed: 0.05,
+    },
+  },
 ];
