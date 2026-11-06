@@ -152,6 +152,7 @@ async function handleExecute(job: Job): Promise<void> {
 
     const baseSha = revParse(queueConfig.mainBranch);
     const { dir, branch } = createJobRepo(job.id, baseSha);
+    log.info(`Job #${job.id} repo isolado: ${dir}`);
     updateJob(job.id, { branch, worktree: dir, base_sha: baseSha });
     prepareNodeModules(dir);
 

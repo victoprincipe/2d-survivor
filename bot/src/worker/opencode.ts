@@ -1,11 +1,14 @@
 import { spawn } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
-import { agentConfig, queueConfig } from '../config';
+import path from 'node:path';
+import { agentConfig, paths, queueConfig } from '../config';
 import { Job } from '../db';
-import { jobLogPath } from '../logger';
+import { createLogger, jobLogPath } from '../logger';
 import { agentEnv } from './env';
 import { AgentError } from './errors';
+
+const log = createLogger('agent');
 
 function buildMessage(job: Job): string {
   const nonce = `IMPLEMENTACAO_${crypto.randomUUID().replace(/-/g, '')}`;
@@ -63,16 +66,22 @@ export async function runAgent(job: Job, worktree: string): Promise<AgentResult>
     '--agent',
     agentConfig.name,
     '--title',
-    `Sugestão #${job.id}`,
+    `Implementação #${job.id}`,
   ];
   if (agentConfig.model) args.push('--model', agentConfig.model);
 
   args.push(buildMessage(job));
 
+  const env = agentEnv();
+  const dbDir = path.join(paths.data, 'opencode-jobs');
+  fs.mkdirSync(dbDir, { recursive: true });
+  env.OPENCODE_DB = path.join(dbDir, `job-${job.id}.db`);
+  log.info(`Job #${job.id} cwd=${worktree} db=${env.OPENCODE_DB}`);
+
   return new Promise<AgentResult>((resolve, reject) => {
     const child = spawn(agentConfig.bin, args, {
       cwd: worktree,
-      env: agentEnv(),
+      env,
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true,
     });

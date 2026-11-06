@@ -91,12 +91,14 @@ export function createJobRepo(id: number, base: string): { dir: string; branch: 
   // Clone completo (com .git próprio) para o OpenCode não resolver o
   // projeto para o repo principal via o .git de um worktree linkado.
   git(['clone', '--local', paths.repo, dir]);
+  // Sem origin: o OpenCode não deve seguir o caminho do repo principal.
+  gitTry(['remote', 'remove', 'origin'], dir);
   git(['checkout', '-B', branch, base], dir);
   return { dir, branch };
 }
 
 export function pushJobBranch(dir: string, branch: string): string {
-  return git(['push', '--force', 'origin', branch], dir);
+  return git(['push', '--force', paths.repo, branch], dir);
 }
 
 export function worktreeRemove(dir: string): void {
