@@ -41,8 +41,8 @@ export class WaveDirector {
     // Calculate dynamic spawn rate and HP scaling based on time
     const minutes = this.survivalTime / 60;
     const hpMultiplier = 1.0 + minutes * 0.45;
-    const spawnInterval = Math.max(0.18, 0.9 - minutes * 0.12);
-    const maxEnemies = Math.min(300, 60 + Math.floor(minutes * 40));
+    const spawnInterval = Math.max(0.12, 0.6 - minutes * 0.09);
+    const maxEnemies = Math.min(400, 90 + Math.floor(minutes * 55));
 
     // Regular interval spawning
     if (this.spawnTimer >= spawnInterval && enemies.length < maxEnemies) {
