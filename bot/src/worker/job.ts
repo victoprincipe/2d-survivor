@@ -11,11 +11,12 @@ import {
 import {
   assertRepoReady,
   commitAll,
+  createJobRepo,
   createTag,
   getDiffStats,
   hasChanges,
+  pushJobBranch,
   revParse,
-  worktreeAdd,
   worktreeRemove,
 } from '../git';
 import { createLogger } from '../logger';
@@ -89,6 +90,14 @@ function preserveWork(job: Job, reason: string): string | null {
     if (!hasChanges(worktree)) return null;
     const sha = commitAll(worktree, `wip(job-${job.id}): ${reason}`);
     log.warn(`Trabalho do job #${job.id} preservado em ${sha.slice(0, 8)}.`);
+    if (fresh?.branch) {
+      try {
+        pushJobBranch(worktree, fresh.branch);
+        log.warn(`Branch ${fresh.branch} preservada no repo principal.`);
+      } catch (error) {
+        log.warn(`Não consegui preservar a branch ${fresh.branch}: ${String(error)}`);
+      }
+    }
     return sha;
   } catch (error) {
     log.error(`Não consegui preservar o trabalho do job #${job.id}: ${String(error)}`);
@@ -142,7 +151,7 @@ async function handleExecute(job: Job): Promise<void> {
     }
 
     const baseSha = revParse(queueConfig.mainBranch);
-    const { dir, branch } = worktreeAdd(job.id, baseSha);
+    const { dir, branch } = createJobRepo(job.id, baseSha);
     updateJob(job.id, { branch, worktree: dir, base_sha: baseSha });
     prepareNodeModules(dir);
 
@@ -182,6 +191,8 @@ async function handleExecute(job: Job): Promise<void> {
       log_path: gate.logPath,
       summary,
     });
+
+    pushJobBranch(dir, branch);
 
     createTag(`pre-job-${job.id}`, baseSha);
     createTag(`job-${job.id}`, commitSha);

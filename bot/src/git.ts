@@ -81,16 +81,22 @@ export function assertRepoReady(): { ok: boolean; reason?: string } {
   return { ok: true };
 }
 
-export function worktreeAdd(id: number, base: string): { dir: string; branch: string } {
+export function createJobRepo(id: number, base: string): { dir: string; branch: string } {
   const branch = `implementacao/${id}`;
   const dir = `${paths.worktrees}/job-${id}`;
 
   worktreeRemove(dir);
   fs.mkdirSync(paths.worktrees, { recursive: true });
 
-  git(['worktree', 'prune']);
-  git(['worktree', 'add', '-B', branch, dir, base]);
+  // Clone completo (com .git próprio) para o OpenCode não resolver o
+  // projeto para o repo principal via o .git de um worktree linkado.
+  git(['clone', '--local', paths.repo, dir]);
+  git(['checkout', '-B', branch, base], dir);
   return { dir, branch };
+}
+
+export function pushJobBranch(dir: string, branch: string): string {
+  return git(['push', '--force', 'origin', branch], dir);
 }
 
 export function worktreeRemove(dir: string): void {
