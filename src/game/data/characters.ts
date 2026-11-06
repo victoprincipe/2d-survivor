@@ -10,7 +10,7 @@ export const CHARACTERS: CharacterConfig[] = [
     iconName: 'Bike',
     color: '#c1121f',
     portraitColor: '#6a040f',
-    sprite: '/derson.svg',
+    sprite: '/derson.png',
     statBonuses: {
       maxHp: 10,
       speed: 0.1,
