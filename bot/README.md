@@ -1,0 +1,217 @@
+# Bot de sugestões — 2d-survivor
+
+Bot de Discord que recebe ideias de melhoria dos membros, coloca em uma fila FIFO e executa uma por vez com o **OpenCode** em um worktree isolado. Se o build e o lint passarem, o commit entra na `main` local (ou fica em revisão, conforme `AUTO_APPLY`).
+
+## Como funciona
+
+```
+/sugerir → modal → SQLite (queued)
+                         │
+                         ▼
+               worker pega o menor id
+                         │
+                         ▼
+         git worktree a partir da main
+                         │
+                         ▼
+       opencode run --standalone --auto
+                         │
+                         ▼
+              npm run build && npm run lint
+                         │
+                 ┌───────┴────────┐
+               falhou           passou
+                 │                │
+            failed, main      diff check
+            intacta              │
+                          ┌─────┴─────┐
+                       suspeito      ok
+                          │           │
+                    needs_review   commit + FF na main
+                                      │
+                                      ▼
+                          build/lint de novo (verificação)
+                                      │
+                               falhou ┴ passou
+                                  │       │
+                            revert     done
+```
+
+O worker e o bot são processos separados e compartilham o SQLite em WAL. O bot fica online; o worker pode ser reiniciado sem derrubar o bot.
+
+## Pré-requisitos
+
+- Node.js 22+ (testado com 23.9).
+- `npm install` na raiz do jogo já feito.
+- OpenCode autenticado (`opencode auth login`) e um modelo escolhido em `AGENT_MODEL` (rode `opencode models` para listar).
+- Git disponível no PATH.
+
+> O `HOME` do agente é isolado do seu config global, então o modelo padrão do OpenCode **não** é herdado. Defina `AGENT_MODEL` com um modelo bom para código; sem isso ele pode usar um modelo free/ fraco.
+
+## 1. Criar o app no Discord
+
+1. Acesse <https://discord.com/developers/applications> → **New Application**.
+2. Em **Bot**, copie o **Token**.
+3. Em **Privileged Gateway Intents**, deixe apenas **Guilds** (Message Content não é necessário).
+4. Em **OAuth2 → URL Generator**, marque:
+   - Scopes: `bot`, `applications.commands`
+   - Permissions: View Channels, Send Messages, Embed Links, Read Message History, Add Reactions, Create Public Threads, Send Messages in Threads
+5. Abra a URL gerada e convide o bot para o servidor.
+
+No Discord, ative o **Modo Desenvolvedor** (Configurações → Avançado) para copiar IDs:
+
+- ID do canal onde as sugestões serão publicadas (`SUGGESTIONS_CHANNEL_ID`).
+- ID do cargo de moderador (`MOD_ROLE_ID`). Quem tem esse cargo (ou `Manage Server`) pode pausar, aprovar, reprocessar e reverter jobs.
+
+## 2. Configurar o bot
+
+```bash
+cd bot
+cp .env.example .env
+```
+
+Preencha o `.env`:
+
+| Variável | Obrigatória | Descrição |
+|---|---|---|
+| `DISCORD_TOKEN` | sim | token do bot |
+| `CLIENT_ID` | sim (deploy) | Application ID |
+| `GUILD_ID` | sim (deploy) | ID do servidor |
+| `SUGGESTIONS_CHANNEL_ID` | sim | canal onde os jobs são publicados |
+| `MOD_ROLE_ID` | recomendado | cargo de moderador |
+| `SUBMITTER_ROLE_ID` | não | se preenchido, só esse cargo envia sugestões |
+| `REPO_PATH` | não | caminho do repo do jogo; padrão: pasta pai de `bot/` |
+| `MAIN_BRANCH` | não | padrão `main` |
+| `WORKTREE_DIR` | não | padrão `../.2d-survivor-worktrees` |
+| `AUTO_APPLY` | não | `false` por padrão; veja “Modo probation” |
+| `AGENT_MODEL` | não | formato `provider/model`; use um modelo forte para código |
+| `LINT_STRICT` | não | `true` por padrão; use `false` se o repo já tiver lint quebrado |
+| `POST_MERGE_VERIFY` | não | `true` por padrão; roda build/lint em worktree separado após o merge |
+
+As demais variáveis têm padrões seguros e estão comentadas no `.env.example`.
+
+## 3. Instalar, registrar comandos e rodar
+
+```bash
+cd bot
+npm install
+npm run deploy
+npm run dev
+```
+
+`npm run dev` sobe o bot e o worker juntos (`concurrently`). Para rodar separado:
+
+```bash
+npm run dev:bot
+npm run dev:worker
+```
+
+Na primeira execução o banco é criado em `bot/data/bot.db` e a fila começa **pausada**. No Discord, um moderador deve rodar:
+
+```
+/fila-retomar
+```
+
+Isso só funciona com o repo na `main` e sem alterações pendentes.
+
+## Comandos
+
+| Comando | Quem | O que faz |
+|---|---|---|
+| `/sugerir` | membros com quota | abre o modal e enfileira |
+| `/fila` | todos | estado da fila, repo, job atual e próximos |
+| `/minhas-sugestoes` | todos | suas sugestões e status |
+| `/fila-pausar` | mods | pausa antes do próximo job |
+| `/fila-retomar` | mods | retoma (exige repo limpo na main) |
+| `/fila-cancelar <id>` | autor/mods | cancela job ainda não executado |
+| `/fila-reprocessar <id>` | mods | recoloca um job que falhou na fila |
+| `/fila-aprovar <id>` | mods | aplica um job em `needs_review` |
+| `/fila-descartar <id>` | mods | descarta job e apaga branch/worktree |
+| `/fila-rollback <id>` | mods | `git revert` de um job já aplicado |
+
+## Quotas padrão
+
+- Conta com pelo menos 7 dias.
+- 1 job ativo por usuário (`queued` ou `running`).
+- 3 jobs por dia por usuário.
+- 20 jobs por dia no total.
+- Fila máxima de 20.
+- Prompt de 20 a 1500 caracteres.
+
+Tudo ajustável no `.env`.
+
+## Status dos jobs
+
+| Status | Significado |
+|---|---|
+| `queued` | na fila |
+| `running` | worker executando |
+| `done` | aplicado na main |
+| `needs_review` | build/lint passou, mas o merge foi bloqueado (auto-apply off, diff grande, caminho protegido ou main mudou) |
+| `failed` | agente ou gate falhou; se o merge chegou a acontecer, veja o erro (pode ter sido revertido automaticamente) |
+| `interrupted` | worker caiu no meio; use `/fila-reprocessar` |
+| `cancelled` | cancelado/descartado |
+| `reverted` | rollback aplicado |
+
+## Modo probation (recomendado)
+
+O padrão é `AUTO_APPLY=false`. Nesse modo, todo job que passa no build/lint vira `needs_review` e fica em uma branch `sugestao/<id>`, sem tocar na main.
+
+1. Rode os 3 primeiros jobs assim.
+2. Revise com `git log --oneline main..sugestao/<id>` e `git diff main..sugestao/<id>`.
+3. Se estiver bom, aplique com `/fila-aprovar <id>`.
+4. Quando confiar no fluxo, coloque `AUTO_APPLY=true` no `.env` e reinicie o worker.
+
+## Segurança
+
+O worker roda o OpenCode com um `HOME` próprio (`bot/data/agent-home`):
+
+- A config global do seu OpenCode, MCPs, skills e aprovações salvas **não** são carregadas.
+- Só a `auth.json` do OpenCode é copiada para lá.
+- A config do agente fica em `bot/agent/opencode.json` (copiada para o `HOME` isolado no startup).
+- Leitura de `.env`, `.ssh`, `.aws`, `.config`, `.npmrc` e do próprio auth é negada.
+- O agente não pode editar `bot/`, `.github/`, `AGENTS.md`, `package.json`, lockfiles ou configs.
+- O agente não pode rodar `git commit/push/checkout/reset`, `rm`, `sudo`, `curl`, `wget`, `ssh` ou instalar dependências.
+- O gate (`npm run build` / `npm run lint`) roda com outro `HOME` vazio e sem chaves de provedor, para que código do build não leia credenciais.
+- Diff acima de 20 arquivos/800 linhas, arquivos removidos ou caminhos protegidos forçam `needs_review`.
+- Antes do merge, o worker confere que a main continua no mesmo SHA e limpa; depois do merge, roda build/lint de novo e faz `git revert` automático se falhar.
+- Tags `pre-job-<id>` e `job-<id>` guardam o antes/depois.
+
+**Risco residual:** sem Docker, o shell do agente roda com o seu usuário. As permissões são defesa em profundidade, não uma jaula de kernel. Para um servidor público, use Docker ou exija aprovação de mod antes do merge.
+
+## Operação
+
+- O worker precisa da `main` **checada e limpa**. Enquanto um job roda, não edite o repo principal; se editar, o merge vira `needs_review`.
+- O worker parte do **HEAD** da `main`. Commite o jogo e o bot antes de usar a fila; `git stash` não serve, porque o worktree não enxerga alterações não commitadas.
+- Para trabalhar em paralelo, use outro clone.
+- O worker nunca faz push. Não há remote configurado; tudo fica local.
+- Para inspecionar: `npm run db:status`.
+- Reinicie o worker depois de mudar `.env` ou `bot/agent/opencode.json`.
+
+## Estrutura
+
+```
+bot/
+  agent/opencode.json      # config restritiva do agente
+  src/
+    index.ts               # bot discord.js
+    deploy-commands.ts     # registro dos slash commands
+    commands/              # /sugerir, /fila, moderação
+    events/                # interactionCreate
+    handlers/              # modal de sugestão
+    services/              # quotas, moderação, permissões, notificações
+    ui/                    # embeds
+    worker/                # loop, opencode, gate, apply, rollback
+    scripts/               # db-init, db:status, check:commands
+  data/                    # SQLite, logs, agent-home (gitignored)
+```
+
+## Troubleshooting
+
+- **`Variáveis ausentes no bot/.env`**: preencha `DISCORD_TOKEN` e `SUGGESTIONS_CHANNEL_ID`.
+- **Bot não responde**: rode `npm run deploy` e confira se o bot foi convidado com `applications.commands`.
+- **Fila parada**: `/fila` mostra o motivo. Normalmente é repo sujo, branch diferente de `main` ou fila pausada.
+- **`auth.json do OpenCode não encontrado`**: rode `opencode auth login` e reinicie o worker (ele copia o auth no startup).
+- **Build falha em todo job**: o repo pode já estar quebrado no HEAD; rode `npm run build` na raiz. Se for só lint antigo, use `LINT_STRICT=false`.
+- **`main is already checked out`**: não deixe outro worktree com a `main` checada; o worker usa a sua árvore principal.
+- **Modelo fraco**: o agente usa o modelo padrão do OpenCode. Defina `AGENT_MODEL` com um modelo bom para código.

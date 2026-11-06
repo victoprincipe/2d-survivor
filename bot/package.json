@@ -1,0 +1,33 @@
+{
+  "name": "2d-survivor-bot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Bot de fila de sugestões do 2d-survivor",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n bot,worker -c blue,magenta \"npm:dev:bot\" \"npm:dev:worker\"",
+    "dev:bot": "tsx watch src/index.ts",
+    "dev:worker": "tsx watch src/worker/index.ts",
+    "start:bot": "tsx src/index.ts",
+    "start:worker": "tsx src/worker/index.ts",
+    "deploy": "tsx src/deploy-commands.ts",
+    "typecheck": "tsc --noEmit",
+    "db:init": "tsx src/scripts/db-init.ts",
+    "db:status": "tsx src/scripts/queue-status.ts",
+    "check:commands": "tsx src/scripts/validate-commands.ts"
+  },
+  "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "discord.js": "^14.28.1",
+    "dotenv": "^18.0.9"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^24.19.2",
+    "concurrently": "^10.0.6",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3"
+  }
+}

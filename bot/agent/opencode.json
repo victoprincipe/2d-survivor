@@ -1,0 +1,62 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permissions": [
+    { "action": "*", "resource": "*", "effect": "deny" },
+
+    { "action": "read", "resource": "*", "effect": "allow" },
+    { "action": "read", "resource": ".git/*", "effect": "deny" },
+    { "action": "read", "resource": "*.env", "effect": "deny" },
+    { "action": "read", "resource": "*.env.*", "effect": "deny" },
+    { "action": "read", "resource": "*.env.example", "effect": "allow" },
+    { "action": "read", "resource": "$HOME/.ssh/*", "effect": "deny" },
+    { "action": "read", "resource": "$HOME/.aws/*", "effect": "deny" },
+    { "action": "read", "resource": "$HOME/.config/*", "effect": "deny" },
+    { "action": "read", "resource": "$HOME/.local/share/opencode/*", "effect": "deny" },
+    { "action": "read", "resource": "$HOME/.npmrc", "effect": "deny" },
+
+    { "action": "edit", "resource": "*", "effect": "allow" },
+    { "action": "edit", "resource": "package.json", "effect": "deny" },
+    { "action": "edit", "resource": "package-lock.json", "effect": "deny" },
+    { "action": "edit", "resource": "next.config.*", "effect": "deny" },
+    { "action": "edit", "resource": "tsconfig.json", "effect": "deny" },
+    { "action": "edit", "resource": "eslint.config.*", "effect": "deny" },
+    { "action": "edit", "resource": "postcss.config.*", "effect": "deny" },
+    { "action": "edit", "resource": "tailwind.config.*", "effect": "deny" },
+    { "action": "edit", "resource": "AGENTS.md", "effect": "deny" },
+    { "action": "edit", "resource": "opencode.json*", "effect": "deny" },
+    { "action": "edit", "resource": ".opencode/*", "effect": "deny" },
+    { "action": "edit", "resource": ".git/*", "effect": "deny" },
+    { "action": "edit", "resource": ".github/*", "effect": "deny" },
+    { "action": "edit", "resource": "bot/*", "effect": "deny" },
+    { "action": "edit", "resource": "node_modules/*", "effect": "deny" },
+    { "action": "edit", "resource": ".npmrc", "effect": "deny" },
+    { "action": "edit", "resource": ".yarnrc*", "effect": "deny" },
+
+    { "action": "glob", "resource": "*", "effect": "allow" },
+    { "action": "grep", "resource": "*", "effect": "allow" },
+
+    { "action": "shell", "resource": "*", "effect": "deny" },
+    { "action": "shell", "resource": "git status *", "effect": "allow" },
+    { "action": "shell", "resource": "git log *", "effect": "allow" },
+    { "action": "shell", "resource": "git show *", "effect": "allow" },
+    { "action": "shell", "resource": "ls *", "effect": "allow" },
+    { "action": "shell", "resource": "find *", "effect": "allow" },
+    { "action": "shell", "resource": "grep *", "effect": "allow" },
+    { "action": "shell", "resource": "rg *", "effect": "allow" },
+    { "action": "shell", "resource": "wc *", "effect": "allow" },
+
+    { "action": "external_directory", "resource": "*", "effect": "deny" },
+    { "action": "webfetch", "resource": "*", "effect": "deny" },
+    { "action": "websearch", "resource": "*", "effect": "deny" },
+    { "action": "skill", "resource": "*", "effect": "deny" },
+    { "action": "subagent", "resource": "*", "effect": "deny" },
+    { "action": "question", "resource": "*", "effect": "deny" }
+  ],
+  "agents": {
+    "implementer": {
+      "description": "Implementa uma sugestão de jogador no repositório",
+      "mode": "primary",
+      "system": "Você implementa UMA sugestão por execução no repositório do jogo 2d-survivor. Leia AGENTS.md antes de editar. Faça a menor mudança possível. Não altere bot/, .github/, AGENTS.md, package.json, lockfiles ou arquivos de configuração. Não adicione dependências. Não rode npm; o worker roda build e lint depois. Não faça commit, checkout, push, reset ou rebase. Ao terminar, escreva JOB_SUMMARY.md na raiz com o que mudou, arquivos tocados e como validar. Se a sugestão for inviável, não altere o código e explique o motivo no JOB_SUMMARY.md."
+    }
+  }
+}
