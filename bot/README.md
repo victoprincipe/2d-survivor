@@ -113,7 +113,7 @@ A partir daí o fluxo é automático.
 
 ## Imagens e áudios nos prompts
 
-Você pode anexar até **3 imagens** (PNG, JPEG, GIF ou WebP) de até **8 MB** cada e até **3 áudios** (MP3, WAV, OGG/OPUS, M4A/AAC, FLAC ou WebM) de até **10 MB** cada. O texto é opcional quando há imagem ou áudio.
+Você pode anexar até **3 imagens** (PNG, JPEG, GIF ou WebP) de até **8 MB** cada e até **3 áudios** (MP3, WAV, OGG/OPUS, M4A/AAC, FLAC ou WebM) de até **10 MB** cada. No `/implementar`, o texto é opcional quando há imagem ou áudio. No `/planejar`, o texto é obrigatório; imagem/áudio são complementos.
 
 - O bot baixa os anexos para `bot/data/assets/message-<id>/` e guarda os metadados no SQLite.
 - O worker copia os anexos para `.job-assets/` dentro do clone; a primeira imagem é anexada com `--file` e o agente lê as demais com a ferramenta `read`.

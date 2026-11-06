@@ -54,7 +54,7 @@ export function deriveTitle(prompt: string, imageNames: string[] = []): string {
 
   const fallback =
     imageNames.length > 0
-      ? `Imagens: ${imageNames.join(', ')}`
+      ? `Anexos: ${imageNames.join(', ')}`
       : 'Implementação';
   const title = firstLine ?? fallback;
   return title.length > 100 ? `${title.slice(0, 99)}…` : title;
