@@ -7,11 +7,12 @@ import {
   git,
   gitTry,
   mergeFf,
+  pushBranch,
   revParse,
   worktreeRemove,
 } from '../git';
 import { createLogger } from '../logger';
-import { NeedsReviewError, PostMergeError } from './errors';
+import { NeedsReviewError, PostMergeError, PushError } from './errors';
 import { runGate } from './gate';
 import { createVerifyWorktree, removeVerifyWorktree } from './workspace';
 
@@ -90,6 +91,17 @@ export async function applyJob(job: Job): Promise<void> {
     }
     const reverted = revertMain(job, newHead);
     throw new PostMergeError(`Falha na verificação pós-merge: ${String(error)}`, reverted);
+  }
+
+  if (queueConfig.gitPush) {
+    try {
+      pushBranch(queueConfig.gitRemote, queueConfig.mainBranch);
+      log.info(`Job #${job.id} enviado para ${queueConfig.gitRemote}/${queueConfig.mainBranch}.`);
+    } catch (error) {
+      throw new PushError(
+        `Push para ${queueConfig.gitRemote}/${queueConfig.mainBranch} falhou: ${String(error)}`,
+      );
+    }
   }
 
   if (job.worktree) worktreeRemove(job.worktree);

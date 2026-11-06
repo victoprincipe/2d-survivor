@@ -5,7 +5,6 @@ import { requireWorkerConfig, paths, queueConfig } from '../config';
 import {
   claimNextJob,
   getDb,
-  isQueuePaused,
   recoverRunningJobs,
   updateJob,
 } from '../db';
@@ -84,12 +83,6 @@ async function main(): Promise<void> {
   log.info('Worker iniciado. Aguardando jobs...');
 
   while (!stopping) {
-    if (isQueuePaused()) {
-      notice('Fila pausada. Use /fila-retomar no Discord.');
-      await sleep(queueConfig.pollMs);
-      continue;
-    }
-
     const ready = assertRepoReady();
     if (!ready.ok) {
       notice(`Fila parada: ${ready.reason}`);

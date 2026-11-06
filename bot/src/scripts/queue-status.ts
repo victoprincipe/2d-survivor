@@ -1,11 +1,9 @@
 import { paths } from '../config';
-import { getDb, isQueuePaused } from '../db';
+import { getDb } from '../db';
 
 const db = getDb();
-const paused = isQueuePaused();
 
 console.log(`Banco: ${paths.db}`);
-console.log(`Fila pausada: ${paused ? 'sim' : 'não'}`);
 
 const counts = db
   .prepare('SELECT status, COUNT(*) AS total FROM jobs GROUP BY status ORDER BY status')

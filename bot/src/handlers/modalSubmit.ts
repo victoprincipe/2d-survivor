@@ -14,7 +14,7 @@ import { jobEmbed, truncate } from '../ui/embeds';
 const log = createLogger('modal');
 
 export async function handleModalSubmit(interaction: ModalSubmitInteraction): Promise<void> {
-  if (interaction.customId !== 'sugestao:criar') return;
+  if (interaction.customId !== 'implementacao:criar') return;
 
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
@@ -24,7 +24,7 @@ export async function handleModalSubmit(interaction: ModalSubmitInteraction): Pr
   }
 
   if (!hasSubmitterRole(interaction)) {
-    await interaction.editReply('Você não tem o cargo necessário para enviar sugestões.');
+    await interaction.editReply('Você não tem o cargo necessário para enviar implementações.');
     return;
   }
 
@@ -45,7 +45,7 @@ export async function handleModalSubmit(interaction: ModalSubmitInteraction): Pr
 
   const validation = validateSuggestion(title, prompt);
   if (!validation.ok) {
-    await interaction.editReply(validation.reason ?? 'Sugestão inválida.');
+    await interaction.editReply(validation.reason ?? 'Implementação inválida.');
     return;
   }
 
@@ -73,7 +73,7 @@ export async function handleModalSubmit(interaction: ModalSubmitInteraction): Pr
     let threadId: string | null = null;
     try {
       const thread = await message.startThread({
-        name: truncate(`Sugestão #${job.id} — ${job.title}`, 90),
+        name: truncate(`Implementação #${job.id} — ${job.title}`, 90),
         autoArchiveDuration: 1440,
       });
       threadId = thread.id;
@@ -89,11 +89,11 @@ export async function handleModalSubmit(interaction: ModalSubmitInteraction): Pr
 
     const position = getQueuePosition(job.id);
     await interaction.editReply(
-      `Sugestão **#${job.id}** registrada. Posição na fila: **${position}**. ` +
-        'Acompanhe pelo thread criado no canal de sugestões.',
+      `Implementação **#${job.id}** registrada. Posição na fila: **${position}**. ` +
+        'Acompanhe pelo thread criado no canal de implementações.',
     );
   } catch (error) {
-    log.error(`Falha ao registrar sugestão: ${String(error)}`);
+    log.error(`Falha ao registrar implementação: ${String(error)}`);
     if (jobId !== null) {
       updateJob(jobId, {
         status: 'failed',
@@ -102,7 +102,7 @@ export async function handleModalSubmit(interaction: ModalSubmitInteraction): Pr
       });
     }
     await interaction.editReply(
-      'Não consegui registrar a sugestão. Avise um moderador para verificar os logs do bot.',
+      'Não consegui registrar a implementação. Avise o administrador do servidor para verificar os logs do bot.',
     );
   }
 }

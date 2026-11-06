@@ -61,8 +61,9 @@ export const discordConfig = {
 };
 
 export const queueConfig = {
-  mainBranch: readString('MAIN_BRANCH', 'main'),
-  autoApply: readBool('AUTO_APPLY', false),
+  mainBranch: readString('MAIN_BRANCH', 'master'),
+  gitRemote: readString('GIT_REMOTE', 'origin'),
+  gitPush: readBool('GIT_PUSH', true),
   maxActivePerUser: readInt('MAX_ACTIVE_PER_USER', 1),
   dailyUserLimit: readInt('DAILY_USER_LIMIT', 3),
   dailyGlobalLimit: readInt('DAILY_GLOBAL_LIMIT', 20),

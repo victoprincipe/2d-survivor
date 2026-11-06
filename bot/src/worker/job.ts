@@ -30,6 +30,7 @@ import {
   GateError,
   NeedsReviewError,
   PostMergeError,
+  PushError,
   RepoNotReadyError,
 } from './errors';
 import { runGate } from './gate';
@@ -106,12 +107,9 @@ function cleanupWorktree(job: Job): void {
   updateJob(job.id, { worktree: null });
 }
 
-function reviewReasons(job: Job, stats: ReturnType<typeof getDiffStats>): string[] {
+function reviewReasons(stats: ReturnType<typeof getDiffStats>): string[] {
   const reasons: string[] = [];
 
-  if (!queueConfig.autoApply) {
-    reasons.push('AUTO_APPLY desligado no .env');
-  }
   if (stats.files > queueConfig.maxDiffFiles) {
     reasons.push(`Diff tocou ${stats.files} arquivos (limite ${queueConfig.maxDiffFiles})`);
   }
@@ -188,7 +186,7 @@ async function handleExecute(job: Job): Promise<void> {
     createTag(`pre-job-${job.id}`, baseSha);
     createTag(`job-${job.id}`, commitSha);
 
-    const reasons = reviewReasons(job, stats);
+    const reasons = reviewReasons(stats);
     if (reasons.length > 0) {
       throw new NeedsReviewError(reasons.join('; '));
     }
@@ -203,7 +201,10 @@ async function handleExecute(job: Job): Promise<void> {
       review_reason: null,
       worktree: null,
     });
-    await postEmbedToJob(done, `Job **#${job.id}** aplicado na \`${queueConfig.mainBranch}\`.`);
+    const message = queueConfig.gitPush
+      ? `Job **#${job.id}** aplicado e enviado para \`${queueConfig.gitRemote}/${queueConfig.mainBranch}\`.`
+      : `Job **#${job.id}** aplicado na \`${queueConfig.mainBranch}\`.`;
+    await postEmbedToJob(done, message);
     await updateJobMessage(done);
   } catch (error) {
     const fresh = getJob(job.id);
@@ -227,7 +228,7 @@ async function handleApply(job: Job): Promise<void> {
     review_reason: null,
     worktree: null,
   });
-  await postEmbedToJob(done, `Job **#${job.id}** aprovado e aplicado na \`${queueConfig.mainBranch}\`.`);
+  await postEmbedToJob(done, `Job **#${job.id}** aplicado na \`${queueConfig.mainBranch}\`.`);
   await updateJobMessage(done);
 }
 
@@ -266,16 +267,20 @@ async function handleFailure(job: Job, error: unknown): Promise<void> {
   };
 
   if (error instanceof NeedsReviewError) {
-    status = 'needs_review';
+    status = 'failed';
     patch = {
       finished_at: nowIso(),
-      review_reason: error.message,
-      error: null,
+      error: `Bloqueado para revisão: ${error.message}`,
     };
   } else if (error instanceof PostMergeError) {
     patch = {
       finished_at: nowIso(),
-      error: `${error.message}${error.reverted ? ' (revertido automaticamente)' : ' (NÃO revertido; verifique a main)'}`,
+      error: `${error.message}${error.reverted ? ' (revertido automaticamente)' : ` (NÃO revertido; verifique a ${queueConfig.mainBranch})`}`,
+    };
+  } else if (error instanceof PushError) {
+    patch = {
+      finished_at: nowIso(),
+      error: `${error.message} O commit local foi mantido; faça o push manualmente.`,
     };
   } else if (error instanceof AgentError || error instanceof GateError) {
     patch = {
@@ -289,9 +294,9 @@ async function handleFailure(job: Job, error: unknown): Promise<void> {
   log.error(`Job #${job.id} terminou como ${status}: ${String(error)}`);
 
   const hint =
-    status === 'needs_review' && fresh.kind !== 'rollback'
-      ? `Use \`/fila-aprovar ${job.id}\` para aplicar ou \`/fila-reprocessar ${job.id}\` para refazer.`
-      : `Use \`/fila-reprocessar ${job.id}\` para tentar de novo ou \`/fila-descartar ${job.id}\` para descartar.`;
+    error instanceof PushError
+      ? 'O commit local foi mantido, mas o push falhou. Verifique o remote e faça o push manualmente.'
+      : `Job #${job.id} falhou. A branch \`implementacao/${job.id}\` foi mantida para inspeção.`;
 
   await postEmbedToJob(final, hint);
   await updateJobMessage(final);

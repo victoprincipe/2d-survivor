@@ -79,7 +79,7 @@ export function jobEmbed(job: Job): EmbedBuilder {
 
   return new EmbedBuilder()
     .setColor(statusColor(job.status))
-    .setTitle(truncate(`Sugestão #${job.id} — ${job.title}`, 250))
+    .setTitle(truncate(`Implementação #${job.id} — ${job.title}`, 250))
     .setDescription(truncate(job.prompt, 3500))
     .addFields(fields)
     .setFooter({ text: `job #${job.id} • ${job.kind}` })

@@ -33,7 +33,7 @@ export function validateSuggestion(title: string, prompt: string): ValidationRes
 
   for (const { pattern, reason } of BLOCKED_PATTERNS) {
     if (pattern.test(`${title}\n${prompt}`)) {
-      return { ok: false, reason: `Sugestão bloqueada: ${reason}.` };
+      return { ok: false, reason: `Implementação bloqueada: ${reason}.` };
     }
   }
 

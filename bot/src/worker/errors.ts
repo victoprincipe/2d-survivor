@@ -41,3 +41,10 @@ export class PostMergeError extends Error {
     this.name = 'PostMergeError';
   }
 }
+
+export class PushError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PushError';
+  }
+}

@@ -11,8 +11,8 @@ import { checkAccountAge, checkSubmissionQuota } from '../services/quotas';
 import { hasSubmitterRole } from '../services/permissions';
 
 export const data = new SlashCommandBuilder()
-  .setName('sugerir')
-  .setDescription('Envia uma ideia de melhoria para o jogo');
+  .setName('implementar')
+  .setDescription('Envia uma ideia para ser implementada no jogo');
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
   if (!interaction.guildId) {
@@ -25,7 +25,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
   if (!hasSubmitterRole(interaction)) {
     await interaction.reply({
-      content: 'Você não tem o cargo necessário para enviar sugestões.',
+      content: 'Você não tem o cargo necessário para enviar implementações.',
       flags: MessageFlags.Ephemeral,
     });
     return;
@@ -44,8 +44,8 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   }
 
   const modal = new ModalBuilder()
-    .setCustomId('sugestao:criar')
-    .setTitle('Sugerir uma melhoria')
+    .setCustomId('implementacao:criar')
+    .setTitle('Implementar uma ideia')
     .addComponents(
       new ActionRowBuilder<TextInputBuilder>().addComponents(
         new TextInputBuilder()
@@ -60,7 +60,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       new ActionRowBuilder<TextInputBuilder>().addComponents(
         new TextInputBuilder()
           .setCustomId('descricao')
-          .setLabel('Descreva a melhoria')
+          .setLabel('Descreva a implementação')
           .setPlaceholder('O que deve mudar no jogo? Seja específico.')
           .setStyle(TextInputStyle.Paragraph)
           .setMinLength(20)

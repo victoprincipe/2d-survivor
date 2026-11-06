@@ -1,8 +1,7 @@
 import { paths } from '../config';
-import { getDb, isQueuePaused } from '../db';
+import { getDb } from '../db';
 
 getDb();
 
 console.log(`Banco: ${paths.db}`);
-console.log(`Fila começa pausada: ${isQueuePaused() ? 'sim' : 'não'}`);
-console.log('Use /fila-retomar no Discord para liberar a fila.');
+console.log('Fila ativa. Use /implementar no Discord.');

@@ -1,35 +1,19 @@
-import type {
-  ChatInputCommandInteraction,
-  SlashCommandBuilder,
-  SlashCommandOptionsOnlyBuilder,
-} from 'discord.js';
-import * as sugerir from './sugerir';
+import type { ChatInputCommandInteraction, SlashCommandBuilder } from 'discord.js';
+import * as implementar from './implementar';
 import * as fila from './fila';
-import * as minhasSugestoes from './minhas-sugestoes';
-import * as filaPausar from './fila-pausar';
-import * as filaRetomar from './fila-retomar';
-import * as filaCancelar from './fila-cancelar';
-import * as filaReprocessar from './fila-reprocessar';
-import * as filaAprovar from './fila-aprovar';
-import * as filaDescartar from './fila-descartar';
-import * as filaRollback from './fila-rollback';
+import * as minhasImplementacoes from './minhas-implementacoes';
+import * as ultimasImplementacoes from './ultimas-implementacoes';
 
 export interface Command {
-  data: SlashCommandBuilder | SlashCommandOptionsOnlyBuilder;
+  data: SlashCommandBuilder;
   execute: (interaction: ChatInputCommandInteraction) => Promise<void>;
 }
 
 export const commands: Command[] = [
-  sugerir,
+  implementar,
   fila,
-  minhasSugestoes,
-  filaPausar,
-  filaRetomar,
-  filaCancelar,
-  filaReprocessar,
-  filaAprovar,
-  filaDescartar,
-  filaRollback,
+  minhasImplementacoes,
+  ultimasImplementacoes,
 ];
 
 export const commandMap = new Map(commands.map((command) => [command.data.name, command]));

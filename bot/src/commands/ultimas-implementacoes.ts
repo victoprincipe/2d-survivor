@@ -4,19 +4,19 @@ import {
   MessageFlags,
   SlashCommandBuilder,
 } from 'discord.js';
-import { listByAuthor } from '../db';
+import { listRecent } from '../db';
 import { discordTimestamp, statusLabel } from '../ui/embeds';
 
 export const data = new SlashCommandBuilder()
-  .setName('minhas-sugestoes')
-  .setDescription('Lista as suas sugestões mais recentes');
+  .setName('ultimas-implementacoes')
+  .setDescription('Lista as últimas implementações do servidor');
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
-  const jobs = listByAuthor(interaction.user.id, 10);
+  const jobs = listRecent(10);
 
   if (jobs.length === 0) {
     await interaction.reply({
-      content: 'Você ainda não enviou nenhuma sugestão. Use `/sugerir`.',
+      content: 'Ainda não há implementações registradas. Use `/implementar`.',
       flags: MessageFlags.Ephemeral,
     });
     return;
@@ -28,10 +28,10 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   );
 
   const embed = new EmbedBuilder()
-    .setTitle('Suas sugestões')
-    .setColor(0x3498db)
+    .setTitle('Últimas implementações')
+    .setColor(0x2ecc71)
     .setDescription(lines.join('\n\n'))
-    .setFooter({ text: `${jobs.length} sugestão(ões) mais recente(s)` })
+    .setFooter({ text: `${jobs.length} implementação(ões) mais recente(s)` })
     .setTimestamp();
 
   await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });

@@ -16,7 +16,7 @@ export function checkAccountAge(createdAt: Date): QuotaResult {
   if (ageDays < queueConfig.minAccountAgeDays) {
     return {
       ok: false,
-      reason: `Sua conta precisa ter pelo menos ${queueConfig.minAccountAgeDays} dias para enviar sugestões.`,
+      reason: `Sua conta precisa ter pelo menos ${queueConfig.minAccountAgeDays} dias para enviar implementações.`,
     };
   }
   return { ok: true };
@@ -28,18 +28,18 @@ export function checkSubmissionQuota(userId: string): QuotaResult {
   }
 
   if (countTodayGlobal() >= queueConfig.dailyGlobalLimit) {
-    return { ok: false, reason: 'O limite diário global de sugestões foi atingido. Tente amanhã.' };
+    return { ok: false, reason: 'O limite diário global de implementações foi atingido. Tente amanhã.' };
   }
 
   if (countActiveByAuthor(userId) >= queueConfig.maxActivePerUser) {
     return {
       ok: false,
-      reason: `Você já tem ${queueConfig.maxActivePerUser} sugestão(ões) na fila. Aguarde ela terminar.`,
+      reason: `Você já tem ${queueConfig.maxActivePerUser} implementação(ões) na fila. Aguarde ela terminar.`,
     };
   }
 
   if (countTodayByAuthor(userId) >= queueConfig.dailyUserLimit) {
-    return { ok: false, reason: `Você atingiu o limite de ${queueConfig.dailyUserLimit} sugestões por dia.` };
+    return { ok: false, reason: `Você atingiu o limite de ${queueConfig.dailyUserLimit} implementações por dia.` };
   }
 
   return { ok: true };

@@ -18,6 +18,7 @@ const COMMIT_ENV = {
   GIT_AUTHOR_EMAIL: 'bot@2d-survivor.local',
   GIT_COMMITTER_NAME: '2d-survivor bot',
   GIT_COMMITTER_EMAIL: 'bot@2d-survivor.local',
+  GIT_TERMINAL_PROMPT: '0',
 };
 
 export function git(args: string[], cwd = paths.repo): string {
@@ -81,7 +82,7 @@ export function assertRepoReady(): { ok: boolean; reason?: string } {
 }
 
 export function worktreeAdd(id: number, base: string): { dir: string; branch: string } {
-  const branch = `sugestao/${id}`;
+  const branch = `implementacao/${id}`;
   const dir = `${paths.worktrees}/job-${id}`;
 
   worktreeRemove(dir);
@@ -145,6 +146,10 @@ export function getDiffStats(
 export function mergeFf(branch: string): string {
   git(['merge', '--ff-only', branch]);
   return git(['rev-parse', 'HEAD']);
+}
+
+export function pushBranch(remote: string, branch: string): string {
+  return git(['push', remote, branch]);
 }
 
 export function createTag(name: string, sha: string): void {
