@@ -39,3 +39,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# bot de sugestões
+/bot/node_modules/
+/bot/data/
+/bot/dist/
+/bot/.env*
+!/bot/.env.example
+/bot/.worktrees/
