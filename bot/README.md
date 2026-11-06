@@ -5,7 +5,7 @@ Bot de Discord que recebe ideias de melhoria, coloca em uma fila FIFO e executa 
 ## Como funciona
 
 ```
-mensagem no canal de prompts → SQLite (queued)
+/implementar → SQLite (queued)
                                          │
                                          ▼
                                worker pega o menor id
@@ -57,7 +57,7 @@ O `/fila` mostra o estado do checkout local só como informação.
 
 1. <https://discord.com/developers/applications> → **New Application**.
 2. Em **Bot**, copie o **Token**.
-3. Em **Privileged Gateway Intents**, habilite **Message Content** e mantenha **Guilds**. O bot também usa o intent normal **GuildMessages**.
+3. Em **Privileged Gateway Intents**, não é necessário habilitar nenhum intent privilegiado. O bot usa apenas o intent **Guilds**.
 4. Em **OAuth2 → URL Generator**, marque `bot` + `applications.commands` e as permissões: View Channels, Send Messages, Embed Links, Read Message History, Add Reactions, Create Public Threads, Send Messages in Threads.
 5. Convide o bot e copie o ID do canal de implementações.
 
@@ -74,7 +74,6 @@ cp .env.example .env
 | `CLIENT_ID` | sim (deploy) | Application ID |
 | `GUILD_ID` | sim (deploy) | ID do servidor |
 | `SUGGESTIONS_CHANNEL_ID` | sim | canal onde os jobs são publicados |
-| `PROMPT_CHANNEL_ID` | não | canal onde os usuários escrevem o prompt; se vazio, usa `SUGGESTIONS_CHANNEL_ID` |
 | `SUBMITTER_ROLE_ID` | não | se preenchido, só esse cargo envia |
 | `REPO_PATH` | não | caminho do repo; padrão: pasta pai de `bot/` |
 | `MAIN_BRANCH` | não | padrão `master` |
@@ -99,10 +98,9 @@ Separado: `npm run dev:bot` e `npm run dev:worker`.
 
 ## Como enviar
 
-Há duas formas:
+Use **`/implementar prompt:<texto>`** em qualquer canal do servidor. Não há modal; o prompt vai como opção do comando. Você também pode anexar uma imagem opcional na opção `imagem`.
 
-- **Chat:** escreva o prompt **diretamente no canal definido em `PROMPT_CHANNEL_ID`** (ou em `SUGGESTIONS_CHANNEL_ID`, se vazio). O bot lê a mensagem, cria o job e responde com o ID e a posição.
-- **Comando:** use `/implementar prompt:<texto>`. Não há modal; o prompt vai como opção do comando. Você também pode anexar uma imagem opcional na opção `imagem`.
+**Mensagens normais no chat são ignoradas.** O bot só cria jobs por slash command.
 
 A partir daí o fluxo é automático.
 
@@ -134,7 +132,7 @@ O título exibido é derivado da primeira linha do prompt; não há campo separa
 
 - Conta com pelo menos 7 dias.
 - 1 job ativo por usuário.
-- 5 jobs por dia por usuário; 20 no total.
+- 15 jobs por dia por usuário; 20 no total.
 - Fila máxima de 20.
 - Prompt de 20 a 1500 caracteres; com imagens, o texto é opcional e pode ter até 1500 caracteres.
 
@@ -193,7 +191,7 @@ bot/
     index.ts               # bot discord.js
     deploy-commands.ts     # registro dos slash commands
     commands/              # implementar, fila, minhas, ultimas, reprocessar
-    events/                # interactionCreate, messageCreate
+    events/                # interactionCreate
     services/              # quotas, moderação, permissões, notificações
     ui/                    # embeds
     worker/                # loop, opencode, gate, apply, assets
@@ -206,7 +204,7 @@ bot/
 - **`Variáveis ausentes no bot/.env`**: preencha token e canal.
 - **Bot não responde**: rode `npm run deploy`; confira `applications.commands`.
 - **`auth.json do OpenCode não encontrado`**: rode `opencode auth login` e reinicie o worker.
-- **Mensagens não são lidas**: confira se o **Message Content Intent** está habilitado no Developer Portal e se `PROMPT_CHANNEL_ID` aponta para o canal certo.
+- **Comandos não aparecem**: rode `npm run deploy` e confira `GUILD_ID`; o bot precisa do escopo `applications.commands`.
 - **Imagem rejeitada**: confira formato (PNG/JPEG/GIF/WebP), tamanho (8 MB) e quantidade (3). Se o job falhar com “imagem não encontrada”, as imagens expiraram: reenvie o prompt.
 - **Job com imagem falha no modelo**: confira `AGENT_VISION_MODEL` (`opencode models`); modelos text-only não aceitam imagem.
 - **Build falha em todo job**: rode `npm run build` na raiz. Se for só lint antigo, use `LINT_STRICT=false`.

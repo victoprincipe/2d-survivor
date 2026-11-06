@@ -63,8 +63,6 @@ export const discordConfig = {
   clientId: readString('CLIENT_ID'),
   guildId: readString('GUILD_ID'),
   suggestionsChannelId: readString('SUGGESTIONS_CHANNEL_ID'),
-  promptChannelId:
-    readString('PROMPT_CHANNEL_ID') || readString('SUGGESTIONS_CHANNEL_ID'),
   modRoleId: readString('MOD_ROLE_ID') || null,
   submitterRoleId: readString('SUBMITTER_ROLE_ID') || null,
 };
@@ -72,7 +70,7 @@ export const discordConfig = {
 export const queueConfig = {
   mainBranch: readString('MAIN_BRANCH', 'master'),
   maxActivePerUser: readInt('MAX_ACTIVE_PER_USER', 1),
-  dailyUserLimit: readInt('DAILY_USER_LIMIT', 5),
+  dailyUserLimit: readInt('DAILY_USER_LIMIT', 15),
   dailyGlobalLimit: readInt('DAILY_GLOBAL_LIMIT', 20),
   queueLimit: readInt('QUEUE_LIMIT', 20),
   minAccountAgeDays: readInt('MIN_ACCOUNT_AGE_DAYS', 7),

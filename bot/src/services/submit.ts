@@ -15,8 +15,6 @@ import { jobEmbed, truncate } from '../ui/embeds';
 
 const log = createLogger('submit');
 
-const IMAGE_NAME_PATTERN = /\.(png|jpe?g|gif|webp)$/i;
-
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 /** Detecta o formato real pelos magic bytes; o contentType do Discord pode mentir. */
@@ -43,13 +41,6 @@ function detectImage(buffer: Buffer): { contentType: string; extension: string }
 
 function formatMb(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-export function isImageAttachment(attachment: Attachment): boolean {
-  return (
-    (attachment.contentType ?? '').startsWith('image/') ||
-    IMAGE_NAME_PATTERN.test(attachment.name)
-  );
 }
 
 /**
