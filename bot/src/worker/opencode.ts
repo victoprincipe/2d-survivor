@@ -6,7 +6,7 @@ import { agentConfig, paths, queueConfig } from '../config';
 import { Job, Plan, getPlan, jobAttachments } from '../db';
 import { createLogger, jobLogPath } from '../logger';
 import { copyJobAssets } from './assets';
-import { agentEnv } from './env';
+import { agentEnv, openCodeGoKey } from './env';
 import { AgentError } from './errors';
 
 const log = createLogger('agent');
@@ -161,6 +161,8 @@ export async function runAgent(job: Job, worktree: string): Promise<AgentResult>
   }
 
   const env = agentEnv();
+  const goKey = openCodeGoKey();
+  if (goKey) env.GO_KEY = goKey;
   env.HOME = jobHome;
   env.OPENCODE_DB = path.join(dataDir, 'opencode.db');
   // O OpenCode usa PWD para descobrir a localização do projeto.

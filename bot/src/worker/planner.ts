@@ -6,7 +6,7 @@ import { agentConfig, paths, planConfig } from '../config';
 import { Plan, planAttachments } from '../db';
 import { createLogger, planLogPath } from '../logger';
 import { copyPlanAssets } from './assets';
-import { agentEnv } from './env';
+import { agentEnv, openCodeGoKey } from './env';
 import { AgentError } from './errors';
 
 const log = createLogger('planner');
@@ -149,6 +149,8 @@ export async function runPlanner(plan: Plan, worktree: string): Promise<PlannerR
   fs.mkdirSync(path.join(worktree, '.plan-artifacts'), { recursive: true });
 
   const env = agentEnv();
+  const goKey = openCodeGoKey();
+  if (goKey) env.GO_KEY = goKey;
   env.HOME = planHome;
   env.OPENCODE_DB = path.join(dataDir, 'opencode.db');
   env.PWD = worktree;

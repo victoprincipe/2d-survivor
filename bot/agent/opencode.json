@@ -1,5 +1,20 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "opencode-go": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "OpenCode Go",
+      "api": "https://opencode.ai/zen/go/v1",
+      "options": { "apiKey": "{env:GO_KEY}" },
+      "models": {
+        "deepseek-v4.1-flash": {
+          "name": "DeepSeek V4.1 Flash",
+          "attachment": true,
+          "tool_call": true
+        }
+      }
+    }
+  },
   "permissions": [
     { "action": "*", "resource": "*", "effect": "deny" },
 

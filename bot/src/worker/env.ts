@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { paths } from '../config';
 
 const EXACT_SECRETS = new Set([
@@ -100,4 +102,22 @@ export function gateEnv(): NodeJS.ProcessEnv {
     delete env[key];
   }
   return env;
+}
+
+/** Chave do OpenCode Go usada pelo provider customizado (config: {env:GO_KEY}). */
+export function openCodeGoKey(): string | null {
+  const fromEnv = process.env.GO_KEY?.trim();
+  if (fromEnv) return fromEnv;
+
+  try {
+    const auth = JSON.parse(
+      fs.readFileSync(
+        path.join(paths.agentHome, '.local', 'share', 'opencode', 'auth.json'),
+        'utf8',
+      ),
+    ) as Record<string, { key?: string } | undefined>;
+    return auth['opencode-go']?.key?.trim() || null;
+  } catch {
+    return null;
+  }
 }
