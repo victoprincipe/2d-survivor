@@ -58,8 +58,8 @@ export async function runAgent(job: Job, worktree: string): Promise<AgentResult>
   fs.writeFileSync(logPath, `# OpenCode — job #${job.id}\n`);
 
   const args = [
-    'run',
     '--standalone',
+    'run',
     '--auto',
     '--format',
     'default',
