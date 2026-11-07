@@ -23,6 +23,7 @@ import {
   Feather,
   Zap,
   Play,
+  Pause,
   ShoppingBag,
   Info,
   Target,
@@ -72,11 +73,24 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
     savedData.difficulty ?? 'normal'
   );
   const [selectionVolume, setSelectionVolume] = useState(1);
+  const [isSelectionMusicPlaying, setIsSelectionMusicPlaying] = useState(false);
   const selectionAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const selectedChar = CHARACTERS[selectedCharIndex];
   const difficultyMeta = getDifficulty(selectedDifficulty);
   const claimableMissions = countClaimableMissions(savedData);
+  const selectedCharHasMusic = Boolean(CHARACTER_SELECTION_MUSIC[selectedChar.id]);
+
+  const playSelectionAudio = (audio: HTMLAudioElement) => {
+    audio
+      .play()
+      .then(() => {
+        if (selectionAudioRef.current === audio) setIsSelectionMusicPlaying(true);
+      })
+      .catch(() => {
+        if (selectionAudioRef.current === audio) setIsSelectionMusicPlaying(false);
+      });
+  };
 
   const handleSelectCharacter = (index: number) => {
     setSelectedCharIndex(index);
@@ -85,12 +99,40 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
       selectionAudioRef.current?.pause();
       const audio = new Audio(musicUrl);
       audio.volume = getSelectionMusicVolume(CHARACTERS[index].id, selectionVolume);
+      audio.onended = () => {
+        if (selectionAudioRef.current === audio) setIsSelectionMusicPlaying(false);
+      };
       selectionAudioRef.current = audio;
-      audio.play().catch(() => {});
+      playSelectionAudio(audio);
     } else {
       selectionAudioRef.current?.pause();
       selectionAudioRef.current = null;
+      setIsSelectionMusicPlaying(false);
     }
+  };
+
+  const handleToggleSelectionMusic = () => {
+    const currentAudio = selectionAudioRef.current;
+    if (currentAudio) {
+      if (isSelectionMusicPlaying) {
+        currentAudio.pause();
+        setIsSelectionMusicPlaying(false);
+      } else {
+        currentAudio.volume = getSelectionMusicVolume(selectedChar.id, selectionVolume);
+        playSelectionAudio(currentAudio);
+      }
+      return;
+    }
+
+    const musicUrl = CHARACTER_SELECTION_MUSIC[selectedChar.id];
+    if (!musicUrl) return;
+    const audio = new Audio(musicUrl);
+    audio.volume = getSelectionMusicVolume(selectedChar.id, selectionVolume);
+    audio.onended = () => {
+      if (selectionAudioRef.current === audio) setIsSelectionMusicPlaying(false);
+    };
+    selectionAudioRef.current = audio;
+    playSelectionAudio(audio);
   };
 
   const handleSelectionVolumeChange = (vol: number) => {
@@ -253,25 +295,41 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
         {activeTab === 'character' && (
           <div className="flex w-full flex-col gap-4">
             <div className="flex w-full justify-end">
-              <label className="stone-panel flex items-center gap-2 px-3 py-1.5">
-                <Volume2 className="h-4 w-4 text-[#e69f22]" />
-                <span className="text-[11px] font-bold uppercase tracking-wider text-[#9ca3af]">
-                  Volume
-                </span>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={selectionVolume}
-                  onChange={(e) => handleSelectionVolumeChange(parseFloat(e.target.value))}
-                  className="w-24 cursor-pointer accent-amber-500"
-                  aria-label="Volume da música de seleção"
-                />
-                <span className="w-8 text-right font-mono text-[11px] text-[#cbd5e1]">
-                  {Math.round(selectionVolume * 100)}%
-                </span>
-              </label>
+              <div className="flex items-center gap-2">
+                <label className="stone-panel flex items-center gap-2 px-3 py-1.5">
+                  <Volume2 className="h-4 w-4 text-[#e69f22]" />
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-[#9ca3af]">
+                    Volume
+                  </span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={selectionVolume}
+                    onChange={(e) => handleSelectionVolumeChange(parseFloat(e.target.value))}
+                    className="w-24 cursor-pointer accent-amber-500"
+                    aria-label="Volume da música de seleção"
+                  />
+                  <span className="w-8 text-right font-mono text-[11px] text-[#cbd5e1]">
+                    {Math.round(selectionVolume * 100)}%
+                  </span>
+                </label>
+                <button
+                  type="button"
+                  onClick={handleToggleSelectionMusic}
+                  disabled={!selectedCharHasMusic}
+                  className="stone-panel flex cursor-pointer items-center justify-center p-1.5 text-[#e69f22] transition hover:text-[#ffcc33] active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+                  aria-label={isSelectionMusicPlaying ? 'Pausar música de seleção' : 'Tocar música de seleção'}
+                  title={isSelectionMusicPlaying ? 'Pausar música' : 'Tocar música'}
+                >
+                  {isSelectionMusicPlaying ? (
+                    <Pause className="h-4 w-4 fill-current" />
+                  ) : (
+                    <Play className="h-4 w-4 fill-current" />
+                  )}
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
