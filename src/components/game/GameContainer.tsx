@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { CharacterConfig, GameEndSummary, HUDState, SavedGameData, UpgradeOption } from '@/game/types';
+import { CharacterConfig, DifficultyId, GameEndSummary, HUDState, SavedGameData, UpgradeOption } from '@/game/types';
 import { CHARACTERS } from '@/game/data/characters';
 import { loadSavedData } from '@/game/data/persistence';
+import { getDifficulty } from '@/game/data/difficulties';
 import { GameEngine } from '@/game/engine/GameEngine';
 import { HUD } from './HUD';
 import { StartScreen } from './StartScreen';
@@ -31,6 +32,9 @@ export const GameContainer: React.FC = () => {
   const [gameState, setGameState] = useState<GameState>('menu');
   const [savedData, setSavedData] = useState<SavedGameData>(loadSavedData);
   const [selectedCharacter, setSelectedCharacter] = useState<CharacterConfig>(CHARACTERS[0]);
+  const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyId>(
+    savedData.difficulty ?? 'normal'
+  );
   const [hud, setHud] = useState<HUDState>(DEFAULT_HUD);
   const [levelUpOptions, setLevelUpOptions] = useState<UpgradeOption[]>([]);
   const [chestReward, setChestReward] = useState<{ gold: number; upgrade?: UpgradeOption } | null>(null);
@@ -53,8 +57,13 @@ export const GameContainer: React.FC = () => {
     };
   }, []);
 
-  const handleStartGame = (character: CharacterConfig, currentSavedData: SavedGameData) => {
+  const handleStartGame = (
+    character: CharacterConfig,
+    currentSavedData: SavedGameData,
+    difficulty: DifficultyId = currentSavedData.difficulty ?? 'normal'
+  ) => {
     setSelectedCharacter(character);
+    setSelectedDifficulty(difficulty);
     setGameState('playing');
 
     // Wait for canvas to be mounted in DOM
@@ -66,7 +75,7 @@ export const GameContainer: React.FC = () => {
         engineRef.current.destroy();
       }
 
-      const engine = new GameEngine(canvas, character, currentSavedData, {
+      const engine = new GameEngine(canvas, character, currentSavedData, difficulty, {
         onHUDUpdate: (newHud) => {
           setHud(newHud);
         },
@@ -142,7 +151,7 @@ export const GameContainer: React.FC = () => {
   };
 
   const handleRestart = () => {
-    handleStartGame(selectedCharacter, loadSavedData());
+    handleStartGame(selectedCharacter, loadSavedData(), selectedDifficulty);
   };
 
   const handleContinueEndless = () => {
@@ -232,6 +241,7 @@ export const GameContainer: React.FC = () => {
           onPause={handlePause}
           isMuted={isMuted}
           onToggleMute={handleToggleMute}
+          difficultyName={getDifficulty(selectedDifficulty).name}
         />
       )}
 

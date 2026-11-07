@@ -1,4 +1,5 @@
 import { PermanentPowerUp, SavedGameData } from '../types';
+import { DEFAULT_DIFFICULTY, DIFFICULTIES } from './difficulties';
 
 export const POWER_UP_DEFINITIONS: PermanentPowerUp[] = [
   {
@@ -63,6 +64,7 @@ export function getInitialSave(): SavedGameData {
   return {
     gold: 0,
     powerUps: {},
+    difficulty: DEFAULT_DIFFICULTY,
     highScore: {
       timeSurvived: 0,
       kills: 0,
@@ -78,9 +80,11 @@ export function loadSavedData(): SavedGameData {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return getInitialSave();
     const parsed = JSON.parse(raw);
+    const savedDifficulty = DIFFICULTIES.find((d) => d.id === parsed.difficulty)?.id;
     return {
       gold: parsed.gold ?? 0,
       powerUps: parsed.powerUps ?? {},
+      difficulty: savedDifficulty ?? DEFAULT_DIFFICULTY,
       highScore: {
         timeSurvived: parsed.highScore?.timeSurvived ?? 0,
         kills: parsed.highScore?.kills ?? 0,

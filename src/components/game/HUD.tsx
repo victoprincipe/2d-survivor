@@ -30,6 +30,7 @@ interface HUDProps {
   onPause: () => void;
   isMuted: boolean;
   onToggleMute: () => void;
+  difficultyName: string;
 }
 
 const WEAPON_ICONS: Record<string, React.ReactNode> = {
@@ -53,7 +54,7 @@ const PASSIVE_ICONS: Record<string, React.ReactNode> = {
   bracer: <Crosshair className="w-4 h-4 text-red-400" />,
 };
 
-export const HUD: React.FC<HUDProps> = ({ hud, onPause, isMuted, onToggleMute }) => {
+export const HUD: React.FC<HUDProps> = ({ hud, onPause, isMuted, onToggleMute, difficultyName }) => {
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -84,6 +85,12 @@ export const HUD: React.FC<HUDProps> = ({ hud, onPause, isMuted, onToggleMute })
           {/* Level Badge */}
           <div className="bg-gradient-to-br from-amber-500 to-amber-700 border-2 border-yellow-300 rounded-lg px-2.5 py-0.5 shadow-md font-black text-sm text-yellow-100 flex items-center">
             LV {hud.level}
+          </div>
+
+          {/* Difficulty Badge */}
+          <div className="bg-slate-900/90 border border-slate-700 rounded-lg px-2.5 py-0.5 shadow-md font-bold text-[10px] uppercase tracking-wider text-slate-200 flex items-center gap-1">
+            <Skull className="w-3 h-3 text-red-400" />
+            {difficultyName}
           </div>
         </div>
 

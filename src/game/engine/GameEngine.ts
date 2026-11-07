@@ -1,4 +1,14 @@
-import { CharacterConfig, GameEndSummary, HUDState, UpgradeOption, SavedGameData, WeaponId, PassiveId } from '../types';
+import {
+  CharacterConfig,
+  DifficultyConfig,
+  DifficultyId,
+  GameEndSummary,
+  HUDState,
+  UpgradeOption,
+  SavedGameData,
+  WeaponId,
+  PassiveId,
+} from '../types';
 import { Camera } from './Camera';
 import { InputManager } from './Input';
 import { SoundEngine } from './SoundEngine';
@@ -12,6 +22,7 @@ import { WaveDirector } from '../systems/WaveDirector';
 import { WorldSystem } from '../systems/WorldProps';
 import { WEAPON_REGISTRY, PASSIVE_REGISTRY } from '../data/upgrades';
 import { saveGameData, loadSavedData } from '../data/persistence';
+import { getDifficulty } from '../data/difficulties';
 
 export interface GameEngineCallbacks {
   onHUDUpdate: (hud: HUDState) => void;
@@ -35,6 +46,7 @@ export class GameEngine {
   public waveDirector: WaveDirector;
   public worldProps: WorldSystem;
   public vfx: VFXManager;
+  public difficulty: DifficultyConfig;
 
   public enemies: Enemy[] = [];
   public drops: Drop[] = [];
@@ -58,6 +70,7 @@ export class GameEngine {
     canvas: HTMLCanvasElement,
     character: CharacterConfig,
     savedData: SavedGameData,
+    difficultyId: DifficultyId,
     callbacks: GameEngineCallbacks
   ) {
     this.canvas = canvas;
@@ -72,7 +85,8 @@ export class GameEngine {
     this.spatialGrid = new SpatialGrid<Enemy>(110);
     this.vfx = new VFXManager();
     this.worldProps = new WorldSystem();
-    this.waveDirector = new WaveDirector();
+    this.difficulty = getDifficulty(difficultyId);
+    this.waveDirector = new WaveDirector(this.difficulty);
 
     this.player = new Player(character, savedData.powerUps);
     this.weaponSystem = new WeaponSystem(character.startingWeapon);
@@ -246,9 +260,10 @@ export class GameEngine {
 
     if (enemy.isBoss) {
       // Crimson Vampire Boss defeated!
+      const bossXp = Math.round(250 * this.difficulty.xpMultiplier);
       this.drops.push(new Drop(Date.now(), 'chest', enemy.x, enemy.y));
-      this.drops.push(new Drop(Date.now() + 1, 'gem_red', enemy.x + 20, enemy.y, 250));
-      this.drops.push(new Drop(Date.now() + 2, 'gem_red', enemy.x - 20, enemy.y, 250));
+      this.drops.push(new Drop(Date.now() + 1, 'gem_red', enemy.x + 20, enemy.y, bossXp));
+      this.drops.push(new Drop(Date.now() + 2, 'gem_red', enemy.x - 20, enemy.y, bossXp));
       this.handleVictory();
       return;
     }
@@ -281,9 +296,10 @@ export class GameEngine {
         this.callbacks.onLevelUp(options);
       }
     } else if (drop.type === 'coin') {
-      this.goldCollected += drop.value;
+      const gained = Math.round(drop.value * this.difficulty.goldMultiplier);
+      this.goldCollected += gained;
       this.sound.playGemPickup(4);
-      this.vfx.addDamageNumber(this.player.x, this.player.y, drop.value, true, true);
+      this.vfx.addDamageNumber(this.player.x, this.player.y, gained, true, true);
     } else if (drop.type === 'chicken') {
       this.player.heal(drop.value);
       this.sound.playGemPickup(8);
@@ -310,7 +326,7 @@ export class GameEngine {
     } else if (drop.type === 'chest') {
       this.sound.playChestOpen();
       this.pause();
-      const goldBonus = 50 + Math.floor(Math.random() * 50);
+      const goldBonus = Math.round((50 + Math.floor(Math.random() * 50)) * this.difficulty.goldMultiplier);
       this.goldCollected += goldBonus;
       const upgradeOptions = this.weaponSystem.generateUpgradeOptions();
       const chosenUpgrade = upgradeOptions.length > 0 ? upgradeOptions[0] : undefined;
@@ -392,6 +408,8 @@ export class GameEngine {
       goldEarned: this.goldCollected,
       totalDamage: Math.round(totalDmg),
       characterName: this.player.character.name,
+      difficulty: this.difficulty.id,
+      difficultyName: this.difficulty.name,
       weaponStats,
     };
   }

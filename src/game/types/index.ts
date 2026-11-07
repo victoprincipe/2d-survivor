@@ -81,9 +81,25 @@ export interface PermanentPowerUp {
   costMultiplier: number;
 }
 
+export type DifficultyId = 'easy' | 'normal' | 'hard' | 'nightmare' | 'infernal';
+
+export interface DifficultyConfig {
+  id: DifficultyId;
+  name: string;
+  description: string;
+  color: string;
+  enemyHp: number;
+  enemyDamage: number;
+  enemyCount: number;
+  spawnRate: number;
+  xpMultiplier: number;
+  goldMultiplier: number;
+}
+
 export interface SavedGameData {
   gold: number;
   powerUps: Record<string, number>;
+  difficulty: DifficultyId;
   highScore: {
     timeSurvived: number;
     kills: number;
@@ -141,6 +157,8 @@ export interface GameEndSummary {
   goldEarned: number;
   totalDamage: number;
   characterName: string;
+  difficulty: DifficultyId;
+  difficultyName: string;
   weaponStats: {
     id: WeaponId;
     name: string;

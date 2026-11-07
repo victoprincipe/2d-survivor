@@ -49,6 +49,8 @@ export const EndGameModal: React.FC<EndGameModalProps> = ({ summary, onRestart, 
           </h2>
           <p className="text-slate-400 text-xs mt-1">
             Sobrevivente: <span className="text-slate-200 font-bold">{summary.characterName}</span>
+            <span className="mx-1.5 text-slate-600">•</span>
+            Dificuldade: <span className="text-slate-200 font-bold">{summary.difficultyName}</span>
           </p>
         </div>
 

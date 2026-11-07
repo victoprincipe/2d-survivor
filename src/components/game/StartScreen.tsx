@@ -2,9 +2,10 @@
 
 import React, { useState } from 'react';
 import Image from 'next/image';
-import { CharacterConfig, SavedGameData } from '@/game/types';
+import { CharacterConfig, DifficultyId, SavedGameData } from '@/game/types';
 import { CHARACTERS } from '@/game/data/characters';
 import { POWER_UP_DEFINITIONS, getPowerUpCost, saveGameData } from '@/game/data/persistence';
+import { DIFFICULTIES, getDifficulty } from '@/game/data/difficulties';
 import { WEAPON_REGISTRY } from '@/game/data/upgrades';
 import {
   Flame,
@@ -33,7 +34,7 @@ import {
 
 interface StartScreenProps {
   savedData: SavedGameData;
-  onStartGame: (character: CharacterConfig, savedData: SavedGameData) => void;
+  onStartGame: (character: CharacterConfig, savedData: SavedGameData, difficulty: DifficultyId) => void;
   onUpdateSave: (savedData: SavedGameData) => void;
 }
 
@@ -70,8 +71,19 @@ const CHARACTER_ICONS: Record<string, React.ReactNode> = {
 export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame, onUpdateSave }) => {
   const [selectedCharIndex, setSelectedCharIndex] = useState(0);
   const [activeTab, setActiveTab] = useState<'character' | 'shop'>('character');
+  const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyId>(
+    savedData.difficulty ?? 'normal'
+  );
 
   const selectedChar = CHARACTERS[selectedCharIndex];
+  const difficultyMeta = getDifficulty(selectedDifficulty);
+
+  const handleSelectDifficulty = (difficulty: DifficultyId) => {
+    setSelectedDifficulty(difficulty);
+    const updatedData: SavedGameData = { ...savedData, difficulty };
+    saveGameData(updatedData);
+    onUpdateSave(updatedData);
+  };
 
   const handleBuyPowerUp = (powerUpId: string) => {
     const def = POWER_UP_DEFINITIONS.find((p) => p.id === powerUpId);
@@ -138,6 +150,37 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
               <Trophy className="w-3.5 h-3.5 text-amber-400" />
               <span>{savedData.highScore.wins}</span>
             </div>
+          </div>
+        </div>
+
+        {/* Difficulty Selector */}
+        <div className="w-full mb-4 bg-slate-950/80 border border-slate-800 rounded-2xl p-3 shadow-xl">
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+              <Skull className="w-4 h-4 text-red-400" />
+              Dificuldade
+            </span>
+            <span className="text-[11px] text-slate-400 text-right">{difficultyMeta.description}</span>
+          </div>
+          <div className="grid grid-cols-5 gap-1.5">
+            {DIFFICULTIES.map((difficulty) => (
+              <button
+                key={difficulty.id}
+                onClick={() => handleSelectDifficulty(difficulty.id)}
+                className={`py-2 rounded-lg border text-[10px] sm:text-xs font-bold uppercase tracking-wider transition cursor-pointer ${
+                  selectedDifficulty === difficulty.id
+                    ? 'bg-red-950/80 border-red-500 text-white shadow-lg'
+                    : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                }`}
+                title={difficulty.description}
+              >
+                <span
+                  className="inline-block w-1.5 h-1.5 rounded-full mr-1"
+                  style={{ backgroundColor: difficulty.color }}
+                />
+                {difficulty.name}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -222,7 +265,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
 
             {/* Play Button */}
             <button
-              onClick={() => onStartGame(selectedChar, savedData)}
+              onClick={() => onStartGame(selectedChar, savedData, selectedDifficulty)}
               className="w-full mt-2 py-4 rounded-xl bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white font-black text-base uppercase tracking-widest shadow-2xl shadow-red-500/30 transition cursor-pointer active:scale-98 flex items-center justify-center gap-2"
             >
               <Play className="w-5 h-5 fill-white" />

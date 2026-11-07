@@ -1,3 +1,4 @@
+import { DifficultyConfig, EnemyType } from '../types';
 import { Enemy } from '../entities/Enemy';
 import { Player } from '../entities/Player';
 import { Camera } from '../engine/Camera';
@@ -5,8 +6,13 @@ import { SoundEngine } from '../engine/SoundEngine';
 
 export class WaveDirector {
   public survivalTime: number = 0;
+  public difficulty: DifficultyConfig;
   private nextEnemyId: number = 1;
   private spawnTimer: number = 0;
+
+  constructor(difficulty: DifficultyConfig) {
+    this.difficulty = difficulty;
+  }
 
   // Event flags to ensure one-time triggers
   public eventAlert: string | null = null;
@@ -38,11 +44,14 @@ export class WaveDirector {
       this.bossActive = null;
     }
 
-    // Calculate dynamic spawn rate and HP scaling based on time
+    // Calculate dynamic spawn rate and HP scaling based on time and difficulty
     const minutes = this.survivalTime / 60;
-    const hpMultiplier = 1.0 + minutes * 0.45;
-    const spawnInterval = Math.max(0.12, 0.6 - minutes * 0.09);
-    const maxEnemies = Math.min(400, 90 + Math.floor(minutes * 55));
+    const hpMultiplier = (1.0 + minutes * 0.45) * this.difficulty.enemyHp;
+    const spawnInterval = Math.max(0.12, 0.6 - minutes * 0.09) / this.difficulty.spawnRate;
+    const maxEnemies = Math.min(
+      400,
+      Math.floor((90 + Math.floor(minutes * 55)) * this.difficulty.enemyCount)
+    );
 
     // Regular interval spawning
     if (this.spawnTimer >= spawnInterval && enemies.length < maxEnemies) {
@@ -149,25 +158,32 @@ export class WaveDirector {
       type = roll < 0.25 ? 'bat' : roll < 0.5 ? 'ghost' : roll < 0.8 ? 'skeleton' : 'zombie';
     }
 
-    onSpawn(new Enemy(this.nextEnemyId++, type, pos.x, pos.y, hpMult));
+    onSpawn(this.createEnemy(type, pos.x, pos.y, hpMult));
+  }
+
+  private createEnemy(type: EnemyType, x: number, y: number, hpMult: number): Enemy {
+    const enemy = new Enemy(this.nextEnemyId++, type, x, y, hpMult);
+    enemy.damage = Math.max(1, Math.round(enemy.damage * this.difficulty.enemyDamage));
+    enemy.xpValue = Math.max(1, Math.round(enemy.xpValue * this.difficulty.xpMultiplier));
+    return enemy;
   }
 
   private spawnBatSwarm(player: Player, camera: Camera, onSpawn: (enemy: Enemy) => void): void {
-    const count = 35;
+    const count = Math.round(35 * this.difficulty.enemyCount);
     for (let i = 0; i < count; i++) {
       const pos = this.getSpawnPositionOutsideScreen(camera);
-      onSpawn(new Enemy(this.nextEnemyId++, 'bat', pos.x, pos.y, 0.8));
+      onSpawn(this.createEnemy('bat', pos.x, pos.y, 0.8));
     }
   }
 
   private spawnRingEnemies(player: Player, hpMult: number, onSpawn: (enemy: Enemy) => void): void {
-    const count = 28;
+    const count = Math.round(28 * this.difficulty.enemyCount);
     const radius = 420;
     for (let i = 0; i < count; i++) {
       const angle = (i * Math.PI * 2) / count;
       const x = player.x + Math.cos(angle) * radius;
       const y = player.y + Math.sin(angle) * radius;
-      onSpawn(new Enemy(this.nextEnemyId++, 'zombie', x, y, hpMult));
+      onSpawn(this.createEnemy('zombie', x, y, hpMult));
     }
   }
 
@@ -178,7 +194,7 @@ export class WaveDirector {
     onSpawn: (enemy: Enemy) => void
   ): void {
     const pos = this.getSpawnPositionOutsideScreen(camera);
-    onSpawn(new Enemy(this.nextEnemyId++, 'elite_minotaur', pos.x, pos.y, hpMult));
+    onSpawn(this.createEnemy('elite_minotaur', pos.x, pos.y, hpMult));
   }
 
   private spawnBoss(
@@ -188,7 +204,7 @@ export class WaveDirector {
     onSpawn: (enemy: Enemy) => void
   ): Enemy {
     const pos = this.getSpawnPositionOutsideScreen(camera);
-    const boss = new Enemy(this.nextEnemyId++, 'boss_vampire', pos.x, pos.y, hpMult);
+    const boss = this.createEnemy('boss_vampire', pos.x, pos.y, hpMult);
     onSpawn(boss);
     return boss;
   }
