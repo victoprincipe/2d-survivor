@@ -1,7 +1,5 @@
 import { Camera } from '../engine/Camera';
 import { Player } from '../entities/Player';
-import { Drop } from '../entities/Drops';
-import { DropType } from '../types';
 
 export interface TorchProp {
   id: number;
@@ -16,7 +14,7 @@ export class WorldSystem {
   public torches: TorchProp[] = [];
   private nextTorchId: number = 1;
   private torchSpawnTimer: number = 0;
-  private maxTorches: number = 14;
+  private maxTorches: number = 7;
 
   private tilePatternCanvas: HTMLCanvasElement | null = null;
   private tilePattern: CanvasPattern | null = null;
@@ -94,26 +92,9 @@ export class WorldSystem {
     }
   }
 
-  damageTorch(torch: TorchProp, onDropSpawn: (drop: Drop) => void): boolean {
+  damageTorch(torch: TorchProp): boolean {
     torch.hp -= 1;
-    if (torch.hp <= 0) {
-      // Determine random drop from torch
-      const roll = Math.random();
-      let dropType: DropType = 'coin';
-      if (roll < 0.5) {
-        dropType = 'coin';
-      } else if (roll < 0.75) {
-        dropType = 'chicken'; // Heal
-      } else if (roll < 0.9) {
-        dropType = 'magnet'; // Pull gems
-      } else {
-        dropType = 'rosary'; // Screen wipe
-      }
-
-      onDropSpawn(new Drop(Date.now() + Math.random(), dropType, torch.x, torch.y));
-      return true; // Destroyed
-    }
-    return false;
+    return torch.hp <= 0;
   }
 
   renderFloor(ctx: CanvasRenderingContext2D, camera: Camera): void {

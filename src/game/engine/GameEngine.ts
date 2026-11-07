@@ -63,6 +63,7 @@ export class GameEngine {
   private hudThrottleTimer: number = 0;
   private gemStreak: number = 0;
   private gemStreakTimer: number = 0;
+  private itemSpawnTimer: number = 0;
 
   private callbacks: GameEngineCallbacks;
 
@@ -218,9 +219,15 @@ export class GameEngine {
       this.worldProps,
       this.vfx,
       this.sound,
-      (enemy) => this.onEnemyKilled(enemy),
-      (drop) => this.drops.push(drop)
+      (enemy) => this.onEnemyKilled(enemy)
     );
+
+    // 6.5. Spawn a random pickup item every 2 minutes
+    this.itemSpawnTimer += dt;
+    if (this.itemSpawnTimer >= 120) {
+      this.itemSpawnTimer -= 120;
+      this.spawnRandomItem();
+    }
 
     // 7. Update Drops & Pickups
     for (let i = this.drops.length - 1; i >= 0; i--) {
@@ -280,6 +287,31 @@ export class GameEngine {
       dropType = 'gem_green';
     }
     this.drops.push(new Drop(Date.now() + Math.random(), dropType, enemy.x, enemy.y, enemy.xpValue));
+  }
+
+  private spawnRandomItem(): void {
+    const roll = Math.random();
+    let type: Drop['type'] = 'coin';
+    if (roll < 0.5) {
+      type = 'coin';
+    } else if (roll < 0.75) {
+      type = 'chicken';
+    } else if (roll < 0.9) {
+      type = 'magnet';
+    } else {
+      type = 'rosary';
+    }
+
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 200 + Math.random() * 300;
+    this.drops.push(
+      new Drop(
+        Date.now() + Math.random(),
+        type,
+        this.player.x + Math.cos(angle) * dist,
+        this.player.y + Math.sin(angle) * dist
+      )
+    );
   }
 
   private handleDropCollected(drop: Drop): void {

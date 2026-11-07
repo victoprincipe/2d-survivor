@@ -2,7 +2,6 @@ import { WeaponId, PassiveId, UpgradeOption, WeaponInstance, PassiveInstance } f
 import { WEAPON_REGISTRY, PASSIVE_REGISTRY } from '../data/upgrades';
 import { Player } from '../entities/Player';
 import { Enemy } from '../entities/Enemy';
-import { Drop } from '../entities/Drops';
 import { SpatialGrid } from '../engine/SpatialGrid';
 import { Camera } from '../engine/Camera';
 import { SoundEngine } from '../engine/SoundEngine';
@@ -154,8 +153,7 @@ export class WeaponSystem {
     worldProps: WorldSystem,
     vfx: VFXManager,
     sound: SoundEngine,
-    onEnemyKilled: (enemy: Enemy) => void,
-    onDropSpawn: (drop: Drop) => void
+    onEnemyKilled: (enemy: Enemy) => void
   ): void {
     // Update whip slash effects
     for (let i = this.whipSlashes.length - 1; i >= 0; i--) {
@@ -179,7 +177,7 @@ export class WeaponSystem {
     this.weapons.forEach((weapon) => {
       weapon.cooldownTimer -= dt;
       if (weapon.cooldownTimer <= 0) {
-        this.fireWeapon(weapon, player, enemies, spatialGrid, worldProps, vfx, sound, onEnemyKilled, onDropSpawn);
+        this.fireWeapon(weapon, player, enemies, spatialGrid, worldProps, vfx, sound, onEnemyKilled);
       }
     });
 
@@ -188,7 +186,7 @@ export class WeaponSystem {
     this.updateGarlic(dt, player, spatialGrid, vfx, sound, onEnemyKilled);
 
     // Update flying projectiles (Wand bolts & Knives)
-    this.updateProjectiles(dt, spatialGrid, worldProps, vfx, sound, onEnemyKilled, onDropSpawn);
+    this.updateProjectiles(dt, spatialGrid, worldProps, vfx, sound, onEnemyKilled);
   }
 
   private fireWeapon(
@@ -199,15 +197,14 @@ export class WeaponSystem {
     worldProps: WorldSystem,
     vfx: VFXManager,
     sound: SoundEngine,
-    onEnemyKilled: (enemy: Enemy) => void,
-    onDropSpawn: (drop: Drop) => void
+    onEnemyKilled: (enemy: Enemy) => void
   ): void {
     const cdFactor = Math.max(0.3, 1 - player.cooldownReduction);
 
     if (w.id === 'whip') {
       const baseCd = w.evolved ? 1.0 : 1.35;
       w.cooldownTimer = baseCd * cdFactor;
-      this.triggerWhip(w, player, grid, worldProps, vfx, sound, onEnemyKilled, onDropSpawn);
+      this.triggerWhip(w, player, grid, worldProps, vfx, sound, onEnemyKilled);
     } else if (w.id === 'wand') {
       const baseCd = w.evolved ? 0.35 : 1.1;
       w.cooldownTimer = baseCd * cdFactor;
@@ -242,8 +239,7 @@ export class WeaponSystem {
     worldProps: WorldSystem,
     vfx: VFXManager,
     sound: SoundEngine,
-    onEnemyKilled: (enemy: Enemy) => void,
-    onDropSpawn: (drop: Drop) => void
+    onEnemyKilled: (enemy: Enemy) => void
   ): void {
     sound.playWhip();
     const facing = player.facingX < 0 ? -1 : 1;
@@ -311,7 +307,7 @@ export class WeaponSystem {
     for (let i = 0; i < worldProps.torches.length; i++) {
       const t = worldProps.torches[i];
       if (Math.abs(t.x - player.x) <= slashWidth && Math.abs(t.y - player.y) <= slashHeight) {
-        worldProps.damageTorch(t, onDropSpawn);
+        worldProps.damageTorch(t);
       }
     }
 
@@ -705,8 +701,7 @@ export class WeaponSystem {
     worldProps: WorldSystem,
     vfx: VFXManager,
     sound: SoundEngine,
-    onEnemyKilled: (enemy: Enemy) => void,
-    onDropSpawn: (drop: Drop) => void
+    onEnemyKilled: (enemy: Enemy) => void
   ): void {
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       const p = this.projectiles[i];
@@ -778,7 +773,7 @@ export class WeaponSystem {
         const tdx = p.x - torch.x;
         const tdy = p.y - torch.y;
         if (tdx * tdx + tdy * tdy <= (p.radius + torch.radius) ** 2) {
-          worldProps.damageTorch(torch, onDropSpawn);
+          worldProps.damageTorch(torch);
           vfx.addSparks(torch.x, torch.y, '#f97316', 5);
           sound.playHit();
           p.pierce -= 1;
