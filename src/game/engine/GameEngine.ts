@@ -37,6 +37,30 @@ export interface GameEngineCallbacks {
   onVictory: (summary: GameEndSummary) => void;
 }
 
+interface BossProjectile {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  radius: number;
+  damage: number;
+  life: number;
+  maxLife: number;
+  kind: 'fireball' | 'soundwave';
+}
+
+interface BossHazard {
+  x: number;
+  y: number;
+  radius: number;
+  life: number;
+  maxLife: number;
+  kind: 'ember' | 'wind';
+  tickTimer: number;
+  damage: number;
+  windStrength: number;
+}
+
 export class GameEngine {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
@@ -55,6 +79,8 @@ export class GameEngine {
 
   public enemies: Enemy[] = [];
   public drops: Drop[] = [];
+  private bossProjectiles: BossProjectile[] = [];
+  private bossHazards: BossHazard[] = [];
 
   public kills: number = 0;
   public goldCollected: number = 0;
@@ -304,6 +330,118 @@ export class GameEngine {
         }
       }
 
+      // Amazon Forest boss attacks.
+      if (e.pendingFireballBurst > 0) {
+        const burst = e.pendingFireballBurst;
+        e.pendingFireballBurst = 0;
+        const baseAngle = Math.atan2(this.player.y - e.y, this.player.x - e.x);
+        this.vfx.addSparks(e.x, e.y, '#f97316', 12);
+        for (let k = 0; k < burst; k++) {
+          const angle = baseAngle + (k - (burst - 1) / 2) * 0.18;
+          this.bossProjectiles.push({
+            x: e.x,
+            y: e.y,
+            vx: Math.cos(angle) * 290,
+            vy: Math.sin(angle) * 290,
+            radius: 9,
+            damage: Math.max(1, Math.round(e.damage * 0.7)),
+            life: 2.6,
+            maxLife: 2.6,
+            kind: 'fireball',
+          });
+        }
+      }
+
+      if (e.pendingEmberTrail) {
+        e.pendingEmberTrail = false;
+        for (let k = 0; k < 3; k++) {
+          const angle = Math.random() * Math.PI * 2;
+          const offset = 10 + Math.random() * 26;
+          this.bossHazards.push({
+            x: e.x + Math.cos(angle) * offset,
+            y: e.y + Math.sin(angle) * offset,
+            radius: 28,
+            life: 4.5,
+            maxLife: 4.5,
+            kind: 'ember',
+            tickTimer: 0,
+            damage: Math.max(1, Math.round(e.damage * 0.3)),
+            windStrength: 0,
+          });
+        }
+        this.vfx.addSparks(e.x, e.y, '#fb923c', 10);
+      }
+
+      if (e.pendingTeleport) {
+        e.pendingTeleport = false;
+        const oldX = e.x;
+        const oldY = e.y;
+        const angle = Math.random() * Math.PI * 2;
+        const distance = 160 + Math.random() * 120;
+        const targetX = this.player.x + Math.cos(angle) * distance;
+        const targetY = this.player.y + Math.sin(angle) * distance;
+        const resolved = this.worldProps.resolvePlayerMovement(
+          e.x,
+          e.y,
+          targetX - e.x,
+          targetY - e.y,
+          e.radius
+        );
+        e.x = resolved.x;
+        e.y = resolved.y;
+        this.bossHazards.push({
+          x: oldX,
+          y: oldY,
+          radius: 230,
+          life: 3.6,
+          maxLife: 3.6,
+          kind: 'wind',
+          tickTimer: 0,
+          damage: 0,
+          windStrength: Math.random() < 0.5 ? 170 : -170,
+        });
+        this.vfx.addDeathBurst(oldX, oldY, '#94a3b8', 12);
+        this.vfx.addSparks(e.x, e.y, '#f472b6', 14);
+      }
+
+      if (e.pendingWindBurst > 0) {
+        const bursts = e.pendingWindBurst;
+        e.pendingWindBurst = 0;
+        for (let k = 0; k < bursts; k++) {
+          this.bossHazards.push({
+            x: e.x,
+            y: e.y,
+            radius: 230,
+            life: 4,
+            maxLife: 4,
+            kind: 'wind',
+            tickTimer: 0,
+            damage: 0,
+            windStrength: Math.random() < 0.5 ? 170 : -170,
+          });
+        }
+      }
+
+      if (e.pendingSoundWave) {
+        e.pendingSoundWave = false;
+        const baseAngle = Math.atan2(this.player.y - e.y, this.player.x - e.x);
+        this.camera.shake(0.12, 3);
+        for (let k = 0; k < 5; k++) {
+          const angle = baseAngle + (k - 2) * 0.22;
+          this.bossProjectiles.push({
+            x: e.x,
+            y: e.y,
+            vx: Math.cos(angle) * 240,
+            vy: Math.sin(angle) * 240,
+            radius: 11,
+            damage: Math.max(1, Math.round(e.damage * 0.65)),
+            life: 3,
+            maxLife: 3,
+            kind: 'soundwave',
+          });
+        }
+      }
+
       // Check body collision with player (jumping grants brief immunity)
       const dx = this.player.x - e.x;
       const dy = this.player.y - e.y;
@@ -376,6 +514,12 @@ export class GameEngine {
       (enemy) => this.enemies.push(enemy)
     );
 
+    // 8.5. Update Amazon boss projectiles and ground hazards
+    if (this.updateBossEffects(dt)) {
+      this.handlePlayerDeath();
+      return;
+    }
+
     // 9. Update VFX
     this.vfx.update(dt);
 
@@ -385,6 +529,77 @@ export class GameEngine {
       this.hudThrottleTimer = 0;
       this.syncHUD();
     }
+  }
+
+  private updateBossEffects(dt: number): boolean {
+    for (let i = this.bossProjectiles.length - 1; i >= 0; i--) {
+      const p = this.bossProjectiles[i];
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.life -= dt;
+
+      const dx = this.player.x - p.x;
+      const dy = this.player.y - p.y;
+      if (Math.sqrt(dx * dx + dy * dy) <= p.radius + this.player.radius) {
+        const fatal = this.player.takeDamage(p.damage);
+        this.sound.playPlayerHurt();
+        this.vfx.addDamageNumber(this.player.x, this.player.y, p.damage, false, false);
+        p.life = 0;
+        if (fatal) return true;
+      }
+
+      if (p.life <= 0) {
+        this.bossProjectiles.splice(i, 1);
+      }
+    }
+
+    for (let i = this.bossHazards.length - 1; i >= 0; i--) {
+      const h = this.bossHazards[i];
+      h.life -= dt;
+
+      const dx = this.player.x - h.x;
+      const dy = this.player.y - h.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (h.kind === 'wind') {
+        if (dist < h.radius) {
+          const falloff = 1 - dist / h.radius;
+          const dirX = dist > 0 ? dx / dist : 1;
+          const dirY = dist > 0 ? dy / dist : 0;
+          const moveX = dirX * h.windStrength * falloff * dt;
+          const moveY = dirY * h.windStrength * falloff * dt;
+          if (this.player.collisionResolver) {
+            const resolved = this.player.collisionResolver(
+              this.player.x,
+              this.player.y,
+              moveX,
+              moveY,
+              this.player.radius
+            );
+            this.player.x = resolved.x;
+            this.player.y = resolved.y;
+          } else {
+            this.player.x += moveX;
+            this.player.y += moveY;
+          }
+        }
+      } else {
+        h.tickTimer -= dt;
+        if (dist < h.radius + this.player.radius && h.tickTimer <= 0) {
+          h.tickTimer = 0.55;
+          const fatal = this.player.takeDamage(h.damage);
+          this.sound.playPlayerHurt();
+          this.vfx.addDamageNumber(this.player.x, this.player.y, h.damage, false, false);
+          if (fatal) return true;
+        }
+      }
+
+      if (h.life <= 0) {
+        this.bossHazards.splice(i, 1);
+      }
+    }
+
+    return false;
   }
 
   private onEnemyKilled(enemy: Enemy): void {
@@ -406,7 +621,7 @@ export class GameEngine {
       this.drops.push(new Drop(Date.now() + 1 + Math.random(), 'gem_red', enemy.x + 22, enemy.y, bossXp));
       this.drops.push(new Drop(Date.now() + 2 + Math.random(), 'gem_red', enemy.x - 22, enemy.y, bossXp));
 
-      if (!this.waveDirector.isEndless) {
+      if (!this.waveDirector.isEndless && !this.waveDirector.isAmazonForest) {
         this.handleVictory();
       } else {
         this.persistRunStats(false);
@@ -807,6 +1022,7 @@ export class GameEngine {
 
     // 4. Render Ground Hazards & Auras beneath Enemies/Player
     this.weaponSystem.renderGround(ctx, camera, this.player);
+    this.renderBossHazards();
 
     // 5. Render Enemies & Player
     for (let i = 0; i < this.enemies.length; i++) {
@@ -814,6 +1030,7 @@ export class GameEngine {
     }
 
     this.player.render(ctx, camera);
+    this.renderBossProjectiles();
 
     // 6. Render Aerial Projectiles, Slashes, Orbitals & Lightning
     this.weaponSystem.render(ctx, camera, this.player);
@@ -935,6 +1152,92 @@ export class GameEngine {
     ctx.lineWidth = 1.5;
     ctx.stroke();
     ctx.restore();
+  }
+
+  private renderBossHazards(): void {
+    const { ctx, camera } = this;
+    for (let i = 0; i < this.bossHazards.length; i++) {
+      const h = this.bossHazards[i];
+      if (!camera.isInView(h.x, h.y, h.radius + 30)) continue;
+      const screen = camera.worldToScreen(h.x, h.y);
+      const alpha = Math.min(1, h.life / 0.8);
+
+      ctx.save();
+      if (h.kind === 'ember') {
+        const glow = ctx.createRadialGradient(screen.x, screen.y, 2, screen.x, screen.y, h.radius);
+        glow.addColorStop(0, `rgba(254, 240, 138, ${0.8 * alpha})`);
+        glow.addColorStop(0.45, `rgba(249, 115, 22, ${0.55 * alpha})`);
+        glow.addColorStop(1, 'rgba(185, 28, 28, 0)');
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(screen.x, screen.y, h.radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        const pulse = 1 + Math.sin(h.life * 9) * 0.12;
+        ctx.fillStyle = `rgba(251, 146, 60, ${0.55 * alpha})`;
+        ctx.beginPath();
+        ctx.ellipse(screen.x, screen.y, h.radius * 0.4 * pulse, h.radius * 0.22 * pulse, 0, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        const spin = h.life * 2.4 * (h.windStrength >= 0 ? 1 : -1);
+        ctx.strokeStyle = `rgba(186, 230, 253, ${0.6 * alpha})`;
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        for (let ring = 0; ring < 3; ring++) {
+          const radius = h.radius * (0.32 + ring * 0.22);
+          const start = spin + ring * 1.4;
+          ctx.beginPath();
+          ctx.arc(screen.x, screen.y, radius, start, start + Math.PI * 1.1);
+          ctx.stroke();
+        }
+        ctx.lineCap = 'butt';
+      }
+      ctx.restore();
+    }
+  }
+
+  private renderBossProjectiles(): void {
+    const { ctx, camera } = this;
+    for (let i = 0; i < this.bossProjectiles.length; i++) {
+      const p = this.bossProjectiles[i];
+      if (!camera.isInView(p.x, p.y, p.radius + 20)) continue;
+      const screen = camera.worldToScreen(p.x, p.y);
+      const alpha = Math.min(1, p.life / 0.5);
+
+      ctx.save();
+      if (p.kind === 'fireball') {
+        const glow = ctx.createRadialGradient(screen.x, screen.y, 1, screen.x, screen.y, p.radius * 2.2);
+        glow.addColorStop(0, `rgba(254, 249, 195, ${alpha})`);
+        glow.addColorStop(0.35, `rgba(249, 115, 22, ${0.95 * alpha})`);
+        glow.addColorStop(1, 'rgba(220, 38, 38, 0)');
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(screen.x, screen.y, p.radius * 2.2, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = `rgba(254, 240, 138, ${alpha})`;
+        ctx.beginPath();
+        ctx.arc(screen.x, screen.y, p.radius * 0.55, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        const angle = Math.atan2(p.vy, p.vx);
+        ctx.translate(screen.x, screen.y);
+        ctx.rotate(angle);
+        ctx.strokeStyle = `rgba(244, 114, 182, ${0.85 * alpha})`;
+        ctx.lineWidth = 3;
+        for (let ring = 0; ring < 3; ring++) {
+          ctx.beginPath();
+          ctx.arc(0, 0, p.radius + ring * 4, -0.85, 0.85);
+          ctx.stroke();
+        }
+        ctx.strokeStyle = `rgba(251, 207, 232, ${0.7 * alpha})`;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(0, 0, p.radius + 14, -0.6, 0.6);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
   }
 
   private renderDebugOverlay(): void {

@@ -189,6 +189,10 @@ export type EnemyType =
   | 'ghost'
   | 'elite_minotaur'
   | 'boss_vampire'
+  // Amazon Forest boss waves: Curupira, Saci-pererê and Boto-cor-de-rosa.
+  | 'boss_curupira'
+  | 'boss_saci'
+  | 'boss_boto'
   // Basic enemies exclusive to the Amazon Forest map.
   | 'bullet_ant'
   | 'leafcutter_ant'

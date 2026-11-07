@@ -50,6 +50,8 @@ export class WaveDirector {
   private nextEnemyId: number = 1;
   private spawnTimer: number = 0;
   private nextAmazonEliteTime: number = 80 + Math.random() * 40;
+  private nextAmazonBossTime: number = 300;
+  private amazonBossWave: number = 0;
 
   constructor(
     difficulty: DifficultyConfig,
@@ -61,7 +63,7 @@ export class WaveDirector {
     this.worldProps = worldProps;
   }
 
-  private get isAmazonForest(): boolean {
+  public get isAmazonForest(): boolean {
     return this.mapId === 'amazon_forest';
   }
 
@@ -93,7 +95,7 @@ export class WaveDirector {
 
     // Check boss status
     if (this.bossActive && this.bossActive.hp <= 0) {
-      this.bossActive = null;
+      this.bossActive = enemies.find((e) => e.isBoss && e.hp > 0) ?? null;
     }
 
     // Smooth early scaling + steeper late/endless scaling
@@ -106,8 +108,13 @@ export class WaveDirector {
       Math.floor((95 + Math.floor(minutes * 58)) * this.difficulty.enemyCount)
     );
 
+    // While an Amazon boss is alive, regular mobs spawn at half the usual rate.
+    const amazonBossFight =
+      this.isAmazonForest && enemies.some((e) => e.isBoss && e.hp > 0);
+    const effectiveSpawnInterval = amazonBossFight ? spawnInterval * 2 : spawnInterval;
+
     // Regular interval spawning
-    if (!this.freezeSpawns && this.spawnTimer >= spawnInterval && enemies.length < maxEnemies) {
+    if (!this.freezeSpawns && this.spawnTimer >= effectiveSpawnInterval && enemies.length < maxEnemies) {
       this.spawnTimer = 0;
       this.spawnRegularEnemy(player, camera, hpMultiplier, onSpawn);
     }
@@ -199,8 +206,14 @@ export class WaveDirector {
       }
     }
 
-    // Event 5: 05:00 - Final Boss: Senhor da Corrupção!
-    if (sec >= 300 && !this.triggeredEvents.has('final_boss')) {
+    // Event 5: 05:00 - Amazon boss waves every 90s (night plain keeps its final boss).
+    if (this.isAmazonForest && sec >= this.nextAmazonBossTime) {
+      this.nextAmazonBossTime += 90;
+      this.spawnAmazonBossWave(camera, hpMultiplier, onSpawn, sound);
+    }
+
+    // Event 5: 05:00 - Final Boss: Senhor da Corrupção! (night plain only)
+    if (!this.isAmazonForest && sec >= 300 && !this.triggeredEvents.has('final_boss')) {
       this.triggeredEvents.add('final_boss');
       this.triggerAlert('👑 SENHOR DA CORRUPÇÃO SURGIU! DERROTE-O PARA VENCER!', 6);
       sound.playBossWarning();
@@ -216,7 +229,7 @@ export class WaveDirector {
         this.triggeredEvents.add(endlessKey);
         sound.playBossWarning();
 
-        if ((minuteMark - 5) % 3 === 0 && !this.bossActive) {
+        if (!this.isAmazonForest && (minuteMark - 5) % 3 === 0 && !this.bossActive) {
           this.triggerAlert(`👑 REENCARNAÇÃO DO SENHOR DA CORRUPÇÃO (MINUTO ${minuteMark})!`, 5.5);
           const boss = this.spawnBoss(player, camera, hpMultiplier * 1.15, onSpawn);
           this.bossActive = boss;
@@ -387,6 +400,42 @@ export class WaveDirector {
     const elite = this.createEnemy('elite_minotaur', pos.x, pos.y, hpMult);
     elite.name = customName;
     onSpawn(elite);
+  }
+
+  private spawnAmazonBossWave(
+    camera: Camera,
+    hpMult: number,
+    onSpawn: (enemy: Enemy) => void,
+    sound: SoundEngine
+  ): void {
+    const simultaneous =
+      this.difficulty.id === 'hard'
+        ? 2
+        : this.difficulty.id === 'nightmare' || this.difficulty.id === 'infernal'
+          ? 3
+          : 1;
+    const order: EnemyType[] = ['boss_curupira', 'boss_saci', 'boss_boto'];
+    const type = order[this.amazonBossWave % order.length];
+    this.amazonBossWave += 1;
+
+    let bossName = '';
+    for (let i = 0; i < simultaneous; i++) {
+      let pos = this.getSpawnPositionOutsideScreen(camera);
+      if (type === 'boss_boto') {
+        const waterPos = this.getWaterSpawnPosition(camera, 48);
+        if (waterPos) pos = waterPos;
+      }
+
+      const boss = this.createEnemy(type, pos.x, pos.y, hpMult);
+      if (i === 0) {
+        this.bossActive = boss;
+        bossName = boss.name;
+      }
+      onSpawn(boss);
+    }
+
+    this.triggerAlert(`👑 ${bossName.toUpperCase()} SURGIU NA FLORESTA!`, 6);
+    sound.playBossWarning();
   }
 
   private spawnBoss(

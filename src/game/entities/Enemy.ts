@@ -60,6 +60,13 @@ export class Enemy {
   public pendingNovaBurst: boolean = false;
   public pendingSummonCount: number = 0;
 
+  // Amazon Forest boss attacks (resolved by GameEngine).
+  public pendingFireballBurst: number = 0;
+  public pendingEmberTrail: boolean = false;
+  public pendingTeleport: boolean = false;
+  public pendingWindBurst: number = 0;
+  public pendingSoundWave: boolean = false;
+
   constructor(id: number, type: EnemyType, x: number, y: number, hpMultiplier: number = 1.0) {
     this.id = id;
     this.type = type;
@@ -327,6 +334,40 @@ export class Enemy {
           this.spriteImage.src = '/boss-lula.gif';
         }
         break;
+      // Amazon Forest bosses: each wave uses one of these three guardians.
+      case 'boss_curupira':
+        this.name = 'Curupira (Guardião da Floresta)';
+        this.radius = 38;
+        this.maxHp = Math.round(1200 * hpMultiplier);
+        this.speed = 88;
+        this.damage = 30;
+        this.xpValue = 520;
+        this.isBoss = true;
+        this.knockbackResistance = 0.06;
+        this.skillCooldown = 2.2;
+        break;
+      case 'boss_saci':
+        this.name = 'Saci-pererê (Redemoinho)';
+        this.radius = 30;
+        this.maxHp = Math.round(1000 * hpMultiplier);
+        this.speed = 122;
+        this.damage = 24;
+        this.xpValue = 480;
+        this.isBoss = true;
+        this.knockbackResistance = 0.08;
+        this.skillCooldown = 2.6;
+        break;
+      case 'boss_boto':
+        this.name = 'Boto-cor-de-rosa (Encantado)';
+        this.radius = 40;
+        this.maxHp = Math.round(1300 * hpMultiplier);
+        this.speed = 94;
+        this.damage = 32;
+        this.xpValue = 560;
+        this.isBoss = true;
+        this.knockbackResistance = 0.07;
+        this.skillCooldown = 2.8;
+        break;
     }
 
     this.hp = this.maxHp;
@@ -471,6 +512,15 @@ export class Enemy {
   }
 
   private updateSpecialSkills(dt: number, dx: number, dy: number, dist: number, speedMult: number): void {
+    if (
+      this.type === 'boss_curupira' ||
+      this.type === 'boss_saci' ||
+      this.type === 'boss_boto'
+    ) {
+      this.updateAmazonBossSkills(dt, dist, speedMult);
+      return;
+    }
+
     if (this.skillState === 'idle') {
       this.skillCooldown -= dt * speedMult;
       if (this.skillCooldown <= 0 && dist < 520) {
@@ -526,6 +576,32 @@ export class Enemy {
       this.skillState = 'idle';
       this.skillCooldown = 5.4;
     }
+  }
+
+  private updateAmazonBossSkills(dt: number, dist: number, speedMult: number): void {
+    this.skillCooldown -= dt * speedMult;
+    if (this.skillCooldown > 0 || dist > 760) return;
+
+    if (this.type === 'boss_curupira') {
+      if (this.bossSkillIndex % 2 === 0) {
+        this.pendingEmberTrail = true;
+      } else {
+        this.pendingFireballBurst = 3;
+      }
+      this.skillCooldown = 2.4;
+    } else if (this.type === 'boss_saci') {
+      if (this.bossSkillIndex % 2 === 0) {
+        this.pendingTeleport = true;
+      } else {
+        this.pendingWindBurst += 1;
+      }
+      this.skillCooldown = 2.8;
+    } else {
+      this.pendingSoundWave = true;
+      this.skillCooldown = 3.0;
+    }
+
+    this.bossSkillIndex += 1;
   }
 
   takeDamage(amount: number, knockX: number = 0, knockY: number = 0, knockForce: number = 200): boolean {
@@ -1254,6 +1330,195 @@ export class Enemy {
       }
 
       ctx.restore();
+    } else if (this.type === 'boss_curupira') {
+      // Curupira: fire hair, green forest body and backwards feet.
+      const flicker = Math.sin(this.animTimer * 5) * 4;
+
+      if (!isFlashing) {
+        const aura = ctx.createRadialGradient(0, 0, 12, 0, 0, 52);
+        aura.addColorStop(0, 'rgba(249, 115, 22, 0.35)');
+        aura.addColorStop(1, 'rgba(249, 115, 22, 0)');
+        ctx.fillStyle = aura;
+        ctx.beginPath();
+        ctx.arc(0, 0, 52, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Reversed feet: the toes point away from the walking direction.
+      if (!isFlashing) ctx.fillStyle = '#5b3a1c';
+      ctx.beginPath();
+      ctx.ellipse(-12, 26, 9, 5, -0.5, 0, Math.PI * 2);
+      ctx.ellipse(12, 26, 9, 5, 0.5, 0, Math.PI * 2);
+      ctx.fill();
+      if (!isFlashing) ctx.fillStyle = '#d6a15f';
+      ctx.beginPath();
+      ctx.moveTo(-19, 24);
+      ctx.lineTo(-28, 27);
+      ctx.lineTo(-19, 29);
+      ctx.closePath();
+      ctx.moveTo(19, 24);
+      ctx.lineTo(28, 27);
+      ctx.lineTo(19, 29);
+      ctx.closePath();
+      ctx.fill();
+
+      // Branch-like legs and mossy body.
+      if (!isFlashing) ctx.fillStyle = '#3f6212';
+      ctx.beginPath();
+      ctx.roundRect(-16, 0, 32, 28, 8);
+      ctx.fill();
+      if (!isFlashing) ctx.fillStyle = '#365314';
+      ctx.beginPath();
+      ctx.ellipse(0, -10, 15, 13, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Face.
+      if (!isFlashing) ctx.fillStyle = '#fde68a';
+      ctx.beginPath();
+      ctx.arc(-5, -12, 2.4, 0, Math.PI * 2);
+      ctx.arc(5, -12, 2.4, 0, Math.PI * 2);
+      ctx.fill();
+      if (!isFlashing) ctx.fillStyle = '#166534';
+      ctx.fillRect(-3, -5, 6, 2);
+
+      // Flaming hair.
+      if (!isFlashing) ctx.fillStyle = '#dc2626';
+      ctx.beginPath();
+      ctx.moveTo(-15, -14);
+      ctx.quadraticCurveTo(-20, -30 - flicker, -8, -24);
+      ctx.quadraticCurveTo(-4, -40 + flicker, 2, -26);
+      ctx.quadraticCurveTo(8, -38 - flicker, 13, -22);
+      ctx.quadraticCurveTo(20, -28 + flicker, 15, -12);
+      ctx.closePath();
+      ctx.fill();
+      if (!isFlashing) ctx.fillStyle = '#f97316';
+      ctx.beginPath();
+      ctx.moveTo(-11, -15);
+      ctx.quadraticCurveTo(-13, -27 - flicker, -2, -21);
+      ctx.quadraticCurveTo(2, -32 + flicker, 7, -20);
+      ctx.quadraticCurveTo(12, -25 - flicker, 11, -13);
+      ctx.closePath();
+      ctx.fill();
+      if (!isFlashing) ctx.fillStyle = '#fde047';
+      ctx.beginPath();
+      ctx.moveTo(-5, -17);
+      ctx.quadraticCurveTo(-3, -25 + flicker, 3, -22);
+      ctx.quadraticCurveTo(7, -25 - flicker, 6, -16);
+      ctx.closePath();
+      ctx.fill();
+    } else if (this.type === 'boss_saci') {
+      // Saci-pererê: small dark boy with a bright red cap and a wind swirl.
+      const swirl = this.animTimer * 2.4;
+
+      if (!isFlashing) {
+        ctx.strokeStyle = 'rgba(148, 197, 255, 0.55)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        for (let a = 0; a < Math.PI * 4; a += 0.2) {
+          const r = 14 + a * 3.2;
+          const px = Math.cos(a + swirl) * r;
+          const py = Math.sin(a + swirl) * r * 0.55;
+          if (a === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+      }
+
+      if (!isFlashing) ctx.fillStyle = '#3b2214';
+      ctx.beginPath();
+      ctx.ellipse(0, 8, 12, 15, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Single leg, in keeping with the folklore.
+      if (!isFlashing) ctx.fillStyle = '#2b160d';
+      ctx.fillRect(-3, 18, 6, 12);
+
+      // Head and red cap.
+      if (!isFlashing) ctx.fillStyle = '#c08457';
+      ctx.beginPath();
+      ctx.arc(0, -8, 11, 0, Math.PI * 2);
+      ctx.fill();
+      if (!isFlashing) ctx.fillStyle = '#dc2626';
+      ctx.beginPath();
+      ctx.moveTo(-13, -10);
+      ctx.quadraticCurveTo(0, -34, 14, -12);
+      ctx.quadraticCurveTo(0, -18, -13, -10);
+      ctx.fill();
+      if (!isFlashing) ctx.fillStyle = '#ef4444';
+      ctx.beginPath();
+      ctx.arc(0, -11, 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#111827';
+      ctx.beginPath();
+      ctx.arc(-4, -7, 1.7, 0, Math.PI * 2);
+      ctx.arc(4, -7, 1.7, 0, Math.PI * 2);
+      ctx.fill();
+      if (!isFlashing) ctx.fillStyle = '#fef3c7';
+      ctx.beginPath();
+      ctx.arc(-1, -2, 2.4, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (this.type === 'boss_boto') {
+      // Boto-cor-de-rosa: large pink river dolphin surrounded by sound ripples.
+      const bob = Math.sin(this.animTimer * 1.7) * 3;
+
+      if (!isFlashing) {
+        ctx.strokeStyle = 'rgba(244, 114, 182, 0.4)';
+        ctx.lineWidth = 2;
+        for (let i = 1; i <= 3; i++) {
+          ctx.beginPath();
+          ctx.arc(0, 0, 24 + i * 9 + Math.sin(this.animTimer * 2 + i) * 2, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
+
+      if (!isFlashing) ctx.fillStyle = '#f9a8d4';
+      ctx.beginPath();
+      ctx.ellipse(-4, bob, 32, 15, -0.06, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(27, 4 + bob, 12, 7, 0.08, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Dorsal fin.
+      if (!isFlashing) ctx.fillStyle = '#f472b6';
+      ctx.beginPath();
+      ctx.moveTo(-4, -11 + bob);
+      ctx.lineTo(-12, -29 + bob);
+      ctx.lineTo(9, -10 + bob);
+      ctx.closePath();
+      ctx.fill();
+
+      // Tail flukes.
+      ctx.beginPath();
+      ctx.moveTo(-30, 2 + bob);
+      ctx.lineTo(-48, -12 + bob);
+      ctx.lineTo(-43, 2 + bob);
+      ctx.lineTo(-48, 15 + bob);
+      ctx.closePath();
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#fbcfe8';
+      ctx.beginPath();
+      ctx.ellipse(-5, 7 + bob, 19, 6, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#0f172a';
+      ctx.beginPath();
+      ctx.arc(26, -2 + bob, 2.6, 0, Math.PI * 2);
+      ctx.fill();
+      if (!isFlashing) ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(27, -3 + bob, 1, 0, Math.PI * 2);
+      ctx.fill();
+      if (!isFlashing) {
+        ctx.strokeStyle = '#ec4899';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(37, 5 + bob);
+        ctx.lineTo(44, 6 + bob);
+        ctx.stroke();
+      }
     } else if (this.type === 'ghost') {
       ctx.globalAlpha = 0.75;
       if (!isFlashing) ctx.fillStyle = '#93c5fd';
@@ -1948,15 +2213,20 @@ export class Enemy {
 
     ctx.restore();
 
-    // Health bar for Elites
-    if (this.isElite) {
-      const barW = 44;
-      const barH = 5;
+    // Health bar for Elites and Amazon Forest bosses.
+    const showBossBar =
+      this.isBoss &&
+      (this.type === 'boss_curupira' ||
+        this.type === 'boss_saci' ||
+        this.type === 'boss_boto');
+    if (this.isElite || showBossBar) {
+      const barW = showBossBar ? 76 : 44;
+      const barH = showBossBar ? 7 : 5;
       const barX = screen.x - barW / 2;
-      const barY = screen.y - this.radius - 12;
+      const barY = screen.y - this.radius - (showBossBar ? 18 : 12);
       ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
       ctx.fillRect(barX, barY, barW, barH);
-      ctx.fillStyle = '#eab308';
+      ctx.fillStyle = showBossBar ? '#f43f5e' : '#eab308';
       ctx.fillRect(barX, barY, barW * Math.max(0, this.hp / this.maxHp), barH);
     }
   }
