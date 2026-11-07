@@ -73,7 +73,7 @@ export class Enemy {
         this.isElite = true;
         break;
       case 'boss_vampire':
-        this.name = 'Lorde Carmesim (Chefe Final)';
+        this.name = 'Senhor da Corrupçao (Chefe Final)';
         this.radius = 36;
         this.maxHp = Math.round(2400 * hpMultiplier);
         this.speed = 95;
