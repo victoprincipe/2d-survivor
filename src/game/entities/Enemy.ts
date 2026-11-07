@@ -79,6 +79,9 @@ export class Enemy {
   public pendingThornRoots: boolean = false;
   public pendingStomp: boolean = false;
   public pendingRoar: boolean = false;
+  // Cobra-Grande (long lunges) and Boitatá (fire trail + radial fireballs).
+  public emberTrailTimer: number = 0;
+  public pendingFireRing: number = 0;
 
   constructor(id: number, type: EnemyType, x: number, y: number, hpMultiplier: number = 1.0) {
     this.id = id;
@@ -436,6 +439,28 @@ export class Enemy {
         this.knockbackResistance = 0.03;
         this.skillCooldown = 3.2;
         break;
+      case 'boss_cobra_grande':
+        this.name = 'Cobra-Grande (Boiúna)';
+        this.radius = 50;
+        this.maxHp = Math.round(4200 * hpMultiplier);
+        this.speed = 118;
+        this.damage = 44;
+        this.xpValue = 1000;
+        this.isBoss = true;
+        this.knockbackResistance = 0.03;
+        this.skillCooldown = 1.6;
+        break;
+      case 'boss_boitata':
+        this.name = 'Boitatá (Chefe Final)';
+        this.radius = 48;
+        this.maxHp = Math.round(5200 * hpMultiplier);
+        this.speed = 124;
+        this.damage = 46;
+        this.xpValue = 1200;
+        this.isBoss = true;
+        this.knockbackResistance = 0.03;
+        this.skillCooldown = 2.2;
+        break;
     }
 
     this.hp = this.maxHp;
@@ -534,7 +559,15 @@ export class Enemy {
     }
 
     if (this.skillState === 'dashing') {
-      const dashSpeed = (this.isBoss ? 275 : 210) * speedMult;
+      const baseDashSpeed =
+        this.type === 'boss_cobra_grande'
+          ? 620
+          : this.type === 'boss_boitata'
+            ? 340
+            : this.isBoss
+              ? 275
+              : 210;
+      const dashSpeed = baseDashSpeed * speedMult;
       this.x += this.dashDirX * dashSpeed * dt;
       this.y += this.dashDirY * dashSpeed * dt;
       return this.hp > 0;
@@ -588,7 +621,9 @@ export class Enemy {
       this.type === 'boss_caipora' ||
       this.type === 'boss_matinta' ||
       this.type === 'boss_vitoria_regia' ||
-      this.type === 'boss_mapinguari'
+      this.type === 'boss_mapinguari' ||
+      this.type === 'boss_cobra_grande' ||
+      this.type === 'boss_boitata'
     ) {
       this.updateAmazonBossSkills(dt, dx, dy, dist, speedMult);
       return;
@@ -658,6 +693,48 @@ export class Enemy {
     dist: number,
     speedMult: number
   ): void {
+    // Boitatá leaves a continuous line of fire behind it wherever it slithers.
+    if (this.type === 'boss_boitata') {
+      this.emberTrailTimer -= dt;
+      if (this.emberTrailTimer <= 0) {
+        this.emberTrailTimer = 0.22;
+        this.pendingEmberTrail = true;
+      }
+    }
+
+    // Cobra-Grande uses long, fast lunges that carry it across land and river.
+    if (this.type === 'boss_cobra_grande') {
+      if (this.skillState === 'telegraph_dash') {
+        this.skillStateTimer -= dt;
+        if (this.skillStateTimer <= 0) {
+          this.skillState = 'dashing';
+          this.skillDuration = 0.95;
+          this.skillStateTimer = 0.95;
+        }
+        return;
+      }
+      if (this.skillState === 'dashing') {
+        this.skillStateTimer -= dt;
+        if (this.skillStateTimer <= 0) {
+          this.skillState = 'idle';
+          this.skillCooldown = 1.8;
+        }
+        return;
+      }
+
+      this.skillCooldown -= dt * speedMult;
+      if (this.skillCooldown > 0 || dist > 900) return;
+
+      const norm = dist > 0 ? dist : 1;
+      this.dashDirX = dx / norm;
+      this.dashDirY = dy / norm;
+      this.skillState = 'telegraph_dash';
+      this.skillDuration = 0.55;
+      this.skillStateTimer = 0.55;
+      this.skillCooldown = 2.1;
+      return;
+    }
+
     // Caipora's mounted charge has its own short state machine so the engine's
     // existing dash movement can carry it toward the player.
     if (this.type === 'boss_caipora') {
@@ -740,6 +817,14 @@ export class Enemy {
         this.pendingRoar = true;
       }
       this.skillCooldown = 3.4;
+    } else if (this.type === 'boss_boitata') {
+      // Alternates a radial fire burst with a wide fan of fireballs.
+      if (this.bossSkillIndex % 2 === 0) {
+        this.pendingFireRing = 12;
+      } else {
+        this.pendingFireballBurst = 7;
+      }
+      this.skillCooldown = 2.4;
     }
 
     this.bossSkillIndex += 1;
@@ -2043,6 +2128,171 @@ export class Enemy {
         ctx.closePath();
         ctx.fill();
       }
+    } else if (this.type === 'boss_cobra_grande') {
+      // Cobra-Grande (Boiúna): colossal dark serpent with glowing eyes.
+      const slither = Math.sin(this.animTimer * 3.4) * 5;
+
+      if (!isFlashing) {
+        const aura = ctx.createRadialGradient(0, 0, 16, 0, 0, 76);
+        aura.addColorStop(0, 'rgba(15, 23, 42, 0.55)');
+        aura.addColorStop(0.55, 'rgba(30, 64, 175, 0.22)');
+        aura.addColorStop(1, 'rgba(15, 23, 42, 0)');
+        ctx.fillStyle = aura;
+        ctx.beginPath();
+        ctx.arc(0, 0, 76, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Long sinuous body with a tapered tail.
+      if (!isFlashing) ctx.fillStyle = '#111827';
+      ctx.beginPath();
+      ctx.moveTo(-58, 20 + slither);
+      ctx.quadraticCurveTo(-32, -12 + slither, -4, 6);
+      ctx.quadraticCurveTo(18, 22, 38, 4);
+      ctx.lineTo(42, 18);
+      ctx.quadraticCurveTo(16, 34, -6, 20);
+      ctx.quadraticCurveTo(-32, 8, -58, 32 + slither);
+      ctx.closePath();
+      ctx.fill();
+
+      // Blue-black dorsal scales.
+      if (!isFlashing) ctx.fillStyle = '#1e293b';
+      for (let i = 0; i < 7; i++) {
+        const sx = -44 + i * 12;
+        const sy = 8 + Math.sin(i * 1.3 + this.animTimer * 3) * 5;
+        ctx.beginPath();
+        ctx.ellipse(sx, sy, 8, 5, -0.25, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Head with a broad jaw.
+      if (!isFlashing) ctx.fillStyle = '#0f172a';
+      ctx.beginPath();
+      ctx.ellipse(36, -2, 22, 15, -0.12, 0, Math.PI * 2);
+      ctx.fill();
+      if (!isFlashing) ctx.fillStyle = '#1e293b';
+      ctx.beginPath();
+      ctx.ellipse(46, 2, 12, 8, -0.05, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Forked tongue.
+      if (!isFlashing) {
+        ctx.strokeStyle = '#f43f5e';
+        ctx.lineWidth = 2.4;
+        ctx.beginPath();
+        ctx.moveTo(56, 3);
+        ctx.lineTo(70, -2 + Math.sin(this.animTimer * 6) * 2);
+        ctx.moveTo(56, 3);
+        ctx.lineTo(70, 8 + Math.sin(this.animTimer * 6) * 2);
+        ctx.stroke();
+      }
+
+      // Glowing eyes.
+      if (!isFlashing) {
+        const eyeGlow = ctx.createRadialGradient(30, -8, 1, 30, -8, 12);
+        eyeGlow.addColorStop(0, 'rgba(253, 224, 71, 0.9)');
+        eyeGlow.addColorStop(1, 'rgba(253, 224, 71, 0)');
+        ctx.fillStyle = eyeGlow;
+        ctx.beginPath();
+        ctx.arc(30, -8, 12, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#fde047';
+        ctx.beginPath();
+        ctx.arc(30, -8, 3.6, 0, Math.PI * 2);
+        ctx.arc(40, -9, 3.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#111827';
+        ctx.beginPath();
+        ctx.arc(30.5, -8, 1.4, 0, Math.PI * 2);
+        ctx.arc(40.5, -9, 1.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } else if (this.type === 'boss_boitata') {
+      // Boitatá: giant fire serpent wreathed in flames.
+      const undulate = Math.sin(this.animTimer * 4.2) * 6;
+      const flicker = Math.sin(this.animTimer * 11) * 3;
+
+      if (!isFlashing) {
+        const aura = ctx.createRadialGradient(0, 0, 12, 0, 0, 84);
+        aura.addColorStop(0, 'rgba(251, 146, 60, 0.55)');
+        aura.addColorStop(0.5, 'rgba(220, 38, 38, 0.28)');
+        aura.addColorStop(1, 'rgba(220, 38, 38, 0)');
+        ctx.fillStyle = aura;
+        ctx.beginPath();
+        ctx.arc(0, 0, 84, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Flame spikes along the back.
+      if (!isFlashing) {
+        for (let i = 0; i < 10; i++) {
+          const bx = -50 + i * 10;
+          const by = 6 + Math.sin(i * 0.9 + this.animTimer * 4) * 6;
+          const height = 14 + (i % 3) * 6 + flicker;
+          ctx.fillStyle = i % 2 === 0 ? '#f97316' : '#dc2626';
+          ctx.beginPath();
+          ctx.moveTo(bx - 5, by);
+          ctx.quadraticCurveTo(bx, by - height, bx + 5, by);
+          ctx.closePath();
+          ctx.fill();
+          ctx.fillStyle = '#fde047';
+          ctx.beginPath();
+          ctx.moveTo(bx - 2, by);
+          ctx.quadraticCurveTo(bx, by - height * 0.55, bx + 2, by);
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
+
+      // Sinuous body.
+      if (!isFlashing) {
+        const body = ctx.createLinearGradient(-58, -10, 50, 20);
+        body.addColorStop(0, '#7f1d1d');
+        body.addColorStop(0.5, '#dc2626');
+        body.addColorStop(1, '#f97316');
+        ctx.fillStyle = body;
+      }
+      ctx.beginPath();
+      ctx.moveTo(-58, 22 + undulate);
+      ctx.quadraticCurveTo(-30, -10 + undulate, -2, 8);
+      ctx.quadraticCurveTo(20, 24, 40, 5);
+      ctx.lineTo(44, 19);
+      ctx.quadraticCurveTo(18, 36, -6, 22);
+      ctx.quadraticCurveTo(-32, 10, -58, 34 + undulate);
+      ctx.closePath();
+      ctx.fill();
+
+      // Lighter belly scales.
+      if (!isFlashing) ctx.fillStyle = '#fbbf24';
+      for (let i = 0; i < 7; i++) {
+        const sx = -42 + i * 12;
+        const sy = 16 + Math.sin(i * 1.2 + this.animTimer * 3.5) * 5;
+        ctx.beginPath();
+        ctx.ellipse(sx, sy, 6, 3, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Head with burning eyes.
+      if (!isFlashing) ctx.fillStyle = '#b91c1c';
+      ctx.beginPath();
+      ctx.ellipse(36, -2, 21, 14, -0.12, 0, Math.PI * 2);
+      ctx.fill();
+      if (!isFlashing) ctx.fillStyle = '#f97316';
+      ctx.beginPath();
+      ctx.ellipse(46, 2, 11, 7, -0.05, 0, Math.PI * 2);
+      ctx.fill();
+      if (!isFlashing) {
+        ctx.fillStyle = '#fef08a';
+        ctx.beginPath();
+        ctx.arc(30, -8, 3.8, 0, Math.PI * 2);
+        ctx.arc(40, -9, 3.4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#7f1d1d';
+        ctx.beginPath();
+        ctx.arc(30.5, -8, 1.4, 0, Math.PI * 2);
+        ctx.arc(40.5, -9, 1.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
     } else if (this.type === 'ghost') {
       ctx.globalAlpha = 0.75;
       if (!isFlashing) ctx.fillStyle = '#93c5fd';
@@ -2747,7 +2997,9 @@ export class Enemy {
         this.type === 'boss_caipora' ||
         this.type === 'boss_matinta' ||
         this.type === 'boss_vitoria_regia' ||
-        this.type === 'boss_mapinguari');
+        this.type === 'boss_mapinguari' ||
+        this.type === 'boss_cobra_grande' ||
+        this.type === 'boss_boitata');
     if (this.isElite || showBossBar) {
       const barW = showBossBar ? 76 : 44;
       const barH = showBossBar ? 7 : 5;

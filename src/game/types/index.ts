@@ -190,7 +190,8 @@ export type EnemyType =
   | 'elite_minotaur'
   | 'boss_vampire'
   // Amazon Forest boss waves: Curupira, Saci-pererê, Boto-cor-de-rosa,
-  // Iara, Caipora, Matinta Pereira, Vitória-Régia and Mapinguari.
+  // Iara, Caipora, Matinta Pereira, Vitória-Régia, Mapinguari,
+  // Cobra-Grande (Boiúna) and Boitatá (final boss).
   | 'boss_curupira'
   | 'boss_saci'
   | 'boss_boto'
@@ -199,6 +200,8 @@ export type EnemyType =
   | 'boss_matinta'
   | 'boss_vitoria_regia'
   | 'boss_mapinguari'
+  | 'boss_cobra_grande'
+  | 'boss_boitata'
   // Basic enemies exclusive to the Amazon Forest map.
   | 'bullet_ant'
   | 'leafcutter_ant'

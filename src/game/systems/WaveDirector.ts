@@ -51,6 +51,7 @@ export class WaveDirector {
   private spawnTimer: number = 0;
   private nextAmazonEliteTime: number = 80 + Math.random() * 40;
   private nextAmazonBossTime: number = 300;
+  private nextAmazonEliteHordeTime: number = 1120;
   private amazonBossWave: number = 0;
 
   constructor(
@@ -207,9 +208,30 @@ export class WaveDirector {
     }
 
     // Event 5: 05:00 - Amazon boss waves every 90s (night plain keeps its final boss).
-    if (this.isAmazonForest && sec >= this.nextAmazonBossTime) {
+    // The 10 scheduled folklore bosses end with Boitatá at 18:30; after that
+    // only the elite hordes below keep spawning.
+    if (
+      this.isAmazonForest &&
+      sec >= this.nextAmazonBossTime &&
+      this.amazonBossWave < 10
+    ) {
       this.nextAmazonBossTime += 90;
       this.spawnAmazonBossWave(camera, hpMultiplier, onSpawn, sound);
+    }
+
+    // After Boitatá (18:30), the forest keeps the pressure up with intense
+    // elite packs until the 20:00 mark.
+    if (
+      this.isAmazonForest &&
+      sec >= 1110 &&
+      sec < 1200 &&
+      sec >= this.nextAmazonEliteHordeTime &&
+      enemies.length < 380
+    ) {
+      this.nextAmazonEliteHordeTime = sec + 12;
+      this.spawnAmazonEliteHorde(camera, hpMultiplier, onSpawn);
+      this.triggerAlert('🔥 HORDA DE ELITES DA MATA!', 3.5);
+      sound.playBossWarning();
     }
 
     // Event 5: 05:00 - Final Boss: Senhor da Corrupção! (night plain only)
@@ -423,6 +445,8 @@ export class WaveDirector {
       'boss_matinta',
       'boss_vitoria_regia',
       'boss_mapinguari',
+      'boss_cobra_grande',
+      'boss_boitata',
     ];
     const type = order[this.amazonBossWave % order.length];
     this.amazonBossWave += 1;
@@ -430,9 +454,10 @@ export class WaveDirector {
     let bossName = '';
     for (let i = 0; i < simultaneous; i++) {
       let pos = this.getSpawnPositionOutsideScreen(camera);
-      // Iara and Boto are water spirits: try to make them surface near the
-      // river or a lake when there is water just outside the camera.
-      if (type === 'boss_boto' || type === 'boss_iara') {
+      // Iara, Boto and the Cobra-Grande are river spirits: try to make them
+      // surface near the river or a lake when there is water just outside the
+      // camera. The Cobra can slither back onto land on its own.
+      if (type === 'boss_boto' || type === 'boss_iara' || type === 'boss_cobra_grande') {
         const waterPos = this.getWaterSpawnPosition(camera, 48);
         if (waterPos) pos = waterPos;
       }
@@ -447,6 +472,24 @@ export class WaveDirector {
 
     this.triggerAlert(`👑 ${bossName.toUpperCase()} SURGIU NA FLORESTA!`, 6);
     sound.playBossWarning();
+  }
+
+  private spawnAmazonEliteHorde(
+    camera: Camera,
+    hpMult: number,
+    onSpawn: (enemy: Enemy) => void
+  ): void {
+    const eliteTypes: EnemyType[] = [
+      'elite_jaguar',
+      'elite_tapir',
+      'elite_goliath_spider',
+    ];
+    const count = Math.max(2, Math.round(3 * this.difficulty.enemyCount));
+    for (let i = 0; i < count; i++) {
+      const pos = this.getSpawnPositionOutsideScreen(camera);
+      const type = eliteTypes[Math.floor(Math.random() * eliteTypes.length)];
+      onSpawn(this.createEnemy(type, pos.x, pos.y, hpMult * 1.1));
+    }
   }
 
   private spawnBoss(

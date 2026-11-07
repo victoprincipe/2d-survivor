@@ -57,6 +57,19 @@ const AMAZON_DEV_MONSTERS: { type: EnemyType; label: string }[] = [
   { type: 'elite_black_caiman', label: '🐊 Jacaré-açu' },
 ];
 
+const AMAZON_DEV_BOSSES: { type: EnemyType; label: string }[] = [
+  { type: 'boss_curupira', label: '🌳 Curupira' },
+  { type: 'boss_saci', label: '🌪️ Saci-pererê' },
+  { type: 'boss_boto', label: '🐬 Boto-cor-de-rosa' },
+  { type: 'boss_iara', label: '🧜 Iara' },
+  { type: 'boss_caipora', label: '🐗 Caipora' },
+  { type: 'boss_matinta', label: '🦉 Matinta Pereira' },
+  { type: 'boss_vitoria_regia', label: '🪷 Vitória-Régia' },
+  { type: 'boss_mapinguari', label: '👁️ Mapinguari' },
+  { type: 'boss_cobra_grande', label: '🐍 Cobra-Grande' },
+  { type: 'boss_boitata', label: '🔥 Boitatá' },
+];
+
 interface DevToolsProps {
   getEngine: () => GameEngine | null;
   savedData: SavedGameData;
@@ -1200,6 +1213,30 @@ export const DevTools: React.FC<DevToolsProps> = ({
                                 setTelemetry(engine.getDevTelemetry());
                               }}
                               className="p-2 rounded-lg bg-emerald-950/40 hover:bg-emerald-900/60 border border-emerald-800/80 text-emerald-300 font-semibold text-[11px] transition cursor-pointer text-left"
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Spawn Amazon Folklore Bosses Grid */}
+                      <div>
+                        <span className="text-[11px] font-bold text-rose-400 uppercase tracking-wider block mb-2">
+                          Chefes do Folclore Amazônico (10)
+                        </span>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                          {AMAZON_DEV_BOSSES.map(({ type, label }) => (
+                            <button
+                              key={type}
+                              type="button"
+                              onClick={() => {
+                                const engine = getEngine();
+                                if (!engine) return;
+                                engine.devSpawnEnemy(type, 1);
+                                setTelemetry(engine.getDevTelemetry());
+                              }}
+                              className="p-2 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/80 text-rose-300 font-semibold text-[11px] transition cursor-pointer text-left"
                             >
                               {label}
                             </button>

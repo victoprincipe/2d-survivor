@@ -354,22 +354,45 @@ export class GameEngine {
 
       if (e.pendingEmberTrail) {
         e.pendingEmberTrail = false;
-        for (let k = 0; k < 3; k++) {
+        const isBoitata = e.type === 'boss_boitata';
+        const emberCount = isBoitata ? 1 : 3;
+        for (let k = 0; k < emberCount; k++) {
           const angle = Math.random() * Math.PI * 2;
-          const offset = 10 + Math.random() * 26;
+          const offset = isBoitata ? Math.random() * 8 : 10 + Math.random() * 26;
           this.bossHazards.push({
             x: e.x + Math.cos(angle) * offset,
             y: e.y + Math.sin(angle) * offset,
-            radius: 28,
-            life: 4.5,
-            maxLife: 4.5,
+            radius: isBoitata ? 26 : 28,
+            life: isBoitata ? 3.5 : 4.5,
+            maxLife: isBoitata ? 3.5 : 4.5,
             kind: 'ember',
             tickTimer: 0,
-            damage: Math.max(1, Math.round(e.damage * 0.3)),
+            damage: Math.max(1, Math.round(e.damage * (isBoitata ? 0.25 : 0.3))),
             windStrength: 0,
           });
         }
-        this.vfx.addSparks(e.x, e.y, '#fb923c', 10);
+        this.vfx.addSparks(e.x, e.y, '#fb923c', isBoitata ? 4 : 10);
+      }
+
+      if (e.pendingFireRing > 0) {
+        const count = e.pendingFireRing;
+        e.pendingFireRing = 0;
+        this.vfx.addSparks(e.x, e.y, '#f97316', 18);
+        this.camera.shake(0.16, 4);
+        for (let k = 0; k < count; k++) {
+          const angle = (k * Math.PI * 2) / count;
+          this.bossProjectiles.push({
+            x: e.x,
+            y: e.y,
+            vx: Math.cos(angle) * 220,
+            vy: Math.sin(angle) * 220,
+            radius: 10,
+            damage: Math.max(1, Math.round(e.damage * 0.55)),
+            life: 3,
+            maxLife: 3,
+            kind: 'fireball',
+          });
+        }
       }
 
       if (e.pendingTeleport) {
@@ -1677,6 +1700,9 @@ export class GameEngine {
       const enemy = this.waveDirector.createEnemy(type, x, y, hpMult);
       this.enemies.push(enemy);
       this.spatialGrid.insert(enemy);
+      if (enemy.isBoss) {
+        this.waveDirector.bossActive = enemy;
+      }
     }
   }
 
