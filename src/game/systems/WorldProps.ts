@@ -11,8 +11,8 @@ const FOREST_SIZE = 14000;
 const FOREST_HALF_SIZE = FOREST_SIZE / 2;
 const COLLISION_STEP = 8;
 
-// Decorative Amazon water. The river and lakes are purely visual for now:
-// they do not affect movement, collision or speed.
+// Decorative Amazon water. The river and lakes do not affect player movement,
+// but the aquatic fauna is locked to the river band.
 const RIVER_WIDTH = 980;
 const RIVER_BANK = 150;
 const RIVER_HALF_WIDTH = RIVER_WIDTH / 2;
@@ -272,6 +272,28 @@ export class WorldSystem {
     }
 
     return false;
+  }
+
+  /** Water covering the river or the Amazon lakes. */
+  public isWaterAt(x: number, y: number): boolean {
+    return this.isInWater(x, y);
+  }
+
+  /** The river itself, where the four aquatic animals must stay. */
+  public isInRiver(x: number, y: number): boolean {
+    return Math.abs(y - this.riverCenterY(x)) <= RIVER_HALF_WIDTH;
+  }
+
+  public getRiverCenterY(x: number): number {
+    return this.riverCenterY(x);
+  }
+
+  public getRiverHalfWidth(): number {
+    return RIVER_HALF_WIDTH;
+  }
+
+  public getForestHalfSize(): number {
+    return FOREST_HALF_SIZE;
   }
 
   /**

@@ -93,7 +93,7 @@ export class GameEngine {
     this.vfx = new VFXManager();
     this.worldProps = new WorldSystem(mapId);
     this.difficulty = getDifficulty(difficultyId);
-    this.waveDirector = new WaveDirector(this.difficulty);
+    this.waveDirector = new WaveDirector(this.difficulty, mapId, this.worldProps);
 
     this.player = new Player(character, savedData.powerUps);
     this.player.setCollisionResolver((fromX, fromY, dx, dy, radius) =>
@@ -234,7 +234,7 @@ export class GameEngine {
             const ang = (s * Math.PI * 2) / toSpawn;
             const mx = e.x + Math.cos(ang) * 65;
             const my = e.y + Math.sin(ang) * 65;
-            spawnedMinions.push(this.waveDirector.createEnemy('bat', mx, my, hpMult));
+            spawnedMinions.push(this.waveDirector.createSummonEnemy(mx, my, hpMult));
           }
         }
       }
