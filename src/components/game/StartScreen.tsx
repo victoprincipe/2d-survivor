@@ -54,7 +54,7 @@ const DIFFICULTY_DOT_COLORS: Record<DifficultyId, string> = {
 };
 
 const CHARACTER_SELECTION_MUSIC: Record<string, string> = {
-  kayrurururu: '/audio/job-52-audio-1.mp3',
+  kayrurururu: '/audio/job-57-audio-1.mp3',
   derson: '/audio/job-54-audio-1.mp3',
 };
 
