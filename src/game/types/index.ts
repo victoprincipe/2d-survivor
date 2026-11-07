@@ -21,6 +21,78 @@ export type EvolvedWeaponId =
 
 export type PassiveId = 'spinach' | 'wings' | 'heart' | 'tome' | 'magnet' | 'bracer';
 
+export type DifficultyId = 'facil' | 'normal' | 'dificil' | 'pesadelo' | 'infernal';
+export type ItemRarity = 'comum' | 'rara' | 'epica' | 'lendaria';
+export type RelicId =
+  | 'iron_ring'
+  | 'swift_boots'
+  | 'moon_charm'
+  | 'sapphire_lens'
+  | 'blood_chalice'
+  | 'storm_coil'
+  | 'phoenix_ember'
+  | 'void_heart';
+
+export interface RelicEffects {
+  might?: number;
+  armor?: number;
+  maxHp?: number;
+  speed?: number;
+  cooldownReduction?: number;
+  xpMultiplier?: number;
+  pickupRadius?: number;
+  recoveryPerSec?: number;
+  goldMultiplier?: number;
+}
+
+export interface RelicConfig {
+  id: RelicId;
+  name: string;
+  description: string;
+  rarity: ItemRarity;
+  color: string;
+  iconName: string;
+  effects: RelicEffects;
+}
+
+export type SpecialAbilityKind = 'heal' | 'nova' | 'shield' | 'haste';
+
+export interface SpecialAbilityConfig {
+  name: string;
+  description: string;
+  kind: SpecialAbilityKind;
+  cooldown: number;
+  power: number;
+  radius?: number;
+  duration?: number;
+}
+
+export interface LifetimeStats {
+  runs: number;
+  kills: number;
+  timeSurvived: number;
+  bossesKilled: number;
+  elitesKilled: number;
+  goldEarned: number;
+  levelsGained: number;
+  evolutions: number;
+  relicsFound: number;
+  charactersPlayed: string[];
+  bestTime: number;
+  bestKills: number;
+  bestRelics: number;
+  highestLevel: number;
+  winsByDifficulty: Partial<Record<DifficultyId, number>>;
+}
+
+export interface MissionState {
+  dailyKey: string;
+  weeklyKey: string;
+  dailyBaseline: LifetimeStats;
+  weeklyBaseline: LifetimeStats;
+  claimed: string[];
+}
+
 export interface WeaponInstance {
   id: WeaponId;
   evolvedId?: EvolvedWeaponId;
@@ -47,6 +119,7 @@ export interface CharacterConfig {
   color: string;
   portraitColor: string;
   sprite?: string;
+  skinAccent?: string;
   statBonuses: {
     maxHp?: number;
     speed?: number;
@@ -56,6 +129,18 @@ export interface CharacterConfig {
     pickupRadius?: number;
     armor?: number;
   };
+  unlockLevel?: number;
+  specialAbility?: SpecialAbilityConfig;
+}
+
+export interface CharacterSkinConfig {
+  id: string;
+  name: string;
+  description: string;
+  color: string;
+  portraitColor: string;
+  accentColor: string;
+  unlockLevel: number;
 }
 
 export interface UpgradeOption {
@@ -69,6 +154,20 @@ export interface UpgradeOption {
   isEvolution?: boolean;
   synergyWith?: string;
   iconName: string;
+}
+
+export interface RunRecord {
+  won: boolean;
+  survivalTime: number;
+  kills: number;
+  level: number;
+  goldEarned: number;
+  bossesKilled: number;
+  elitesKilled: number;
+  evolutions: number;
+  relicsFound: number;
+  characterId: string;
+  difficulty: DifficultyId;
 }
 
 export interface PermanentPowerUp {
@@ -90,9 +189,24 @@ export interface SavedGameData {
     highestLevel: number;
     wins: number;
   };
+  accountXp: number;
+  difficulty: DifficultyId;
+  skin: string;
+  achievements: string[];
+  lifetimeStats: LifetimeStats;
+  missionState: MissionState;
 }
 
-export type EnemyType = 'bat' | 'skeleton' | 'zombie' | 'ghost' | 'elite_minotaur' | 'boss_vampire';
+export type EnemyType =
+  | 'bat'
+  | 'skeleton'
+  | 'zombie'
+  | 'ghost'
+  | 'elite_minotaur'
+  | 'elite_banshee'
+  | 'miniboss_golem'
+  | 'boss_necromancer'
+  | 'boss_vampire';
 
 export type DropType =
   | 'gem_blue'
@@ -125,6 +239,18 @@ export interface HUDState {
     level: number;
     name: string;
   }[];
+  relics: {
+    id: RelicId;
+    name: string;
+    rarity: ItemRarity;
+  }[];
+  difficultyName?: string;
+  ability?: {
+    name: string;
+    description: string;
+    cooldown: number;
+    remaining: number;
+  };
   activeBoss?: {
     name: string;
     hp: number;
@@ -141,6 +267,10 @@ export interface GameEndSummary {
   goldEarned: number;
   totalDamage: number;
   characterName: string;
+  difficultyName: string;
+  accountXpEarned: number;
+  newAchievements: string[];
+  relicsFound: number;
   weaponStats: {
     id: WeaponId;
     name: string;

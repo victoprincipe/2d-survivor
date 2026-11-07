@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { CharacterConfig, GameEndSummary, HUDState, SavedGameData, UpgradeOption } from '@/game/types';
+import { CharacterConfig, GameEndSummary, HUDState, RelicConfig, SavedGameData, UpgradeOption } from '@/game/types';
 import { CHARACTERS } from '@/game/data/characters';
 import { loadSavedData } from '@/game/data/persistence';
 import { GameEngine } from '@/game/engine/GameEngine';
@@ -25,6 +25,7 @@ const DEFAULT_HUD: HUDState = {
   gold: 0,
   weapons: [],
   passives: [],
+  relics: [],
 };
 
 export const GameContainer: React.FC = () => {
@@ -33,7 +34,7 @@ export const GameContainer: React.FC = () => {
   const [selectedCharacter, setSelectedCharacter] = useState<CharacterConfig>(CHARACTERS[0]);
   const [hud, setHud] = useState<HUDState>(DEFAULT_HUD);
   const [levelUpOptions, setLevelUpOptions] = useState<UpgradeOption[]>([]);
-  const [chestReward, setChestReward] = useState<{ gold: number; upgrade?: UpgradeOption } | null>(null);
+  const [chestReward, setChestReward] = useState<{ gold: number; upgrade?: UpgradeOption; relic?: RelicConfig } | null>(null);
   const [endSummary, setEndSummary] = useState<GameEndSummary | null>(null);
 
   const [isMuted, setIsMuted] = useState<boolean>(false);
@@ -74,8 +75,8 @@ export const GameContainer: React.FC = () => {
           setLevelUpOptions(options);
           setGameState('level_up');
         },
-        onTreasureChest: (gold, upgrade) => {
-          setChestReward({ gold, upgrade });
+        onTreasureChest: (gold, upgrade, relic) => {
+          setChestReward({ gold, upgrade, relic });
           setGameState('chest');
         },
         onGameOver: (summary) => {
@@ -252,6 +253,7 @@ export const GameContainer: React.FC = () => {
         <TreasureChestModal
           gold={chestReward.gold}
           upgrade={chestReward.upgrade}
+          relic={chestReward.relic}
           onClose={handleCloseChest}
         />
       )}

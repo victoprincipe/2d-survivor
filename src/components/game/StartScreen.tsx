@@ -2,10 +2,13 @@
 
 import React, { useState } from 'react';
 import Image from 'next/image';
-import { CharacterConfig, SavedGameData } from '@/game/types';
-import { CHARACTERS } from '@/game/data/characters';
+import { CharacterConfig, DifficultyId, SavedGameData } from '@/game/types';
+import { CHARACTERS, CHARACTER_SKINS } from '@/game/data/characters';
 import { POWER_UP_DEFINITIONS, getPowerUpCost, saveGameData } from '@/game/data/persistence';
 import { WEAPON_REGISTRY } from '@/game/data/upgrades';
+import { DIFFICULTIES } from '@/game/data/difficulty';
+import { getAccountLevelInfo, isCharacterUnlocked } from '@/game/data/progress';
+import { ProgressionPanel } from './ProgressionPanel';
 import {
   Flame,
   Sword,
@@ -29,6 +32,7 @@ import {
   Bike,
   Utensils,
   Syringe,
+  BookOpen,
 } from 'lucide-react';
 
 interface StartScreenProps {
@@ -42,7 +46,9 @@ const WEAPON_ICONS: Record<string, React.ReactNode> = {
   wand: <Wand2 className="w-5 h-5 text-blue-400" />,
   knife: <Sword className="w-5 h-5 text-slate-300" />,
   bow: <BowArrow className="w-5 h-5 text-lime-400" />,
+  bible: <BookOpen className="w-5 h-5 text-indigo-400" />,
   garlic: <Shield className="w-5 h-5 text-emerald-400" />,
+  lightning: <Zap className="w-5 h-5 text-cyan-300" />,
   derson_combo: <Utensils className="w-5 h-5 text-amber-400" />,
   syringe: <Syringe className="w-5 h-5 text-cyan-400" />,
 };
@@ -65,13 +71,57 @@ const CHARACTER_ICONS: Record<string, React.ReactNode> = {
   Bike: <Bike className="w-6 h-6 text-white/90 drop-shadow" />,
   Syringe: <Syringe className="w-6 h-6 text-white/90 drop-shadow" />,
   Utensils: <Utensils className="w-6 h-6 text-white/90 drop-shadow" />,
+  BookOpen: <BookOpen className="w-6 h-6 text-white/90 drop-shadow" />,
 };
 
 export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame, onUpdateSave }) => {
   const [selectedCharIndex, setSelectedCharIndex] = useState(0);
-  const [activeTab, setActiveTab] = useState<'character' | 'shop'>('character');
+  const [activeTab, setActiveTab] = useState<'character' | 'shop' | 'progress'>('character');
+  const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyId>(savedData.difficulty);
+  const [selectedSkinId, setSelectedSkinId] = useState<string>(savedData.skin);
 
   const selectedChar = CHARACTERS[selectedCharIndex];
+  const account = getAccountLevelInfo(savedData.accountXp);
+  const selectedLocked = !isCharacterUnlocked(selectedChar.unlockLevel, savedData.accountXp);
+  const selectedSkin =
+    CHARACTER_SKINS.find(
+      (skin) => skin.id === selectedSkinId && skin.unlockLevel <= account.level
+    ) ?? CHARACTER_SKINS[0];
+
+  const handleStartGame = () => {
+    if (selectedLocked) return;
+    const skinnedCharacter: CharacterConfig =
+      selectedSkin.id === 'classico'
+        ? selectedChar
+        : {
+            ...selectedChar,
+            color: selectedSkin.color,
+            portraitColor: selectedSkin.portraitColor,
+            skinAccent: selectedSkin.accentColor,
+          };
+    const updatedData: SavedGameData = {
+      ...savedData,
+      difficulty: selectedDifficulty,
+      skin: selectedSkin.id,
+    };
+    saveGameData(updatedData);
+    onUpdateSave(updatedData);
+    onStartGame(skinnedCharacter, updatedData);
+  };
+
+  const handleSkinChange = (skinId: string) => {
+    setSelectedSkinId(skinId);
+    const updatedData: SavedGameData = { ...savedData, skin: skinId };
+    saveGameData(updatedData);
+    onUpdateSave(updatedData);
+  };
+
+  const handleDifficultyChange = (difficulty: DifficultyId) => {
+    setSelectedDifficulty(difficulty);
+    const updatedData: SavedGameData = { ...savedData, difficulty };
+    saveGameData(updatedData);
+    onUpdateSave(updatedData);
+  };
 
   const handleBuyPowerUp = (powerUpId: string) => {
     const def = POWER_UP_DEFINITIONS.find((p) => p.id === powerUpId);
@@ -126,6 +176,10 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
           </div>
 
           <div className="flex gap-4 text-xs font-mono text-slate-300">
+            <div className="flex items-center gap-1" title="Nível de Conta">
+              <Trophy className="w-3.5 h-3.5 text-amber-400" />
+              <span>Nv. {account.level}</span>
+            </div>
             <div className="flex items-center gap-1" title="Melhor Tempo">
               <Clock className="w-3.5 h-3.5 text-cyan-400" />
               <span>{formatTime(savedData.highScore.timeSurvived)}</span>
@@ -165,6 +219,17 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
             <ShoppingBag className="w-4 h-4 text-yellow-400" />
             Loja de Power-Ups
           </button>
+          <button
+            onClick={() => setActiveTab('progress')}
+            className={`flex-1 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition cursor-pointer flex items-center justify-center gap-2 border ${
+              activeTab === 'progress'
+                ? 'bg-cyan-950/80 border-cyan-500 text-white shadow-lg'
+                : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+            }`}
+          >
+            <Trophy className="w-4 h-4 text-cyan-300" />
+            Progressão
+          </button>
         </div>
 
         {/* TAB 1: Character Select */}
@@ -174,16 +239,27 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
               {CHARACTERS.map((char, index) => {
                 const isSelected = selectedCharIndex === index;
                 const startingWeaponMeta = WEAPON_REGISTRY[char.startingWeapon];
+                const locked = !isCharacterUnlocked(char.unlockLevel, savedData.accountXp);
                 return (
                   <button
                     key={char.id}
-                    onClick={() => setSelectedCharIndex(index)}
-                    className={`p-4 rounded-xl border-2 text-left transition-all duration-150 cursor-pointer flex flex-col justify-between relative overflow-hidden ${
-                      isSelected
-                        ? 'bg-slate-900 border-amber-400 shadow-xl shadow-amber-500/10 scale-[1.02]'
-                        : 'bg-slate-950/90 border-slate-800 hover:border-slate-700'
+                    onClick={() => {
+                      if (!locked) setSelectedCharIndex(index);
+                    }}
+                    disabled={locked}
+                    className={`p-4 rounded-xl border-2 text-left transition-all duration-150 flex flex-col justify-between relative overflow-hidden ${
+                      locked
+                        ? 'bg-slate-950/60 border-slate-800 opacity-60 cursor-not-allowed'
+                        : isSelected
+                          ? 'bg-slate-900 border-amber-400 shadow-xl shadow-amber-500/10 scale-[1.02] cursor-pointer'
+                          : 'bg-slate-950/90 border-slate-800 hover:border-slate-700 cursor-pointer'
                     }`}
                   >
+                    {locked && (
+                      <span className="absolute top-2 right-2 z-10 text-[9px] font-black uppercase tracking-wider bg-slate-900 border border-slate-700 text-slate-300 px-2 py-0.5 rounded-full">
+                        Nível {char.unlockLevel}
+                      </span>
+                    )}
                     <div>
                       {/* Character avatar with icon */}
                       <div
@@ -205,7 +281,16 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
                       </div>
                       <h3 className="font-black text-white text-base">{char.name}</h3>
                       <p className="text-amber-400 text-[11px] font-semibold mb-2">{char.title}</p>
-                      <p className="text-slate-400 text-xs leading-relaxed">{char.description}</p>
+                      <p className="text-slate-400 text-xs leading-relaxed">
+                        {locked
+                          ? `Desbloqueie ao alcançar o nível de conta ${char.unlockLevel}.`
+                          : char.description}
+                      </p>
+                      {!locked && char.specialAbility && (
+                        <p className="text-cyan-300 text-[10px] font-semibold mt-1">
+                          Habilidade: {char.specialAbility.name}
+                        </p>
+                      )}
                     </div>
 
                     <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between">
@@ -220,13 +305,83 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
               })}
             </div>
 
+            {/* Difficulty selection */}
+            <div className="w-full bg-slate-950/70 border border-slate-800 rounded-xl p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-300">Dificuldade</span>
+                <span className="text-[10px] text-slate-400">
+                  {DIFFICULTIES.find((difficulty) => difficulty.id === selectedDifficulty)?.description}
+                </span>
+              </div>
+              <div className="grid grid-cols-5 gap-1.5">
+                {DIFFICULTIES.map((difficulty) => (
+                  <button
+                    key={difficulty.id}
+                    onClick={() => handleDifficultyChange(difficulty.id)}
+                    className={`py-1.5 rounded-lg border text-[10px] font-black uppercase tracking-wider transition cursor-pointer ${
+                      selectedDifficulty === difficulty.id
+                        ? 'bg-slate-900 text-white'
+                        : 'bg-slate-950 text-slate-400 hover:text-white'
+                    }`}
+                    style={{
+                      borderColor:
+                        selectedDifficulty === difficulty.id ? difficulty.color : 'rgba(51, 65, 85, 0.8)',
+                    }}
+                  >
+                    {difficulty.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Cosmetic skins */}
+            <div className="w-full bg-slate-950/70 border border-slate-800 rounded-xl p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-300">Skins</span>
+                <span className="text-[10px] text-slate-400">{selectedSkin.description}</span>
+              </div>
+              <div className="grid grid-cols-4 gap-1.5">
+                {CHARACTER_SKINS.map((skin) => {
+                  const unlocked = skin.unlockLevel <= account.level;
+                  const active = selectedSkin.id === skin.id;
+                  return (
+                    <button
+                      key={skin.id}
+                      onClick={() => {
+                        if (unlocked) handleSkinChange(skin.id);
+                      }}
+                      disabled={!unlocked}
+                      title={unlocked ? skin.name : `Desbloqueia no nível ${skin.unlockLevel}`}
+                      className={`py-1.5 rounded-lg border text-[10px] font-black uppercase tracking-wider transition ${
+                        !unlocked
+                          ? 'bg-slate-950 border-slate-800 text-slate-600 cursor-not-allowed'
+                          : active
+                            ? 'bg-slate-900 text-white cursor-pointer'
+                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white cursor-pointer'
+                      }`}
+                      style={{ borderColor: active ? skin.accentColor : undefined }}
+                    >
+                      {unlocked ? skin.name : `Nv. ${skin.unlockLevel}`}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Play Button */}
             <button
-              onClick={() => onStartGame(selectedChar, savedData)}
-              className="w-full mt-2 py-4 rounded-xl bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white font-black text-base uppercase tracking-widest shadow-2xl shadow-red-500/30 transition cursor-pointer active:scale-98 flex items-center justify-center gap-2"
+              onClick={handleStartGame}
+              disabled={selectedLocked}
+              className={`w-full mt-2 py-4 rounded-xl font-black text-base uppercase tracking-widest transition flex items-center justify-center gap-2 ${
+                selectedLocked
+                  ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white shadow-2xl shadow-red-500/30 cursor-pointer active:scale-98'
+              }`}
             >
               <Play className="w-5 h-5 fill-white" />
-              INICIAR COM {selectedChar.name.toUpperCase()}
+              {selectedLocked
+                ? `BLOQUEADO ATÉ O NÍVEL ${selectedChar.unlockLevel}`
+                : `INICIAR COM ${selectedChar.name.toUpperCase()}`}
             </button>
           </div>
         )}
@@ -282,6 +437,11 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
               );
             })}
           </div>
+        )}
+
+        {/* TAB 3: Missions, achievements and account progression */}
+        {activeTab === 'progress' && (
+          <ProgressionPanel savedData={savedData} onUpdateSave={onUpdateSave} />
         )}
 
         {/* Instructions footer */}

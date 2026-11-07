@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { GameEndSummary } from '@/game/types';
-import { Trophy, Skull, Clock, Coins, Award, Swords, RotateCcw, Infinity as InfinityIcon } from 'lucide-react';
+import { Trophy, Skull, Clock, Coins, Award, Swords, RotateCcw, Infinity as InfinityIcon, Sparkles } from 'lucide-react';
 
 interface EndGameModalProps {
   summary: GameEndSummary;
@@ -50,6 +50,14 @@ export const EndGameModal: React.FC<EndGameModalProps> = ({ summary, onRestart, 
           <p className="text-slate-400 text-xs mt-1">
             Sobrevivente: <span className="text-slate-200 font-bold">{summary.characterName}</span>
           </p>
+          <div className="flex items-center gap-2 mt-2">
+            <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border border-slate-600 text-slate-300">
+              {summary.difficultyName}
+            </span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-300">
+              +{summary.accountXpEarned} XP de conta
+            </span>
+          </div>
         </div>
 
         {/* Stats Grid */}
@@ -80,6 +88,31 @@ export const EndGameModal: React.FC<EndGameModalProps> = ({ summary, onRestart, 
             <span className="text-base font-black font-mono text-yellow-300">+{summary.goldEarned}</span>
           </div>
         </div>
+
+        {/* Relics and achievements earned this run */}
+        {(summary.relicsFound > 0 || summary.newAchievements.length > 0) && (
+          <div className="bg-slate-950/90 border border-slate-800/80 rounded-xl p-4 mb-6 flex flex-col gap-2">
+            {summary.relicsFound > 0 && (
+              <div className="flex items-center gap-2 text-xs text-fuchsia-300">
+                <Sparkles className="w-4 h-4" />
+                <span className="font-bold">Relíquias encontradas nesta partida: {summary.relicsFound}</span>
+              </div>
+            )}
+            {summary.newAchievements.length > 0 && (
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] font-black uppercase tracking-wider text-amber-400">
+                  Conquistas desbloqueadas
+                </span>
+                {summary.newAchievements.map((achievement) => (
+                  <span key={achievement} className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                    <Trophy className="w-3.5 h-3.5 text-amber-400" />
+                    {achievement}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Weapon Performance & DPS Breakdown Chart */}
         <div className="bg-slate-950/90 border border-slate-800/80 rounded-xl p-4 mb-6">

@@ -21,7 +21,20 @@ export class Enemy {
   public animTimer: number = Math.random() * 10;
   public isBoss: boolean = false;
   public isElite: boolean = false;
+  public isFinalBoss: boolean = false;
   public name: string = '';
+
+  // Signature attacks for elites and bosses
+  public specialKind: 'none' | 'nova' | 'summon' | 'charge' = 'none';
+  public specialTimer: number = 0;
+  public specialRadius: number = 0;
+  public specialDamage: number = 0;
+  public specialColor: string = '#ef4444';
+  private specialCooldown: number = 0;
+  private specialReady: boolean = false;
+  private chargeTimer: number = 0;
+  private chargeDirX: number = 0;
+  private chargeDirY: number = 0;
 
   constructor(id: number, type: EnemyType, x: number, y: number, hpMultiplier: number = 1.0) {
     this.id = id;
@@ -70,6 +83,50 @@ export class Enemy {
         this.damage = 25;
         this.xpValue = 150;
         this.isElite = true;
+        this.specialKind = 'charge';
+        this.specialCooldown = 6;
+        this.specialDamage = 16;
+        this.specialColor = '#f97316';
+        break;
+      case 'elite_banshee':
+        this.name = 'Banshee Elite';
+        this.radius = 22;
+        this.maxHp = Math.round(430 * hpMultiplier);
+        this.speed = 62;
+        this.damage = 18;
+        this.xpValue = 140;
+        this.isElite = true;
+        this.specialKind = 'nova';
+        this.specialCooldown = 4.5;
+        this.specialRadius = 190;
+        this.specialDamage = 15;
+        this.specialColor = '#93c5fd';
+        break;
+      case 'miniboss_golem':
+        this.name = 'Golem Ancestral (Mini-Chefe)';
+        this.radius = 30;
+        this.maxHp = Math.round(1150 * hpMultiplier);
+        this.speed = 52;
+        this.damage = 26;
+        this.xpValue = 320;
+        this.isElite = true;
+        this.specialKind = 'nova';
+        this.specialCooldown = 5;
+        this.specialRadius = 155;
+        this.specialDamage = 22;
+        this.specialColor = '#f59e0b';
+        break;
+      case 'boss_necromancer':
+        this.name = 'Necromante do Véu';
+        this.radius = 34;
+        this.maxHp = Math.round(1850 * hpMultiplier);
+        this.speed = 78;
+        this.damage = 30;
+        this.xpValue = 420;
+        this.isBoss = true;
+        this.specialKind = 'summon';
+        this.specialCooldown = 5;
+        this.specialColor = '#a855f7';
         break;
       case 'boss_vampire':
         this.name = 'Lorde Carmesim (Chefe Final)';
@@ -79,8 +136,16 @@ export class Enemy {
         this.damage = 35;
         this.xpValue = 500;
         this.isBoss = true;
+        this.isFinalBoss = true;
+        this.specialKind = 'nova';
+        this.specialCooldown = 5.5;
+        this.specialRadius = 175;
+        this.specialDamage = 28;
+        this.specialColor = '#ef4444';
         break;
     }
+
+    this.specialTimer = this.specialCooldown > 0 ? this.specialCooldown * 0.65 : 0;
 
     // Reduce all monster movement speed by 10%
     this.speed *= 0.9;
@@ -94,6 +159,32 @@ export class Enemy {
     // Hit flash decay
     if (this.hitFlashTimer > 0) {
       this.hitFlashTimer -= dt;
+    }
+
+    // Signature attack timers
+    if (this.specialCooldown > 0) {
+      this.specialTimer -= dt;
+      if (this.specialTimer <= 0) {
+        this.specialTimer = this.specialCooldown;
+        if (this.specialKind === 'charge') {
+          const cdx = player.x - this.x;
+          const cdy = player.y - this.y;
+          const cdist = Math.sqrt(cdx * cdx + cdy * cdy);
+          if (cdist > 0) {
+            this.chargeDirX = cdx / cdist;
+            this.chargeDirY = cdy / cdist;
+            this.chargeTimer = 0.7;
+          }
+        } else {
+          this.specialReady = true;
+        }
+      }
+    }
+
+    if (this.chargeTimer > 0) {
+      this.chargeTimer -= dt;
+      this.x += this.chargeDirX * this.speed * 2.4 * dt;
+      this.y += this.chargeDirY * this.speed * 2.4 * dt;
     }
 
     // Knockback decay
@@ -132,6 +223,8 @@ export class Enemy {
   }
 
   takeDamage(amount: number, knockX: number = 0, knockY: number = 0, knockForce: number = 200): boolean {
+    if (this.hp <= 0) return false;
+
     this.hp -= amount;
     this.hitFlashTimer = 0.12;
 
@@ -140,7 +233,25 @@ export class Enemy {
     this.knockbackX += knockX * knockForce * resistance;
     this.knockbackY += knockY * knockForce * resistance;
 
-    return this.hp <= 0;
+    if (this.hp <= 0) {
+      this.hp = 0;
+      return true;
+    }
+
+    return false;
+  }
+
+  consumeSpecial(): { kind: 'nova' | 'summon'; radius: number; damage: number; color: string } | null {
+    if (!this.specialReady) return null;
+    const kind = this.specialKind;
+    if (kind !== 'nova' && kind !== 'summon') return null;
+    this.specialReady = false;
+    return {
+      kind,
+      radius: this.specialRadius,
+      damage: this.specialDamage,
+      color: this.specialColor,
+    };
   }
 
   render(ctx: CanvasRenderingContext2D, camera: Camera): void {
@@ -230,6 +341,76 @@ export class Enemy {
       ctx.arc(3, -5, 2.5, 0, Math.PI * 2);
       ctx.fill();
       ctx.globalAlpha = 1.0;
+    } else if (this.type === 'elite_banshee') {
+      if (!isFlashing) {
+        const aura = ctx.createRadialGradient(0, 0, 6, 0, 0, 34);
+        aura.addColorStop(0, 'rgba(147, 197, 253, 0.35)');
+        aura.addColorStop(1, 'rgba(147, 197, 253, 0)');
+        ctx.fillStyle = aura;
+        ctx.beginPath();
+        ctx.arc(0, 0, 34, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#bfdbfe';
+      }
+      ctx.beginPath();
+      ctx.arc(0, -8, 13, Math.PI, 0);
+      ctx.lineTo(13, 10);
+      ctx.lineTo(6, 5);
+      ctx.lineTo(0, 10);
+      ctx.lineTo(-6, 5);
+      ctx.lineTo(-13, 10);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#1e3a8a';
+      ctx.beginPath();
+      ctx.arc(-4, -7, 3, 0, Math.PI * 2);
+      ctx.arc(4, -7, 3, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (this.type === 'miniboss_golem') {
+      if (!isFlashing) ctx.fillStyle = '#57534e';
+      ctx.beginPath();
+      ctx.roundRect(-25, -22, 50, 46, 8);
+      ctx.fill();
+      if (!isFlashing) ctx.fillStyle = '#78716c';
+      ctx.fillRect(-20, -16, 40, 12);
+      ctx.fillStyle = '#f59e0b';
+      ctx.beginPath();
+      ctx.arc(0, 0, 9, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#fef3c7';
+      ctx.beginPath();
+      ctx.arc(0, 0, 4, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (this.type === 'boss_necromancer') {
+      if (!isFlashing) {
+        const aura = ctx.createRadialGradient(0, 0, 8, 0, 0, 42);
+        aura.addColorStop(0, 'rgba(168, 85, 247, 0.4)');
+        aura.addColorStop(1, 'rgba(168, 85, 247, 0)');
+        ctx.fillStyle = aura;
+        ctx.beginPath();
+        ctx.arc(0, 0, 42, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#2e1065';
+      }
+      ctx.beginPath();
+      ctx.roundRect(-22, -18, 44, 44, 9);
+      ctx.fill();
+      if (!isFlashing) ctx.fillStyle = '#4c1d95';
+      ctx.beginPath();
+      ctx.arc(0, -2, 15, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#e9d5ff';
+      ctx.beginPath();
+      ctx.arc(-5, -3, 3, 0, Math.PI * 2);
+      ctx.arc(5, -3, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#c084fc';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-14, 14);
+      ctx.lineTo(0, 8);
+      ctx.lineTo(14, 14);
+      ctx.stroke();
     } else if (this.type === 'elite_minotaur') {
       if (!isFlashing) ctx.fillStyle = '#991b1b';
       // Massive body
@@ -285,18 +466,29 @@ export class Enemy {
       ctx.fillRect(2, -16, 2, 3);
     }
 
+    if (this.specialKind === 'nova' && this.specialRadius > 0 && this.specialTimer > 0 && this.specialTimer < 0.9) {
+      const pulse = 0.35 + (0.9 - this.specialTimer) * 0.5;
+      ctx.globalAlpha = Math.min(0.8, pulse);
+      ctx.strokeStyle = this.specialColor;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(0, 0, this.specialRadius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
     ctx.restore();
 
     // Health bar for Elites and Bosses
-    if (this.isElite) {
-      const barW = 44;
+    if (this.isElite || this.isBoss) {
+      const barW = this.isBoss ? 62 : 44;
       const barH = 5;
       const barX = screen.x - barW / 2;
       const barY = screen.y - this.radius - 12;
       ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
       ctx.fillRect(barX, barY, barW, barH);
-      ctx.fillStyle = '#eab308';
-      ctx.fillRect(barX, barY, barW * (this.hp / this.maxHp), barH);
+      ctx.fillStyle = this.isBoss ? '#ef4444' : this.isElite ? '#eab308' : '#ef4444';
+      ctx.fillRect(barX, barY, barW * Math.max(0, this.hp / this.maxHp), barH);
     }
   }
 }

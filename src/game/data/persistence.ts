@@ -1,4 +1,6 @@
-import { PermanentPowerUp, SavedGameData } from '../types';
+import { DifficultyId, LifetimeStats, MissionState, PermanentPowerUp, SavedGameData } from '../types';
+import { DEFAULT_DIFFICULTY, isDifficultyId } from './difficulty';
+import { getDailyKey, getWeeklyKey } from './time';
 
 export const POWER_UP_DEFINITIONS: PermanentPowerUp[] = [
   {
@@ -59,7 +61,102 @@ export const POWER_UP_DEFINITIONS: PermanentPowerUp[] = [
 
 const STORAGE_KEY = 'vampire_survivors_2d_save';
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function numberOr(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
+
+export function createLifetimeStats(): LifetimeStats {
+  return {
+    runs: 0,
+    kills: 0,
+    timeSurvived: 0,
+    bossesKilled: 0,
+    elitesKilled: 0,
+    goldEarned: 0,
+    levelsGained: 0,
+    evolutions: 0,
+    relicsFound: 0,
+    charactersPlayed: [],
+    bestTime: 0,
+    bestKills: 0,
+    bestRelics: 0,
+    highestLevel: 0,
+    winsByDifficulty: {},
+  };
+}
+
+export function normalizeLifetimeStats(value: unknown): LifetimeStats {
+  const raw = isRecord(value) ? value : {};
+  const winsRaw = isRecord(raw.winsByDifficulty) ? raw.winsByDifficulty : {};
+  const winsByDifficulty: Partial<Record<DifficultyId, number>> = {};
+
+  for (const [key, wins] of Object.entries(winsRaw)) {
+    if (isDifficultyId(key)) {
+      winsByDifficulty[key] = Math.max(0, Math.floor(numberOr(wins, 0)));
+    }
+  }
+
+  return {
+    runs: Math.max(0, Math.floor(numberOr(raw.runs, 0))),
+    kills: Math.max(0, Math.floor(numberOr(raw.kills, 0))),
+    timeSurvived: Math.max(0, numberOr(raw.timeSurvived, 0)),
+    bossesKilled: Math.max(0, Math.floor(numberOr(raw.bossesKilled, 0))),
+    elitesKilled: Math.max(0, Math.floor(numberOr(raw.elitesKilled, 0))),
+    goldEarned: Math.max(0, Math.floor(numberOr(raw.goldEarned, 0))),
+    levelsGained: Math.max(0, Math.floor(numberOr(raw.levelsGained, 0))),
+    evolutions: Math.max(0, Math.floor(numberOr(raw.evolutions, 0))),
+    relicsFound: Math.max(0, Math.floor(numberOr(raw.relicsFound, 0))),
+    charactersPlayed: stringArray(raw.charactersPlayed),
+    bestTime: Math.max(0, numberOr(raw.bestTime, 0)),
+    bestKills: Math.max(0, Math.floor(numberOr(raw.bestKills, 0))),
+    bestRelics: Math.max(0, Math.floor(numberOr(raw.bestRelics, 0))),
+    highestLevel: Math.max(0, Math.floor(numberOr(raw.highestLevel, 0))),
+    winsByDifficulty,
+  };
+}
+
+export function createMissionState(lifetimeStats: LifetimeStats): MissionState {
+  return {
+    dailyKey: getDailyKey(),
+    weeklyKey: getWeeklyKey(),
+    dailyBaseline: { ...lifetimeStats },
+    weeklyBaseline: { ...lifetimeStats },
+    claimed: [],
+  };
+}
+
+function normalizeMissionState(value: unknown, lifetimeStats: LifetimeStats): MissionState {
+  const raw = isRecord(value) ? value : {};
+  const dailyKey = getDailyKey();
+  const weeklyKey = getWeeklyKey();
+  const storedDailyKey = typeof raw.dailyKey === 'string' ? raw.dailyKey : '';
+  const storedWeeklyKey = typeof raw.weeklyKey === 'string' ? raw.weeklyKey : '';
+
+  return {
+    dailyKey,
+    weeklyKey,
+    dailyBaseline:
+      storedDailyKey === dailyKey && isRecord(raw.dailyBaseline)
+        ? normalizeLifetimeStats(raw.dailyBaseline)
+        : { ...lifetimeStats },
+    weeklyBaseline:
+      storedWeeklyKey === weeklyKey && isRecord(raw.weeklyBaseline)
+        ? normalizeLifetimeStats(raw.weeklyBaseline)
+        : { ...lifetimeStats },
+    claimed: stringArray(raw.claimed),
+  };
+}
+
 export function getInitialSave(): SavedGameData {
+  const lifetimeStats = createLifetimeStats();
   return {
     gold: 0,
     powerUps: {},
@@ -69,6 +166,12 @@ export function getInitialSave(): SavedGameData {
       highestLevel: 0,
       wins: 0,
     },
+    accountXp: 0,
+    difficulty: DEFAULT_DIFFICULTY,
+    skin: 'classico',
+    achievements: [],
+    lifetimeStats,
+    missionState: createMissionState(lifetimeStats),
   };
 }
 
@@ -77,16 +180,31 @@ export function loadSavedData(): SavedGameData {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return getInitialSave();
-    const parsed = JSON.parse(raw);
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const lifetimeStats = normalizeLifetimeStats(parsed.lifetimeStats);
+    const highScore = isRecord(parsed.highScore) ? parsed.highScore : {};
+    const powerUpsRaw = isRecord(parsed.powerUps) ? parsed.powerUps : {};
+    const powerUps: Record<string, number> = {};
+
+    for (const [key, value] of Object.entries(powerUpsRaw)) {
+      powerUps[key] = Math.max(0, Math.floor(numberOr(value, 0)));
+    }
+
     return {
-      gold: parsed.gold ?? 0,
-      powerUps: parsed.powerUps ?? {},
+      gold: Math.max(0, Math.floor(numberOr(parsed.gold, 0))),
+      powerUps,
       highScore: {
-        timeSurvived: parsed.highScore?.timeSurvived ?? 0,
-        kills: parsed.highScore?.kills ?? 0,
-        highestLevel: parsed.highScore?.highestLevel ?? 0,
-        wins: parsed.highScore?.wins ?? 0,
+        timeSurvived: Math.max(0, numberOr(highScore.timeSurvived, 0)),
+        kills: Math.max(0, Math.floor(numberOr(highScore.kills, 0))),
+        highestLevel: Math.max(0, Math.floor(numberOr(highScore.highestLevel, 0))),
+        wins: Math.max(0, Math.floor(numberOr(highScore.wins, 0))),
       },
+      accountXp: Math.max(0, Math.floor(numberOr(parsed.accountXp, 0))),
+      difficulty: isDifficultyId(parsed.difficulty) ? parsed.difficulty : DEFAULT_DIFFICULTY,
+      skin: typeof parsed.skin === 'string' && parsed.skin.length > 0 ? parsed.skin : 'classico',
+      achievements: stringArray(parsed.achievements),
+      lifetimeStats,
+      missionState: normalizeMissionState(parsed.missionState, lifetimeStats),
     };
   } catch {
     return getInitialSave();

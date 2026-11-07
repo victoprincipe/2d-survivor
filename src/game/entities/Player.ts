@@ -21,6 +21,21 @@ export class Player {
   public pickupRadius: number = 65;
   public xpMultiplier: number = 1.0;
   public recoveryPerSec: number = 0;
+  public goldMultiplier: number = 1.0;
+
+  // Base values after character/power-up bonuses (before passives and relics)
+  public baseMaxHp: number = 100;
+  public baseMight: number = 1.0;
+  public baseArmor: number = 0;
+  public baseCooldownReduction: number = 0;
+  public basePickupRadius: number = 65;
+  public baseXpMultiplier: number = 1.0;
+  public baseRecoveryPerSec: number = 0;
+  public baseGoldMultiplier: number = 1.0;
+
+  // Temporary movement buff (character ability)
+  public hasteTimer: number = 0;
+  public hasteFactor: number = 1.0;
 
   // Progression
   public level: number = 1;
@@ -61,15 +76,34 @@ export class Player {
     if (initialPowerUps.maxHp) this.maxHp += initialPowerUps.maxHp * 10;
     if (initialPowerUps.recovery) this.recoveryPerSec += initialPowerUps.recovery * 0.5;
     if (initialPowerUps.speed) this.baseSpeed *= (1 + initialPowerUps.speed * 0.05);
+    if (initialPowerUps.greed) this.goldMultiplier += initialPowerUps.greed * 0.15;
 
     this.hp = this.maxHp;
     this.speed = this.baseSpeed;
+
+    this.baseMaxHp = this.maxHp;
+    this.baseMight = this.might;
+    this.baseArmor = this.armor;
+    this.baseCooldownReduction = this.cooldownReduction;
+    this.basePickupRadius = this.pickupRadius;
+    this.baseXpMultiplier = this.xpMultiplier;
+    this.baseRecoveryPerSec = this.recoveryPerSec;
+    this.baseGoldMultiplier = this.goldMultiplier;
+  }
+
+  public applyHaste(factor: number, duration: number): void {
+    this.hasteFactor = Math.max(1, factor);
+    this.hasteTimer = Math.max(this.hasteTimer, duration);
   }
 
   update(dt: number, input: InputManager): boolean {
     // Invulnerability timer
     if (this.invulnerableTimer > 0) {
       this.invulnerableTimer -= dt;
+    }
+
+    if (this.hasteTimer > 0) {
+      this.hasteTimer -= dt;
     }
 
     // Health recovery
@@ -81,10 +115,11 @@ export class Player {
     const dx = input.dx;
     const dy = input.dy;
     this.isMoving = Math.abs(dx) > 0.05 || Math.abs(dy) > 0.05;
+    const effectiveSpeed = this.speed * (this.hasteTimer > 0 ? this.hasteFactor : 1);
 
     if (this.isMoving) {
-      this.x += dx * this.speed * dt;
-      this.y += dy * this.speed * dt;
+      this.x += dx * effectiveSpeed * dt;
+      this.y += dy * effectiveSpeed * dt;
       this.facingX = input.facingX;
       this.facingY = input.facingY;
       this.walkAnimTimer += dt * 10;
@@ -134,6 +169,18 @@ export class Player {
 
     ctx.save();
     ctx.translate(screen.x, screen.y);
+
+    // Cosmetic skin aura
+    if (this.character.skinAccent) {
+      ctx.save();
+      ctx.globalAlpha = 0.35 + Math.sin(this.walkAnimTimer * 0.5) * 0.12;
+      ctx.strokeStyle = this.character.skinAccent;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(0, 2, 25, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
 
     // Walking bounce
     const bob = Math.sin(this.walkAnimTimer) * 3;
