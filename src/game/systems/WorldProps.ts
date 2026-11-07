@@ -3,9 +3,12 @@ import { Player } from '../entities/Player';
 import { Drop } from '../entities/Drops';
 import { DropType, MapId } from '../types';
 
-// Current maps are effectively open, so this is only a large safety limit
+// The night plain is effectively open, so this is only a large safety limit
 // that prevents the player from wandering out of the coordinate space.
 const WORLD_HALF_SIZE = 100000;
+// The Amazon Forest is a finite 3500x3500 map centered on the origin.
+const FOREST_SIZE = 3500;
+const FOREST_HALF_SIZE = FOREST_SIZE / 2;
 const COLLISION_STEP = 8;
 
 export interface TorchProp {
@@ -24,6 +27,15 @@ interface TreeProp {
   tone: number;
 }
 
+interface FloorPatch {
+  x: number;
+  y: number;
+  rx: number;
+  ry: number;
+  tone: number;
+  rotation: number;
+}
+
 export class WorldSystem {
   public torches: TorchProp[] = [];
   private nextTorchId: number = 1;
@@ -32,18 +44,23 @@ export class WorldSystem {
   private readonly torchSpawnInterval: number = 13;
 
   private mapId: MapId;
+  private worldHalfSize: number = WORLD_HALF_SIZE;
   private trees: TreeProp[] = [];
+  private floorPatches: FloorPatch[] = [];
 
   private floorImage: HTMLImageElement | null = null;
   private floorPattern: CanvasPattern | null = null;
 
   constructor(mapId: MapId = 'night_plain') {
     this.mapId = mapId;
-    if (mapId === 'amazon_forest') this.generateTrees();
+    if (mapId === 'amazon_forest') {
+      this.worldHalfSize = FOREST_HALF_SIZE;
+      this.generateForest();
+    }
     this.loadFloorTexture();
   }
 
-  private generateTrees(): void {
+  private generateForest(): void {
     // Deterministic scatter so the forest looks the same between renders.
     let seed = 1337;
     const random = () => {
@@ -51,16 +68,49 @@ export class WorldSystem {
       return (seed - 1) / 2147483646;
     };
 
+    // Scattered trees inside the playable area.
     for (let i = 0; i < 80; i++) {
-      const x = (random() - 0.5) * 3600;
-      const y = (random() - 0.5) * 3600;
+      const x = (random() - 0.5) * 3000;
+      const y = (random() - 0.5) * 3000;
       // Keep the spawn area clear.
-      if (Math.abs(x) < 150 && Math.abs(y) < 150) continue;
+      if (Math.abs(x) < 180 && Math.abs(y) < 180) continue;
       this.trees.push({
         x,
         y,
         size: 26 + random() * 26,
         tone: random(),
+      });
+    }
+
+    // Dense, solid wall of giant Amazon trees around the four edges.
+    // Three overlapping rows make the border read as impenetrable forest.
+    const spacing = 72;
+    const rows = [0, 78, 156];
+    for (let r = 0; r < rows.length; r++) {
+      const offset = FOREST_HALF_SIZE - rows[r];
+      for (let d = -FOREST_HALF_SIZE; d <= FOREST_HALF_SIZE; d += spacing) {
+        const size = 150 + random() * 100;
+        const jitter = () => (random() - 0.5) * 16;
+
+        // Top and bottom edges.
+        this.trees.push({ x: d + jitter(), y: -offset + jitter(), size, tone: random() });
+        this.trees.push({ x: d + jitter(), y: offset + jitter(), size, tone: random() });
+
+        // Left and right edges.
+        this.trees.push({ x: -offset + jitter(), y: d + jitter(), size, tone: random() });
+        this.trees.push({ x: offset + jitter(), y: d + jitter(), size, tone: random() });
+      }
+    }
+
+    // Dirt patches over the dark green grass floor.
+    for (let i = 0; i < 140; i++) {
+      this.floorPatches.push({
+        x: (random() - 0.5) * FOREST_SIZE,
+        y: (random() - 0.5) * FOREST_SIZE,
+        rx: 30 + random() * 120,
+        ry: 18 + random() * 80,
+        tone: random(),
+        rotation: random() * Math.PI,
       });
     }
   }
@@ -101,7 +151,7 @@ export class WorldSystem {
     const steps = Math.max(1, Math.ceil(distance / COLLISION_STEP));
     const stepX = dx / steps;
     const stepY = dy / steps;
-    const limit = WORLD_HALF_SIZE - radius;
+    const limit = this.worldHalfSize - radius;
     let x = fromX;
     let y = fromY;
 
@@ -169,8 +219,46 @@ export class WorldSystem {
 
   renderFloor(ctx: CanvasRenderingContext2D, camera: Camera): void {
     if (this.mapId === 'amazon_forest') {
-      ctx.fillStyle = '#0f2a16';
+      // Deep darkness outside the finite map bounds.
+      ctx.fillStyle = '#08120b';
       ctx.fillRect(0, 0, camera.viewportWidth, camera.viewportHeight);
+
+      // Dark green grass base restricted to the 3500x3500 playable square.
+      const origin = camera.worldToScreen(-FOREST_HALF_SIZE, -FOREST_HALF_SIZE);
+      ctx.fillStyle = '#14351d';
+      ctx.fillRect(origin.x, origin.y, FOREST_SIZE, FOREST_SIZE);
+
+      for (let i = 0; i < this.floorPatches.length; i++) {
+        const patch = this.floorPatches[i];
+        const margin = Math.max(patch.rx, patch.ry) + 20;
+        if (!camera.isInView(patch.x, patch.y, margin)) continue;
+
+        const screen = camera.worldToScreen(patch.x, patch.y);
+        ctx.save();
+        ctx.translate(screen.x, screen.y);
+        ctx.rotate(patch.rotation);
+
+        ctx.fillStyle = patch.tone > 0.5 ? '#5a3a20' : '#69482a';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, patch.rx, patch.ry, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Lighter, drier center gives the dirt some depth.
+        ctx.fillStyle = 'rgba(126, 88, 50, 0.55)';
+        ctx.beginPath();
+        ctx.ellipse(
+          patch.rx * 0.08,
+          -patch.ry * 0.12,
+          patch.rx * 0.55,
+          patch.ry * 0.5,
+          0,
+          0,
+          Math.PI * 2
+        );
+        ctx.fill();
+
+        ctx.restore();
+      }
       return;
     }
 

@@ -15,7 +15,7 @@ export const GAME_MAPS: GameMap[] = [
   {
     id: 'amazon_forest',
     name: 'Floresta Amazônica',
-    description: 'Selva densa com chão verde escuro e árvores.',
+    description: 'Mapa finito de 3500x3500 com chão de terra, grama escura e árvores gigantes nas bordas.',
   },
 ];
 
