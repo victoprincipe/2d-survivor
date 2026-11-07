@@ -64,6 +64,7 @@ const CHARACTER_ICONS: Record<string, React.ReactNode> = {
   Dumbbell: <Dumbbell className="w-6 h-6 text-white/90 drop-shadow" />,
   Bike: <Bike className="w-6 h-6 text-white/90 drop-shadow" />,
   Syringe: <Syringe className="w-6 h-6 text-white/90 drop-shadow" />,
+  Utensils: <Utensils className="w-6 h-6 text-white/90 drop-shadow" />,
 };
 
 export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame, onUpdateSave }) => {

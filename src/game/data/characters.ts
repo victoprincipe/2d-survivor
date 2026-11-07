@@ -109,4 +109,20 @@ export const CHARACTERS: CharacterConfig[] = [
       pickupRadius: 15,
     },
   },
+  {
+    id: 'dukarai',
+    name: 'Dukarai',
+    title: 'Atendente Lendário',
+    description: 'Atendente incansável da lanchonete arcana. Distribui combos em alta velocidade para saciar a fome da horda.',
+    startingWeapon: 'derson_combo',
+    iconName: 'Utensils',
+    color: '#a4161a',
+    portraitColor: '#370617',
+    sprite: '/dukarai.svg',
+    statBonuses: {
+      maxHp: 15,
+      speed: 0.1,
+      cooldownReduction: 0.05,
+    },
+  },
 ];
