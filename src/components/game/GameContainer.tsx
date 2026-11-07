@@ -46,6 +46,11 @@ export const GameContainer: React.FC = () => {
 
   const engineRef = useRef<GameEngine | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const gameStateRef = useRef<GameState>('menu');
+
+  useEffect(() => {
+    gameStateRef.current = gameState;
+  }, [gameState]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -102,6 +107,16 @@ export const GameContainer: React.FC = () => {
       engine.sound.setMuted(isMuted);
       engine.sound.setSfxVolume(sfxVolume);
       engine.sound.setBgmVolume(bgmVolume);
+
+      engine.input.onPauseToggle = () => {
+        if (gameStateRef.current === 'playing') {
+          engine.pause();
+          setGameState('paused');
+        } else if (gameStateRef.current === 'paused') {
+          engine.resume();
+          setGameState('playing');
+        }
+      };
 
       engineRef.current = engine;
       engine.start();
