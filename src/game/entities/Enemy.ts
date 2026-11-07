@@ -30,6 +30,10 @@ export class Enemy {
   public isBoss: boolean = false;
   public isElite: boolean = false;
   public isAquatic: boolean = false;
+  // Water ambush state, refreshed by the engine every frame.
+  public isSubmerged: boolean = false;
+  public playerInWater: boolean = false;
+  public terrainSpeedMultiplier: number = 1;
   public name: string = '';
   private spriteImage: HTMLImageElement | null = null;
 
@@ -466,6 +470,24 @@ export class Enemy {
     this.hp = this.maxHp;
   }
 
+  /**
+   * Jacaré-açu and the giant river serpent (Sucuri / Cobra-Grande) are tied to
+   * the river: they flee on dry forest ground, attack in the water and never
+   * leave the river and its beach.
+   */
+  public get isRiverPredator(): boolean {
+    return this.type === 'elite_black_caiman' || this.type === 'boss_cobra_grande';
+  }
+
+  /** Piranha, Boto-cor-de-rosa and Ariranha hide underwater unless the hero is wet. */
+  public get isAmbushAquatic(): boolean {
+    return (
+      this.type === 'piranha' ||
+      this.type === 'pink_river_dolphin' ||
+      this.type === 'giant_otter'
+    );
+  }
+
   public isDebuffed(): boolean {
     return (
       this.slowTimer > 0 ||
@@ -551,7 +573,24 @@ export class Enemy {
     const dx = player.x - this.x;
     const dy = player.y - this.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    const speedMult = this.slowTimer > 0 ? Math.max(0.35, 1 - this.slowFactor) : 1.0;
+    const terrainMult =
+      this.isRiverPredator && this.playerInWater ? this.terrainSpeedMultiplier : 1.0;
+    const speedMult =
+      (this.slowTimer > 0 ? Math.max(0.35, 1 - this.slowFactor) : 1.0) * terrainMult;
+
+    // River predators flee while the hero stays in the forest. They only
+    // charge (and use their skills) once the hero steps into the water.
+    if (this.isRiverPredator && !this.playerInWater) {
+      // Cancel any charge/lunge started while the hero was still in the water.
+      this.skillState = 'idle';
+      this.skillStateTimer = 0;
+      if (dist > 0) {
+        const fleeSpeed = this.speed * speedMult;
+        this.x += (-dx / dist) * fleeSpeed * dt;
+        this.y += (-dy / dist) * fleeSpeed * dt;
+      }
+      return this.hp > 0;
+    }
 
     // Elite & Boss special skill state machine
     if (this.isElite || this.isBoss) {
@@ -841,6 +880,7 @@ export class Enemy {
   }
 
   render(ctx: CanvasRenderingContext2D, camera: Camera): void {
+    if (this.isSubmerged) return;
     if (!camera.isInView(this.x, this.y, 160)) return;
 
     const screen = camera.worldToScreen(this.x, this.y);

@@ -263,9 +263,23 @@ export class GameEngine {
     }
 
     // 4. Update Enemies + Boss Special Attacks
+    const playerInWater = this.worldProps.isWaterSurface(this.player.x, this.player.y);
     const spawnedMinions: Enemy[] = [];
     for (let i = this.enemies.length - 1; i >= 0; i--) {
       const e = this.enemies[i];
+      e.playerInWater = playerInWater;
+      // Piranha, Boto-cor-de-rosa and Ariranha stay hidden under the surface
+      // until the hero enters the water.
+      e.isSubmerged = e.isAmbushAquatic && !playerInWater;
+      // Jacaré-açu and Sucuri gain speed in the water (+50%) and on the beach
+      // (+30%) once the hero is wet enough to hunt.
+      e.terrainSpeedMultiplier =
+        e.isRiverPredator && playerInWater
+          ? this.worldProps.isWaterSurface(e.x, e.y)
+            ? 1.5
+            : 1.3
+          : 1.0;
+
       const sep = this.spatialGrid.applySeparation(e, e.radius * 2, 0.45);
       const previousX = e.x;
       const previousY = e.y;
@@ -277,8 +291,19 @@ export class GameEngine {
       }
 
       // Aquatic enemies are locked to the water: reject any step that would
-      // carry them onto the riverbank or dry forest floor.
-      if (e.isAquatic) {
+      // carry them onto the riverbank or dry forest floor. River predators may
+      // haul out onto the beach, but never leave the river/beach band.
+      if (e.isRiverPredator) {
+        const resolved = this.worldProps.resolveRiverBankMovement(
+          previousX,
+          previousY,
+          e.x,
+          e.y,
+          e.radius
+        );
+        e.x = resolved.x;
+        e.y = resolved.y;
+      } else if (e.isAquatic) {
         const resolved = this.worldProps.resolveAquaticMovement(
           previousX,
           previousY,
@@ -649,7 +674,7 @@ export class GameEngine {
       const dy = this.player.y - e.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
 
-      if (!this.player.isJumping && dist < this.player.radius + e.radius) {
+      if (!e.isSubmerged && !this.player.isJumping && dist < this.player.radius + e.radius) {
         const fatal = this.player.takeDamage(e.damage);
         this.sound.playPlayerHurt();
         this.camera.shake(0.2, 5);
@@ -1326,6 +1351,7 @@ export class GameEngine {
     // Nearby enemies as small red blips.
     for (let i = 0; i < this.enemies.length; i++) {
       const enemy = this.enemies[i];
+      if (enemy.isSubmerged) continue;
       const dx = enemy.x - this.player.x;
       const dy = enemy.y - this.player.y;
       if (dx * dx + dy * dy > viewRadius * viewRadius) continue;

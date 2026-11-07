@@ -456,10 +456,14 @@ export class WaveDirector {
       let pos = this.getSpawnPositionOutsideScreen(camera);
       // Iara, Boto and the Cobra-Grande are river spirits: try to make them
       // surface near the river or a lake when there is water just outside the
-      // camera. The Cobra can slither back onto land on its own.
+      // camera. The Cobra (Sucuri) must never start stranded on dry forest.
       if (type === 'boss_boto' || type === 'boss_iara' || type === 'boss_cobra_grande') {
         const waterPos = this.getWaterSpawnPosition(camera, 48);
-        if (waterPos) pos = waterPos;
+        if (waterPos) {
+          pos = waterPos;
+        } else if (type === 'boss_cobra_grande' && this.worldProps) {
+          pos = this.worldProps.getNearestRiverPoint(pos.x);
+        }
       }
 
       const boss = this.createEnemy(type, pos.x, pos.y, hpMult);

@@ -23,7 +23,7 @@ const FRUIT_TREE_PROMPT_PADDING = 10;
 // Amazon water. For the player the river and lakes are purely visual, but
 // aquatic enemies use the stricter isNavigableWater check below to stay wet.
 const RIVER_WIDTH = 980;
-const RIVER_BANK = 150;
+const RIVER_BANK = 260;
 const RIVER_HALF_WIDTH = RIVER_WIDTH / 2;
 
 export interface TorchProp {
@@ -103,6 +103,15 @@ interface LakeProp {
   rotation: number;
 }
 
+interface BankPlantProp {
+  x: number;
+  y: number;
+  size: number;
+  tone: number;
+  rotation: number;
+  kind: 'tuft' | 'leafy';
+}
+
 interface LilyProp {
   x: number;
   y: number;
@@ -153,6 +162,7 @@ export class WorldSystem {
   private palms: PalmProp[] = [];
   private ferns: FernProp[] = [];
   private rocks: RockProp[] = [];
+  private bankPlants: BankPlantProp[] = [];
 
   private floorImage: HTMLImageElement | null = null;
   private floorPattern: CanvasPattern | null = null;
@@ -415,6 +425,31 @@ export class WorldSystem {
       }
     }
 
+    // Low grass tufts and creeping plants scattered across the wider river
+    // beach. They stay inside the sandy band, between the water and the forest.
+    const bankMin = RIVER_HALF_WIDTH + 12;
+    const bankMax = RIVER_HALF_WIDTH + RIVER_BANK - 18;
+    for (let i = 0; i < 620; i++) {
+      const x = (random() - 0.5) * FOREST_SIZE * 0.95;
+      const side = random() < 0.5 ? -1 : 1;
+      const offset = bankMin + random() * (bankMax - bankMin);
+      const y = this.riverCenterY(x) + side * offset;
+      if (
+        Math.abs(x) > FOREST_HALF_SIZE - 140 ||
+        Math.abs(y) > FOREST_HALF_SIZE - 140
+      ) {
+        continue;
+      }
+      this.bankPlants.push({
+        x,
+        y,
+        size: 4 + random() * 7,
+        tone: random(),
+        rotation: random() * Math.PI * 2,
+        kind: random() < 0.62 ? 'tuft' : 'leafy',
+      });
+    }
+
     // Palm trees, ferns and decorative rocks scattered over the dry ground.
     const scatter = (attempts: number, place: (x: number, y: number) => void) => {
       for (let i = 0; i < attempts; i++) {
@@ -465,8 +500,8 @@ export class WorldSystem {
   }
 
   private isInWater(x: number, y: number): boolean {
-    // River band.
-    if (Math.abs(y - this.riverCenterY(x)) < RIVER_HALF_WIDTH + 60) return true;
+    // River band, including the whole sandy beach so land props stay clear of it.
+    if (Math.abs(y - this.riverCenterY(x)) < RIVER_HALF_WIDTH + RIVER_BANK) return true;
 
     // Lakes (rotated ellipses).
     for (let i = 0; i < this.lakes.length; i++) {
@@ -518,6 +553,114 @@ export class WorldSystem {
     }
 
     return false;
+  }
+
+  /**
+   * True when the point is over the open water surface of the river or a lake.
+   * The sandy beach is deliberately excluded: this is what tells the engine
+   * whether the hero has actually stepped into the water.
+   */
+  public isWaterSurface(x: number, y: number): boolean {
+    if (this.mapId !== 'amazon_forest') return false;
+    if (Math.abs(x) > FOREST_HALF_SIZE || Math.abs(y) > FOREST_HALF_SIZE) return false;
+
+    // River band.
+    if (Math.abs(y - this.riverCenterY(x)) < RIVER_HALF_WIDTH) return true;
+
+    // Lakes (rotated ellipses).
+    for (let i = 0; i < this.lakes.length; i++) {
+      const lake = this.lakes[i];
+      const dx = x - lake.x;
+      const dy = y - lake.y;
+      const cos = Math.cos(-lake.rotation);
+      const sin = Math.sin(-lake.rotation);
+      const lx = dx * cos - dy * sin;
+      const ly = dx * sin + dy * cos;
+      if ((lx * lx) / (lake.rx * lake.rx) + (ly * ly) / (lake.ry * lake.ry) <= 1) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * True when the point (plus the given body radius) is inside the river or
+   * lake water and its wider sandy beach. River predators use this instead of
+   * the stricter water check so they may haul out onto the sand but never walk
+   * into the forest.
+   */
+  public isRiverBankTerrain(x: number, y: number, radius: number = 0): boolean {
+    if (this.mapId !== 'amazon_forest') return false;
+    if (Math.abs(x) > FOREST_HALF_SIZE || Math.abs(y) > FOREST_HALF_SIZE) return false;
+
+    const riverHalf = RIVER_HALF_WIDTH + RIVER_BANK - 10 - radius;
+    if (riverHalf > 0 && Math.abs(y - this.riverCenterY(x)) < riverHalf) return true;
+
+    const inset = 10 + radius;
+    for (let i = 0; i < this.lakes.length; i++) {
+      const lake = this.lakes[i];
+      const rx = lake.rx + RIVER_BANK - inset;
+      const ry = lake.ry + RIVER_BANK - inset;
+      if (rx <= 0 || ry <= 0) continue;
+
+      const dx = x - lake.x;
+      const dy = y - lake.y;
+      const cos = Math.cos(-lake.rotation);
+      const sin = Math.sin(-lake.rotation);
+      const lx = dx * cos - dy * sin;
+      const ly = dx * sin + dy * cos;
+      if ((lx * lx) / (rx * rx) + (ly * ly) / (ry * ry) <= 1) return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Closest point on the river centreline, used as a safe fallback spawn so
+   * river predators never start stranded in the middle of the forest.
+   */
+  public getNearestRiverPoint(x: number): { x: number; y: number } {
+    const limit = FOREST_HALF_SIZE - 160;
+    const clampedX = Math.max(-limit, Math.min(limit, x));
+    return { x: clampedX, y: this.riverCenterY(clampedX) };
+  }
+
+  /**
+   * Moves a river predator from one point to another while keeping it inside
+   * the river/lake and beach band. A creature that starts outside the band is
+   * allowed to walk back in, but once inside it can never cross into the forest.
+   */
+  public resolveRiverBankMovement(
+    fromX: number,
+    fromY: number,
+    toX: number,
+    toY: number,
+    radius: number
+  ): { x: number; y: number } {
+    if (this.mapId !== 'amazon_forest') return { x: toX, y: toY };
+    if (!this.isRiverBankTerrain(fromX, fromY, radius)) return { x: toX, y: toY };
+
+    const dx = toX - fromX;
+    const dy = toY - fromY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    if (distance < 0.0001) return { x: fromX, y: fromY };
+
+    const steps = Math.max(1, Math.ceil(distance / COLLISION_STEP));
+    const stepX = dx / steps;
+    const stepY = dy / steps;
+    let x = fromX;
+    let y = fromY;
+
+    for (let i = 0; i < steps; i++) {
+      const nextX = x + stepX;
+      if (this.isRiverBankTerrain(nextX, y, radius)) x = nextX;
+
+      const nextY = y + stepY;
+      if (this.isRiverBankTerrain(x, nextY, radius)) y = nextY;
+    }
+
+    return { x, y };
   }
 
   /**
@@ -1036,6 +1179,59 @@ export class WorldSystem {
   }
 
   private renderAmazonDecorations(ctx: CanvasRenderingContext2D, camera: Camera): void {
+    // Small grass tufts and creeping plants on the sandy river beach.
+    for (let i = 0; i < this.bankPlants.length; i++) {
+      const plant = this.bankPlants[i];
+      if (!camera.isInView(plant.x, plant.y, plant.size * 2 + 8)) continue;
+
+      const screen = camera.worldToScreen(plant.x, plant.y);
+      ctx.save();
+      ctx.translate(screen.x, screen.y);
+      ctx.rotate(plant.rotation);
+
+      if (plant.kind === 'tuft') {
+        ctx.strokeStyle = plant.tone > 0.5 ? '#3f8f3a' : '#2f7d32';
+        ctx.lineWidth = 1.3;
+        ctx.lineCap = 'round';
+        for (let b = 0; b < 5; b++) {
+          const spread = -0.85 + (b / 4) * 1.7;
+          const height = plant.size * (1.1 + (b % 2) * 0.35);
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.quadraticCurveTo(
+            Math.sin(spread) * height * 0.35,
+            -height * 0.65,
+            Math.sin(spread) * height * 0.75,
+            -height
+          );
+          ctx.stroke();
+        }
+        ctx.lineCap = 'butt';
+      } else {
+        ctx.fillStyle = plant.tone > 0.5 ? '#4f9a4b' : '#3c863c';
+        for (let l = 0; l < 3; l++) {
+          const spread = -0.9 + l * 0.9;
+          ctx.beginPath();
+          ctx.ellipse(
+            Math.sin(spread) * plant.size * 0.7,
+            -plant.size * 0.55,
+            plant.size * 0.85,
+            plant.size * 0.3,
+            spread,
+            0,
+            Math.PI * 2
+          );
+          ctx.fill();
+        }
+        ctx.fillStyle = '#2f6f32';
+        ctx.beginPath();
+        ctx.ellipse(0, -plant.size * 0.3, plant.size * 0.2, plant.size * 0.45, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.restore();
+    }
+
     // Decorative rocks.
     for (let i = 0; i < this.rocks.length; i++) {
       const rock = this.rocks[i];
