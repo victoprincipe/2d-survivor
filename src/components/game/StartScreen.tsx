@@ -2,10 +2,11 @@
 
 import React, { useRef, useState } from 'react';
 import Image from 'next/image';
-import { CharacterConfig, DifficultyId, SavedGameData } from '@/game/types';
+import { CharacterConfig, DifficultyId, MapId, SavedGameData } from '@/game/types';
 import { CHARACTERS } from '@/game/data/characters';
 import { POWER_UP_DEFINITIONS, getPowerUpCost, saveGameData } from '@/game/data/persistence';
 import { DIFFICULTIES, getDifficulty } from '@/game/data/difficulties';
+import { GAME_MAPS } from '@/game/data/maps';
 import { countClaimableMissions, getAccountLevel } from '@/game/data/missions';
 import { WEAPON_REGISTRY } from '@/game/data/upgrades';
 import { MissionsTab } from './MissionsTab';
@@ -28,11 +29,19 @@ import {
   Info,
   Target,
   Volume2,
+  Map as MapIcon,
+  Moon,
+  TreePine,
 } from 'lucide-react';
 
 interface StartScreenProps {
   savedData: SavedGameData;
-  onStartGame: (character: CharacterConfig, savedData: SavedGameData, difficulty: DifficultyId) => void;
+  onStartGame: (
+    character: CharacterConfig,
+    savedData: SavedGameData,
+    difficulty: DifficultyId,
+    mapId: MapId
+  ) => void;
   onUpdateSave: (savedData: SavedGameData) => void;
 }
 
@@ -72,6 +81,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
   const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyId>(
     savedData.difficulty ?? 'normal'
   );
+  const [selectedMap, setSelectedMap] = useState<MapId>('night_plain');
   const [selectionVolume, setSelectionVolume] = useState(1);
   const [isSelectionMusicPlaying, setIsSelectionMusicPlaying] = useState(false);
   const selectionAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -185,7 +195,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
       <div aria-hidden="true" className="dungeon-web dungeon-web-tl" />
       <div aria-hidden="true" className="dungeon-web dungeon-web-tr" />
 
-      <div className="relative z-10 my-auto flex w-full max-w-[920px] flex-col items-center">
+      <div className="relative z-10 my-auto flex w-full max-w-[1120px] flex-col items-center">
         {/* Header */}
         <header className="mb-4 w-full text-center">
           <div className="badge-pill mb-2.5">
@@ -231,16 +241,77 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
           </div>
         </div>
 
-        {/* Difficulty Selector */}
-        <div className="stone-panel mb-3 w-full p-3">
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-[#e69f22]">
-              <Skull className="h-4 w-4 text-[#d9381e]" />
-              Dificuldade
-            </span>
-            <span className="text-right text-[11px] text-[#9ca3af]">{difficultyMeta.description}</span>
-          </div>
-          <div className="grid grid-cols-5 gap-1.5">
+        {/* Desktop: map/difficulty on the left, roster/shop/missions on the right */}
+        <div className="grid w-full grid-cols-1 gap-3 lg:grid-cols-[300px_minmax(0,1fr)] lg:items-start">
+          {/* Left column: Map + Difficulty */}
+          <div className="flex w-full flex-col gap-3">
+            {/* Map Selector */}
+            <div className="stone-panel w-full p-3">
+              <div className="mb-2 flex items-center gap-1.5">
+                <MapIcon className="h-4 w-4 text-emerald-400" />
+                <span className="text-xs font-bold uppercase tracking-widest text-[#e69f22]">
+                  Mapas
+                </span>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                {GAME_MAPS.map((map, index) => {
+                  const isSelected = selectedMap === map.id;
+                  return (
+                    <button
+                      key={map.id}
+                      onClick={() => setSelectedMap(map.id)}
+                      className={`flex w-full cursor-pointer items-center gap-2.5 rounded-md border px-2.5 py-2 text-left transition ${
+                        isSelected
+                          ? 'border-[#f5a623] bg-gradient-to-b from-[#3b2a12] to-[#1e1812] shadow-[0_0_14px_rgba(245,166,35,0.22)]'
+                          : 'border-[#383e4c] bg-gradient-to-b from-[#1c2027] to-[#14171c] hover:border-[#4b5363]'
+                      }`}
+                      title={map.description}
+                      aria-pressed={isSelected}
+                    >
+                      <span
+                        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border font-mono text-[10px] font-bold ${
+                          isSelected
+                            ? 'border-[#f5a623] bg-[#3b2a12] text-[#ffd700]'
+                            : 'border-[#383e4c] bg-[#121419] text-[#9ca3af]'
+                        }`}
+                      >
+                        {index + 1}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span
+                          className={`block text-xs font-bold ${
+                            isSelected ? 'text-[#ffd700]' : 'text-[#f3f4f6]'
+                          }`}
+                        >
+                          {map.name}
+                        </span>
+                        <span className="block text-[10px] leading-snug text-[#9ca3af]">
+                          {map.description}
+                        </span>
+                      </span>
+                      {map.id === 'amazon_forest' ? (
+                        <TreePine className="h-4 w-4 shrink-0 text-emerald-400" />
+                      ) : (
+                        <Moon className="h-4 w-4 shrink-0 text-sky-400" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Difficulty Selector */}
+            <div className="stone-panel w-full p-3">
+              <div className="mb-1.5 flex items-center gap-1.5">
+                <Skull className="h-4 w-4 text-[#d9381e]" />
+                <span className="text-xs font-bold uppercase tracking-widest text-[#e69f22]">
+                  Dificuldade
+                </span>
+              </div>
+              <p className="mb-2 text-[11px] leading-snug text-[#9ca3af]">
+                {difficultyMeta.description}
+              </p>
+              <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-5 lg:grid-cols-2">
             {DIFFICULTIES.map((difficulty) => (
               <button
                 key={difficulty.id}
@@ -258,11 +329,14 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
                 {difficulty.name}
               </button>
             ))}
+              </div>
+            </div>
           </div>
-        </div>
 
-        {/* Tabs: Escolha de Personagem vs Loja de Power-Ups */}
-        <div className="mb-3 flex w-full gap-2">
+          {/* Right column: tabs, character grid and start button */}
+          <div className="flex w-full min-w-0 flex-col">
+            {/* Tabs: Escolha de Personagem vs Loja de Power-Ups */}
+            <div className="mb-3 flex w-full gap-2">
           <button
             onClick={() => setActiveTab('character')}
             className={`tab-btn ${activeTab === 'character' ? 'tab-btn-active' : ''}`}
@@ -275,7 +349,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
             className={`tab-btn ${activeTab === 'shop' ? 'tab-btn-active' : ''}`}
           >
             <ShoppingBag className="h-4 w-4 text-yellow-400" />
-            Loja de Power-Ups
+            Loja
           </button>
           <button
             onClick={() => setActiveTab('missions')}
@@ -385,18 +459,6 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
                 );
               })}
             </div>
-
-            {/* Play Button */}
-            <button
-              onClick={() => {
-                selectionAudioRef.current?.pause();
-                onStartGame(selectedChar, savedData, selectedDifficulty);
-              }}
-              className="cta-btn"
-            >
-              <Play className="h-5 w-5 fill-white" />
-              INICIAR COM {selectedChar.name.toUpperCase()}
-            </button>
           </div>
         )}
 
@@ -453,10 +515,24 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
           </div>
         )}
 
-        {/* TAB 3: Missions */}
-        {activeTab === 'missions' && (
-          <MissionsTab savedData={savedData} onUpdateSave={onUpdateSave} />
-        )}
+            {/* TAB 3: Missions */}
+            {activeTab === 'missions' && (
+              <MissionsTab savedData={savedData} onUpdateSave={onUpdateSave} />
+            )}
+
+            {/* Play Button */}
+            <button
+              onClick={() => {
+                selectionAudioRef.current?.pause();
+                onStartGame(selectedChar, savedData, selectedDifficulty, selectedMap);
+              }}
+              className="cta-btn"
+            >
+              <Play className="h-5 w-5 fill-white" />
+              INICIAR COM {selectedChar.name.toUpperCase()}
+            </button>
+          </div>
+        </div>
 
         {/* Instructions footer */}
         <div className="mt-4 flex items-center gap-2 text-[11px] text-[#6b7280]">

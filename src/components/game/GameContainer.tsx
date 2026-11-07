@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { CharacterConfig, DifficultyId, GameEndSummary, HUDState, SavedGameData, UpgradeOption } from '@/game/types';
+import { CharacterConfig, DifficultyId, GameEndSummary, HUDState, MapId, SavedGameData, UpgradeOption } from '@/game/types';
 import { CHARACTERS } from '@/game/data/characters';
 import { loadSavedData } from '@/game/data/persistence';
 import { getDifficulty } from '@/game/data/difficulties';
+import { DEFAULT_MAP_ID } from '@/game/data/maps';
 import { GameEngine } from '@/game/engine/GameEngine';
 import { HUD } from './HUD';
 import { CharacterHUD } from './CharacterHUD';
@@ -36,6 +37,7 @@ export const GameContainer: React.FC = () => {
   const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyId>(
     savedData.difficulty ?? 'normal'
   );
+  const [selectedMap, setSelectedMap] = useState<MapId>(DEFAULT_MAP_ID);
   const [hud, setHud] = useState<HUDState>(DEFAULT_HUD);
   const [levelUpOptions, setLevelUpOptions] = useState<UpgradeOption[]>([]);
   const [chestReward, setChestReward] = useState<{ gold: number; upgrade?: UpgradeOption } | null>(null);
@@ -66,10 +68,12 @@ export const GameContainer: React.FC = () => {
   const handleStartGame = (
     character: CharacterConfig,
     currentSavedData: SavedGameData,
-    difficulty: DifficultyId = currentSavedData.difficulty ?? 'normal'
+    difficulty: DifficultyId = currentSavedData.difficulty ?? 'normal',
+    mapId: MapId = DEFAULT_MAP_ID
   ) => {
     setSelectedCharacter(character);
     setSelectedDifficulty(difficulty);
+    setSelectedMap(mapId);
     setGameState('playing');
 
     // Wait for canvas to be mounted in DOM
@@ -81,7 +85,7 @@ export const GameContainer: React.FC = () => {
         engineRef.current.destroy();
       }
 
-      const engine = new GameEngine(canvas, character, currentSavedData, difficulty, {
+      const engine = new GameEngine(canvas, character, currentSavedData, difficulty, mapId, {
         onHUDUpdate: (newHud) => {
           setHud(newHud);
         },
@@ -167,7 +171,7 @@ export const GameContainer: React.FC = () => {
   };
 
   const handleRestart = () => {
-    handleStartGame(selectedCharacter, loadSavedData(), selectedDifficulty);
+    handleStartGame(selectedCharacter, loadSavedData(), selectedDifficulty, selectedMap);
   };
 
   const handleContinueEndless = () => {

@@ -4,6 +4,7 @@ import {
   DifficultyId,
   GameEndSummary,
   HUDState,
+  MapId,
   UpgradeOption,
   SavedGameData,
   WeaponId,
@@ -76,6 +77,7 @@ export class GameEngine {
     character: CharacterConfig,
     savedData: SavedGameData,
     difficultyId: DifficultyId,
+    mapId: MapId,
     callbacks: GameEngineCallbacks
   ) {
     this.canvas = canvas;
@@ -89,7 +91,7 @@ export class GameEngine {
     this.sound = new SoundEngine();
     this.spatialGrid = new SpatialGrid<Enemy>(110);
     this.vfx = new VFXManager();
-    this.worldProps = new WorldSystem();
+    this.worldProps = new WorldSystem(mapId);
     this.difficulty = getDifficulty(difficultyId);
     this.waveDirector = new WaveDirector(this.difficulty);
 
@@ -624,6 +626,7 @@ export class GameEngine {
 
     // 1. Clear & Render Floor Tile Pattern
     this.worldProps.renderFloor(ctx, camera);
+    this.worldProps.renderTrees(ctx, camera);
 
     // 2. Render Torches & Props
     this.worldProps.renderTorches(ctx, camera);

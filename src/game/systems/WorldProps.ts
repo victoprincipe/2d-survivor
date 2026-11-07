@@ -1,7 +1,7 @@
 import { Camera } from '../engine/Camera';
 import { Player } from '../entities/Player';
 import { Drop } from '../entities/Drops';
-import { DropType } from '../types';
+import { DropType, MapId } from '../types';
 
 export interface TorchProp {
   id: number;
@@ -12,6 +12,13 @@ export interface TorchProp {
   buff: DropType;
 }
 
+interface TreeProp {
+  x: number;
+  y: number;
+  size: number;
+  tone: number;
+}
+
 export class WorldSystem {
   public torches: TorchProp[] = [];
   private nextTorchId: number = 1;
@@ -19,11 +26,38 @@ export class WorldSystem {
   private maxTorches: number = 6;
   private readonly torchSpawnInterval: number = 13;
 
+  private mapId: MapId;
+  private trees: TreeProp[] = [];
+
   private floorImage: HTMLImageElement | null = null;
   private floorPattern: CanvasPattern | null = null;
 
-  constructor() {
+  constructor(mapId: MapId = 'night_plain') {
+    this.mapId = mapId;
+    if (mapId === 'amazon_forest') this.generateTrees();
     this.loadFloorTexture();
+  }
+
+  private generateTrees(): void {
+    // Deterministic scatter so the forest looks the same between renders.
+    let seed = 1337;
+    const random = () => {
+      seed = (seed * 16807) % 2147483647;
+      return (seed - 1) / 2147483646;
+    };
+
+    for (let i = 0; i < 80; i++) {
+      const x = (random() - 0.5) * 3600;
+      const y = (random() - 0.5) * 3600;
+      // Keep the spawn area clear.
+      if (Math.abs(x) < 150 && Math.abs(y) < 150) continue;
+      this.trees.push({
+        x,
+        y,
+        size: 26 + random() * 26,
+        tone: random(),
+      });
+    }
   }
 
   private loadFloorTexture(): void {
@@ -83,6 +117,12 @@ export class WorldSystem {
   }
 
   renderFloor(ctx: CanvasRenderingContext2D, camera: Camera): void {
+    if (this.mapId === 'amazon_forest') {
+      ctx.fillStyle = '#0f2a16';
+      ctx.fillRect(0, 0, camera.viewportWidth, camera.viewportHeight);
+      return;
+    }
+
     const image = this.floorImage;
     if (image) {
       if (!this.floorPattern) {
@@ -111,6 +151,45 @@ export class WorldSystem {
 
     ctx.fillStyle = '#1f2b1f';
     ctx.fillRect(0, 0, camera.viewportWidth, camera.viewportHeight);
+  }
+
+  renderTrees(ctx: CanvasRenderingContext2D, camera: Camera): void {
+    if (this.mapId !== 'amazon_forest') return;
+
+    for (let i = 0; i < this.trees.length; i++) {
+      const tree = this.trees[i];
+      if (!camera.isInView(tree.x, tree.y, tree.size + 30)) continue;
+
+      const screen = camera.worldToScreen(tree.x, tree.y);
+      const size = tree.size;
+
+      ctx.save();
+      ctx.translate(screen.x, screen.y);
+
+      // Ground shadow
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
+      ctx.beginPath();
+      ctx.ellipse(0, 4, size * 0.55, size * 0.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Trunk
+      ctx.fillStyle = '#4a2f1b';
+      ctx.fillRect(-size * 0.08, -size * 0.5, size * 0.16, size * 0.6);
+
+      // Canopy
+      ctx.fillStyle = tree.tone > 0.5 ? '#14532d' : '#166534';
+      ctx.beginPath();
+      ctx.arc(0, -size * 0.62, size * 0.48, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#15803d';
+      ctx.beginPath();
+      ctx.arc(-size * 0.22, -size * 0.72, size * 0.34, 0, Math.PI * 2);
+      ctx.arc(size * 0.24, -size * 0.7, size * 0.32, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
   }
 
   renderTorches(ctx: CanvasRenderingContext2D, camera: Camera): void {
