@@ -2,6 +2,12 @@ import { CharacterConfig } from '../types';
 import { Camera } from '../engine/Camera';
 import { InputManager } from '../engine/Input';
 
+const HP_BAR_WIDTH = 46;
+const HP_BAR_HEIGHT = 11;
+const HP_BAR_FONT_SIZE = 9;
+const HP_BAR_OUTLINE_WIDTH = 2.5;
+const HP_BAR_TEXT_PADDING_X = 3;
+
 export type PermanentPowerUps = {
   might?: number;
   armor?: number;
@@ -237,20 +243,51 @@ export class Player {
     ctx.globalAlpha = 1.0;
 
     // HP Bar above player
-    const barWidth = 36;
-    const barHeight = 5;
-    const barX = screen.x - barWidth / 2;
-    const barY = screen.y - (sprite ? 46 : 30);
+    ctx.save();
+
+    const barWidth = HP_BAR_WIDTH;
+    const barHeight = HP_BAR_HEIGHT;
+    const barX = Math.round(screen.x - barWidth / 2);
+    const barY = Math.round(screen.y - (sprite ? 52 : 36));
 
     ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
     ctx.fillRect(barX, barY, barWidth, barHeight);
 
-    const hpPercent = Math.max(0, this.hp / this.maxHp);
+    const hpPercent = Math.max(0, Math.min(1, this.hp / this.maxHp));
     ctx.fillStyle = hpPercent > 0.5 ? '#10b981' : hpPercent > 0.25 ? '#f59e0b' : '#ef4444';
     ctx.fillRect(barX, barY, barWidth * hpPercent, barHeight);
 
     ctx.strokeStyle = '#1e293b';
     ctx.lineWidth = 1;
     ctx.strokeRect(barX, barY, barWidth, barHeight);
+
+    // HP text centered inside the bar
+    const hpCurrent = Math.max(0, Math.round(this.hp));
+    const hpMax = Math.max(1, Math.round(this.maxHp));
+    const hpText = `${hpCurrent}/${hpMax}`;
+
+    let fontSize = HP_BAR_FONT_SIZE;
+    ctx.font = `bold ${fontSize}px monospace`;
+    const maxTextWidth = barWidth - HP_BAR_TEXT_PADDING_X * 2;
+    const measuredWidth = ctx.measureText(hpText).width;
+    if (measuredWidth > maxTextWidth) {
+      fontSize = Math.max(6, Math.floor((fontSize * maxTextWidth) / measuredWidth));
+      ctx.font = `bold ${fontSize}px monospace`;
+    }
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const textX = barX + barWidth / 2;
+    const textY = barY + barHeight / 2 + 0.5;
+
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = HP_BAR_OUTLINE_WIDTH;
+    ctx.strokeText(hpText, textX, textY);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(hpText, textX, textY);
+
+    ctx.restore();
   }
 }
