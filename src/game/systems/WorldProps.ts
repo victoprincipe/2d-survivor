@@ -16,8 +16,8 @@ const COLLISION_STEP = 8;
 // somewhere else on the map.
 const FRUIT_TREE_RESPAWN = 45;
 const FRUIT_TREE_PICKUP_RADIUS = 34;
-const FRUIT_TREE_PROMPT_WIDTH = 96;
-const FRUIT_TREE_PROMPT_HEIGHT = 24;
+const FRUIT_TREE_PROMPT_WIDTH = 190;
+const FRUIT_TREE_PROMPT_HEIGHT = 42;
 const FRUIT_TREE_PROMPT_PADDING = 10;
 
 // Amazon water. For the player the river and lakes are purely visual, but
@@ -58,6 +58,16 @@ export interface CollectedFruit {
   x: number;
   y: number;
 }
+
+// Short benefit shown under the collect prompt for each Amazon fruit tree.
+const FRUIT_TREE_BENEFITS: Record<FruitTreeKind, string> = {
+  acai: 'Ímã: Atrai todo o XP do mapa',
+  cupuacu: 'Cura: Restaura 35% de HP',
+  castanha: 'Fortuna: Dropa pacote de Ouro',
+  buriti: 'Frenesi: +Velocidade e Ataque (10s)',
+  pupunha: 'Proteção: Escudo temporário (10s)',
+  araca: 'Explosão: Dano em área nos inimigos',
+};
 
 interface TreeProp {
   x: number;
@@ -1470,7 +1480,8 @@ export class WorldSystem {
         this.renderFruitPrompt(
           ctx,
           screen.x,
-          screen.y + this.getFruitPromptOffsetY(tree)
+          screen.y + this.getFruitPromptOffsetY(tree),
+          tree.kind
         );
       }
     }
@@ -1479,7 +1490,8 @@ export class WorldSystem {
   private renderFruitPrompt(
     ctx: CanvasRenderingContext2D,
     x: number,
-    y: number
+    y: number,
+    kind: FruitTreeKind
   ): void {
     const halfWidth = FRUIT_TREE_PROMPT_WIDTH / 2;
     const halfHeight = FRUIT_TREE_PROMPT_HEIGHT / 2;
@@ -1497,11 +1509,15 @@ export class WorldSystem {
       FRUIT_TREE_PROMPT_HEIGHT - 1
     );
 
-    ctx.font = 'bold 12px system-ui, -apple-system, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+    ctx.font = 'bold 12px system-ui, -apple-system, sans-serif';
     ctx.fillStyle = '#fef9c3';
-    ctx.fillText('[E] Coletar', x, y + 0.5);
+    ctx.fillText('[E] Coletar', x, y - 8);
+
+    ctx.font = 'bold 9px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = '#facc15';
+    ctx.fillText(FRUIT_TREE_BENEFITS[kind], x, y + 10);
     ctx.restore();
   }
 
