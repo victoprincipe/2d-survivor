@@ -11,6 +11,12 @@ const FOREST_SIZE = 14000;
 const FOREST_HALF_SIZE = FOREST_SIZE / 2;
 const COLLISION_STEP = 8;
 
+// Decorative Amazon water. The river and lakes are purely visual for now:
+// they do not affect movement, collision or speed.
+const RIVER_WIDTH = 980;
+const RIVER_BANK = 150;
+const RIVER_HALF_WIDTH = RIVER_WIDTH / 2;
+
 export interface TorchProp {
   id: number;
   x: number;
@@ -36,6 +42,46 @@ interface FloorPatch {
   rotation: number;
 }
 
+interface LakeProp {
+  x: number;
+  y: number;
+  rx: number;
+  ry: number;
+  rotation: number;
+}
+
+interface LilyProp {
+  x: number;
+  y: number;
+  size: number;
+  tone: number;
+  rotation: number;
+}
+
+interface PalmProp {
+  x: number;
+  y: number;
+  size: number;
+  tone: number;
+  lean: number;
+}
+
+interface FernProp {
+  x: number;
+  y: number;
+  size: number;
+  tone: number;
+  rotation: number;
+}
+
+interface RockProp {
+  x: number;
+  y: number;
+  size: number;
+  tone: number;
+  rotation: number;
+}
+
 export class WorldSystem {
   public torches: TorchProp[] = [];
   private nextTorchId: number = 1;
@@ -47,6 +93,11 @@ export class WorldSystem {
   private worldHalfSize: number = WORLD_HALF_SIZE;
   private trees: TreeProp[] = [];
   private floorPatches: FloorPatch[] = [];
+  private lakes: LakeProp[] = [];
+  private lilies: LilyProp[] = [];
+  private palms: PalmProp[] = [];
+  private ferns: FernProp[] = [];
+  private rocks: RockProp[] = [];
 
   private floorImage: HTMLImageElement | null = null;
   private floorPattern: CanvasPattern | null = null;
@@ -113,6 +164,114 @@ export class WorldSystem {
         rotation: random() * Math.PI,
       });
     }
+
+    // Two lakes to break up the green floor.
+    this.lakes = [
+      { x: -4000, y: -3600, rx: 1650, ry: 1050, rotation: -0.22 },
+      { x: 4100, y: 3500, rx: 1400, ry: 950, rotation: 0.35 },
+    ];
+
+    // Floating water lilies along the river...
+    for (let i = 0; i < 55; i++) {
+      const x = (random() - 0.5) * FOREST_SIZE * 0.92;
+      const y = this.riverCenterY(x) + (random() - 0.5) * RIVER_WIDTH * 0.78;
+      this.lilies.push({
+        x,
+        y,
+        size: 6 + random() * 10,
+        tone: random(),
+        rotation: random() * Math.PI * 2,
+      });
+    }
+
+    // ...and inside both lakes.
+    for (let l = 0; l < this.lakes.length; l++) {
+      const lake = this.lakes[l];
+      for (let i = 0; i < 24; i++) {
+        const angle = random() * Math.PI * 2;
+        const dist = Math.sqrt(random()) * 0.78;
+        const lx = Math.cos(angle) * lake.rx * dist;
+        const ly = Math.sin(angle) * lake.ry * dist;
+        const cos = Math.cos(lake.rotation);
+        const sin = Math.sin(lake.rotation);
+        this.lilies.push({
+          x: lake.x + lx * cos - ly * sin,
+          y: lake.y + lx * sin + ly * cos,
+          size: 6 + random() * 10,
+          tone: random(),
+          rotation: random() * Math.PI * 2,
+        });
+      }
+    }
+
+    // Palm trees, ferns and decorative rocks scattered over the dry ground.
+    const scatter = (attempts: number, place: (x: number, y: number) => void) => {
+      for (let i = 0; i < attempts; i++) {
+        const x = (random() - 0.5) * FOREST_SIZE * 0.86;
+        const y = (random() - 0.5) * FOREST_SIZE * 0.86;
+        if (Math.abs(x) < 220 && Math.abs(y) < 220) continue;
+        if (this.isInWater(x, y)) continue;
+        place(x, y);
+      }
+    };
+
+    scatter(30, (x, y) => {
+      this.palms.push({
+        x,
+        y,
+        size: 44 + random() * 34,
+        tone: random(),
+        lean: (random() - 0.5) * 0.55,
+      });
+    });
+
+    scatter(70, (x, y) => {
+      this.ferns.push({
+        x,
+        y,
+        size: 12 + random() * 14,
+        tone: random(),
+        rotation: random() * Math.PI * 2,
+      });
+    });
+
+    scatter(45, (x, y) => {
+      this.rocks.push({
+        x,
+        y,
+        size: 10 + random() * 16,
+        tone: random(),
+        rotation: random() * Math.PI * 2,
+      });
+    });
+  }
+
+  private riverCenterY(x: number): number {
+    return (
+      Math.sin((x / FOREST_SIZE) * Math.PI * 1.6) * 1450 +
+      Math.sin(x / 1600) * 240
+    );
+  }
+
+  private isInWater(x: number, y: number): boolean {
+    // River band.
+    if (Math.abs(y - this.riverCenterY(x)) < RIVER_HALF_WIDTH + 60) return true;
+
+    // Lakes (rotated ellipses).
+    for (let i = 0; i < this.lakes.length; i++) {
+      const lake = this.lakes[i];
+      const dx = x - lake.x;
+      const dy = y - lake.y;
+      const cos = Math.cos(-lake.rotation);
+      const sin = Math.sin(-lake.rotation);
+      const lx = dx * cos - dy * sin;
+      const ly = dx * sin + dy * cos;
+      if ((lx * lx) / (lake.rx * lake.rx) + (ly * ly) / (lake.ry * lake.ry) <= 1.08) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   private loadFloorTexture(): void {
@@ -259,6 +418,8 @@ export class WorldSystem {
 
         ctx.restore();
       }
+
+      this.renderAmazonWater(ctx, camera);
       return;
     }
 
@@ -292,8 +453,263 @@ export class WorldSystem {
     ctx.fillRect(0, 0, camera.viewportWidth, camera.viewportHeight);
   }
 
+  private renderAmazonWater(ctx: CanvasRenderingContext2D, camera: Camera): void {
+    const start = -FOREST_HALF_SIZE - 1200;
+    const end = FOREST_HALF_SIZE + 1200;
+    const step = 220;
+
+    ctx.save();
+    ctx.translate(
+      camera.viewportWidth / 2 - camera.x + camera.shakeOffsetX,
+      camera.viewportHeight / 2 - camera.y + camera.shakeOffsetY
+    );
+
+    // Keep the water inside the playable map; the rest stays dark forest.
+    ctx.beginPath();
+    ctx.rect(-FOREST_HALF_SIZE, -FOREST_HALF_SIZE, FOREST_SIZE, FOREST_SIZE);
+    ctx.clip();
+
+    const traceRiver = () => {
+      ctx.beginPath();
+      for (let x = start; x <= end; x += step) {
+        const y = this.riverCenterY(x);
+        if (x === start) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+    };
+
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // Sandy banks around the river.
+    traceRiver();
+    ctx.strokeStyle = '#b89355';
+    ctx.lineWidth = RIVER_WIDTH + RIVER_BANK * 2;
+    ctx.stroke();
+
+    traceRiver();
+    ctx.strokeStyle = '#d8bc82';
+    ctx.lineWidth = RIVER_WIDTH + RIVER_BANK * 0.85;
+    ctx.stroke();
+
+    // Water surface with a lighter current down the middle.
+    traceRiver();
+    ctx.strokeStyle = '#1b6b82';
+    ctx.lineWidth = RIVER_WIDTH;
+    ctx.stroke();
+
+    traceRiver();
+    ctx.strokeStyle = '#2b8ba1';
+    ctx.lineWidth = RIVER_WIDTH - 160;
+    ctx.stroke();
+
+    // Two lakes, each with its own sand rim.
+    for (let i = 0; i < this.lakes.length; i++) {
+      const lake = this.lakes[i];
+      const margin = Math.max(lake.rx, lake.ry) + RIVER_BANK + 30;
+      if (!camera.isInView(lake.x, lake.y, margin)) continue;
+
+      ctx.save();
+      ctx.translate(lake.x, lake.y);
+      ctx.rotate(lake.rotation);
+
+      ctx.fillStyle = '#b89355';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, lake.rx + RIVER_BANK, lake.ry + RIVER_BANK * 0.85, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#d8bc82';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, lake.rx + RIVER_BANK * 0.5, lake.ry + RIVER_BANK * 0.42, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#1b6b82';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, lake.rx, lake.ry, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#2b8ba1';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, lake.rx * 0.82, lake.ry * 0.82, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Soft highlight on the water.
+      ctx.strokeStyle = 'rgba(170, 230, 240, 0.22)';
+      ctx.lineWidth = 10;
+      ctx.beginPath();
+      ctx.ellipse(lake.rx * 0.12, -lake.ry * 0.28, lake.rx * 0.55, lake.ry * 0.45, 0, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    // Floating water lilies.
+    for (let i = 0; i < this.lilies.length; i++) {
+      const lily = this.lilies[i];
+      if (!camera.isInView(lily.x, lily.y, lily.size + 10)) continue;
+
+      ctx.save();
+      ctx.translate(lily.x, lily.y);
+      ctx.rotate(lily.rotation);
+
+      // Pad with a small notch.
+      ctx.fillStyle = lily.tone > 0.5 ? '#2f7d32' : '#3d8f3f';
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.arc(0, 0, lily.size, 0.32, Math.PI * 2 - 0.32);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = 'rgba(140, 205, 100, 0.35)';
+      ctx.beginPath();
+      ctx.ellipse(-lily.size * 0.15, -lily.size * 0.18, lily.size * 0.5, lily.size * 0.3, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // A few pads carry a small flower.
+      if (lily.tone > 0.72) {
+        ctx.fillStyle = '#f9a8d4';
+        ctx.beginPath();
+        ctx.arc(0, 0, lily.size * 0.24, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#fde68a';
+        ctx.beginPath();
+        ctx.arc(0, 0, lily.size * 0.1, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.restore();
+    }
+
+    ctx.restore();
+  }
+
+  private renderAmazonDecorations(ctx: CanvasRenderingContext2D, camera: Camera): void {
+    // Decorative rocks.
+    for (let i = 0; i < this.rocks.length; i++) {
+      const rock = this.rocks[i];
+      if (!camera.isInView(rock.x, rock.y, rock.size + 20)) continue;
+
+      const screen = camera.worldToScreen(rock.x, rock.y);
+      ctx.save();
+      ctx.translate(screen.x, screen.y);
+      ctx.rotate(rock.rotation);
+
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+      ctx.beginPath();
+      ctx.ellipse(0, rock.size * 0.35, rock.size * 1.1, rock.size * 0.4, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = rock.tone > 0.5 ? '#6b7280' : '#57606a';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, rock.size, rock.size * 0.72, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = 'rgba(209, 213, 219, 0.35)';
+      ctx.beginPath();
+      ctx.ellipse(-rock.size * 0.22, -rock.size * 0.2, rock.size * 0.5, rock.size * 0.3, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    // Ferns fanning out from a short stem.
+    for (let i = 0; i < this.ferns.length; i++) {
+      const fern = this.ferns[i];
+      if (!camera.isInView(fern.x, fern.y, fern.size * 2 + 20)) continue;
+
+      const screen = camera.worldToScreen(fern.x, fern.y);
+      ctx.save();
+      ctx.translate(screen.x, screen.y);
+      ctx.rotate(fern.rotation);
+
+      ctx.fillStyle = fern.tone > 0.5 ? '#1f7a3d' : '#2d8a4a';
+      const leaves = 6;
+      for (let l = 0; l < leaves; l++) {
+        const spread = -1.15 + (l / (leaves - 1)) * 2.3;
+        ctx.save();
+        ctx.rotate(spread);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.quadraticCurveTo(fern.size * 0.55, -fern.size * 0.9, 0, -fern.size * 2);
+        ctx.quadraticCurveTo(-fern.size * 0.55, -fern.size * 0.9, 0, 0);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      ctx.strokeStyle = '#166534';
+      ctx.lineWidth = Math.max(1, fern.size * 0.1);
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(0, -fern.size * 0.8);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    // Palm trees: curved trunk plus a crown of fronds.
+    for (let i = 0; i < this.palms.length; i++) {
+      const palm = this.palms[i];
+      if (!camera.isInView(palm.x, palm.y, palm.size * 3)) continue;
+
+      const screen = camera.worldToScreen(palm.x, palm.y);
+      const size = palm.size;
+      const topX = palm.lean * size * 1.9;
+      const topY = -size * 2.5;
+
+      ctx.save();
+      ctx.translate(screen.x, screen.y);
+
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
+      ctx.beginPath();
+      ctx.ellipse(0, 6, size * 0.55, size * 0.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = palm.tone > 0.5 ? '#6b4423' : '#7a4d29';
+      ctx.lineWidth = size * 0.13;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(palm.lean * size * 0.5, -size * 1.3, topX, topY);
+      ctx.stroke();
+
+      for (let f = 0; f < 7; f++) {
+        const angle = -Math.PI + (f / 6) * Math.PI + palm.lean * 0.35;
+        const dirX = Math.cos(angle);
+        const dirY = Math.sin(angle);
+        const length = size * (1.05 + (f % 2) * 0.18);
+        const tipX = topX + dirX * length;
+        const tipY = topY + dirY * length * 0.72;
+        const ctrlX = topX + dirX * length * 0.6 - dirY * length * 0.22;
+        const ctrlY = topY + dirY * length * 0.5 + dirX * length * 0.12;
+
+        ctx.fillStyle = (f + Math.round(palm.tone * 3)) % 2 === 0 ? '#15803d' : '#1f9d4d';
+        ctx.beginPath();
+        ctx.moveTo(topX, topY);
+        ctx.quadraticCurveTo(ctrlX, ctrlY, tipX, tipY);
+        ctx.quadraticCurveTo(
+          topX + dirX * length * 0.45,
+          topY + dirY * length * 0.3,
+          topX,
+          topY
+        );
+        ctx.fill();
+      }
+
+      // Coconuts at the crown.
+      ctx.fillStyle = '#4a2f1b';
+      ctx.beginPath();
+      ctx.arc(topX - size * 0.1, topY + size * 0.08, size * 0.1, 0, Math.PI * 2);
+      ctx.arc(topX + size * 0.12, topY + size * 0.12, size * 0.09, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+  }
+
   renderTrees(ctx: CanvasRenderingContext2D, camera: Camera): void {
     if (this.mapId !== 'amazon_forest') return;
+
+    this.renderAmazonDecorations(ctx, camera);
 
     for (let i = 0; i < this.trees.length; i++) {
       const tree = this.trees[i];
