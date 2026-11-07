@@ -84,8 +84,8 @@ export const discordConfig = {
 export const queueConfig = {
   mainBranch: readString('MAIN_BRANCH', 'master'),
   maxActivePerUser: readInt('MAX_ACTIVE_PER_USER', 1),
-  dailyUserLimit: readInt('DAILY_USER_LIMIT', 30),
-  dailyGlobalLimit: readInt('DAILY_GLOBAL_LIMIT', 40),
+  dailyUserLimit: readInt('DAILY_USER_LIMIT', 50),
+  dailyGlobalLimit: readInt('DAILY_GLOBAL_LIMIT', 50),
   queueLimit: readInt('QUEUE_LIMIT', 20),
   minAccountAgeDays: readInt('MIN_ACCOUNT_AGE_DAYS', 7),
   maxDiffFiles: readInt('MAX_DIFF_FILES', 20),

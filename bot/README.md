@@ -141,7 +141,7 @@ Os dois arquivos são anexados na mensagem do plano, que traz os botões **Aprov
 - **Aprovar**: o plano fica disponível no select do `/implementar`;
 - **Rejeitar**: o plano é arquivado; use `/planejar` de novo se quiser outra abordagem.
 
-O planejador não altera o código: a única escrita permitida é em `.plan-artifacts/`. Planejamentos têm limites próprios (padrão: 10/dia, 1 ativo por usuário, fila de 10) e **não consomem** a quota de 30 implementações/dia.
+O planejador não altera o código: a única escrita permitida é em `.plan-artifacts/`. Planejamentos têm limites próprios (padrão: 10/dia, 1 ativo por usuário, fila de 10) e **não consomem** a quota de 50 implementações/dia.
 
 ## Comandos
 
@@ -161,11 +161,11 @@ O título exibido é derivado da primeira linha do prompt; não há campo separa
 
 - Conta com pelo menos 7 dias.
 - 1 job ativo por usuário.
-- 30 jobs por dia por usuário; 40 no total.
+- 50 jobs por dia por usuário; 50 no total.
 - Fila máxima de 20.
 - Formulário de prompt: até 4000 caracteres. Não há mínimo além de 1 caractere; vazio só é permitido no `/implementar` com plano selecionado ou imagem/áudio.
 - O select de planos do `/implementar` mostra até 25 planos aprovados.
-- Planejamentos: 10 por dia, 1 ativo por usuário e fila de 10 (não contam nos 30 jobs).
+- Planejamentos: 10 por dia, 1 ativo por usuário e fila de 10 (não contam nos 50 jobs).
 
 ## Status
 
