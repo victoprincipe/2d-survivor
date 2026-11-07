@@ -374,8 +374,18 @@ export class GameEngine {
     }
 
     if (enemy.isElite) {
+      const isAmazonElite =
+        enemy.type === 'elite_jaguar' ||
+        enemy.type === 'elite_tapir' ||
+        enemy.type === 'elite_goliath_spider';
       this.drops.push(new Drop(Date.now() + Math.random(), 'chest', enemy.x, enemy.y));
       this.drops.push(new Drop(Date.now() + 1 + Math.random(), 'gem_green', enemy.x + 14, enemy.y, enemy.xpValue));
+      if (isAmazonElite) {
+        // Rare forest elites are walking treasure piñatas: bonus XP and gold.
+        this.drops.push(new Drop(Date.now() + 2 + Math.random(), 'gem_red', enemy.x - 16, enemy.y, enemy.xpValue));
+        this.drops.push(new Drop(Date.now() + 3 + Math.random(), 'coin', enemy.x + 30, enemy.y, 90));
+        this.drops.push(new Drop(Date.now() + 4 + Math.random(), 'coin', enemy.x - 30, enemy.y, 90));
+      }
       return;
     }
 

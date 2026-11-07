@@ -26,12 +26,21 @@ const AMAZON_RESISTANT_ENEMIES: EnemyType[] = [
   'giant_centipede',
 ];
 
+// Rare Amazon Forest elites. Spawned on a slow independent timer so they stay
+// uncommon even when the regular spawn rate is very high.
+const AMAZON_ELITE_ENEMIES: EnemyType[] = [
+  'elite_jaguar',
+  'elite_tapir',
+  'elite_goliath_spider',
+];
+
 export class WaveDirector {
   public survivalTime: number = 0;
   public difficulty: DifficultyConfig;
   private mapId: MapId;
   private nextEnemyId: number = 1;
   private spawnTimer: number = 0;
+  private nextAmazonEliteTime: number = 80 + Math.random() * 40;
 
   constructor(difficulty: DifficultyConfig, mapId: MapId = 'night_plain') {
     this.difficulty = difficulty;
@@ -91,6 +100,19 @@ export class WaveDirector {
 
     if (this.freezeSpawns) {
       return;
+    }
+
+    // Rare Amazon Forest elite: one of the map's three oversized predators
+    // appears from time to time on top of the regular waves.
+    if (this.isAmazonForest && this.survivalTime >= this.nextAmazonEliteTime) {
+      this.nextAmazonEliteTime = this.survivalTime + 90 + Math.random() * 60;
+      const eliteType =
+        AMAZON_ELITE_ENEMIES[Math.floor(Math.random() * AMAZON_ELITE_ENEMIES.length)];
+      const elitePos = this.getSpawnPositionOutsideScreen(camera);
+      const amazonElite = this.createEnemy(eliteType, elitePos.x, elitePos.y, hpMultiplier * 1.05);
+      this.triggerAlert(`⚠️ ${amazonElite.name.toUpperCase()} SURGIU NA FLORESTA!`, 4.5);
+      sound.playBossWarning();
+      onSpawn(amazonElite);
     }
 
     // Timed Events (4 Elite Chests before 05:00 + Final Boss + Endless Loop)

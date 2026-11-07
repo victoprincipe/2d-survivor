@@ -204,7 +204,11 @@ export type EnemyType =
   | 'sloth'
   | 'rhino_beetle'
   | 'sawyer_beetle'
-  | 'giant_centipede';
+  | 'giant_centipede'
+  // Rare Amazon Forest elites: oversized, powerful and highly rewarding.
+  | 'elite_jaguar'
+  | 'elite_tapir'
+  | 'elite_goliath_spider';
 
 export type DropType =
   | 'gem_blue'

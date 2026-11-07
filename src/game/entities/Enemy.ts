@@ -214,6 +214,40 @@ export class Enemy {
         this.xpValue = 60;
         this.knockbackResistance = 0.16;
         break;
+      // Rare Amazon Forest elites. Big, dangerous and loaded with XP/gold.
+      case 'elite_jaguar':
+        this.name = 'Onça-pintada Elite';
+        this.radius = 30;
+        this.maxHp = Math.round(620 * hpMultiplier);
+        this.speed = 150;
+        this.damage = 30;
+        this.xpValue = 220;
+        this.isElite = true;
+        this.knockbackResistance = 0.24;
+        this.skillCooldown = 3.2 + Math.random() * 1.5;
+        break;
+      case 'elite_tapir':
+        this.name = 'Anta Elite';
+        this.radius = 36;
+        this.maxHp = Math.round(1050 * hpMultiplier);
+        this.speed = 70;
+        this.damage = 28;
+        this.xpValue = 260;
+        this.isElite = true;
+        this.knockbackResistance = 0.14;
+        this.skillCooldown = 5.5 + Math.random() * 1.5;
+        break;
+      case 'elite_goliath_spider':
+        this.name = 'Aranha-golias Elite';
+        this.radius = 32;
+        this.maxHp = Math.round(780 * hpMultiplier);
+        this.speed = 95;
+        this.damage = 26;
+        this.xpValue = 240;
+        this.isElite = true;
+        this.knockbackResistance = 0.18;
+        this.skillCooldown = 4.0 + Math.random() * 1.5;
+        break;
       case 'ghost':
         this.name = 'Espectro Noturno';
         this.radius = 16;
@@ -1257,6 +1291,314 @@ export class Enemy {
       ctx.arc(25, -2, 1.5, 0, Math.PI * 2);
       ctx.arc(25, 2, 1.5, 0, Math.PI * 2);
       ctx.fill();
+    } else if (this.type === 'elite_jaguar') {
+      // Large spotted jaguar: low prowling body, muscular legs and a sweeping tail.
+      ctx.save();
+      const stride = Math.sin(this.animTimer * 3.8);
+      const tailSway = Math.sin(this.animTimer * 2.1) * 6;
+
+      ctx.strokeStyle = isFlashing ? '#ffffff' : '#92400e';
+      ctx.lineWidth = 5.5;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-17, 10);
+      ctx.lineTo(-21, 23 + stride * 3);
+      ctx.moveTo(-7, 12);
+      ctx.lineTo(-4, 25 - stride * 3);
+      ctx.moveTo(11, 12);
+      ctx.lineTo(15, 25 + stride * 3);
+      ctx.moveTo(19, 10);
+      ctx.lineTo(25, 22 - stride * 3);
+      ctx.stroke();
+      ctx.lineCap = 'butt';
+
+      ctx.strokeStyle = isFlashing ? '#ffffff' : '#b45309';
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(-25, 0);
+      ctx.quadraticCurveTo(-38, -8 + tailSway, -43, 5 + tailSway);
+      ctx.stroke();
+      if (!isFlashing) {
+        ctx.fillStyle = '#3f2a14';
+        ctx.beginPath();
+        ctx.arc(-42, 5 + tailSway, 3.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      if (!isFlashing) {
+        const bodyGrad = ctx.createLinearGradient(0, -18, 0, 18);
+        bodyGrad.addColorStop(0, '#f59e0b');
+        bodyGrad.addColorStop(0.55, '#d97706');
+        bodyGrad.addColorStop(1, '#92400e');
+        ctx.fillStyle = bodyGrad;
+      }
+      ctx.beginPath();
+      ctx.ellipse(-3, 2, 27, 16, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#d97706';
+      ctx.beginPath();
+      ctx.ellipse(25, -3, 14, 12, 0.08, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#92400e';
+      ctx.beginPath();
+      ctx.arc(19, -14, 5, 0, Math.PI * 2);
+      ctx.arc(31, -13, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#fcd34d';
+      ctx.beginPath();
+      ctx.ellipse(36, 1, 7, 5.5, 0.08, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) {
+        ctx.fillStyle = '#1c1917';
+        ctx.beginPath();
+        ctx.ellipse(41, -0.5, 2.1, 1.6, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#78350f';
+        ctx.lineWidth = 1.1;
+        ctx.beginPath();
+        ctx.moveTo(34, 4);
+        ctx.lineTo(39, 3.2);
+        ctx.stroke();
+      }
+
+      if (!isFlashing) {
+        ctx.strokeStyle = '#3f2a14';
+        ctx.lineWidth = 2.2;
+        const rosettes: [number, number][] = [
+          [-16, -3],
+          [-5, 6],
+          [6, -4],
+          [16, 5],
+          [-21, 7],
+          [2, -8],
+        ];
+        for (let i = 0; i < rosettes.length; i++) {
+          ctx.beginPath();
+          ctx.arc(rosettes[i][0], rosettes[i][1], 3.6, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.fillStyle = '#3f2a14';
+          ctx.beginPath();
+          ctx.arc(rosettes[i][0], rosettes[i][1], 1.1, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      if (!isFlashing) {
+        ctx.fillStyle = '#fef08a';
+        ctx.beginPath();
+        ctx.arc(28, -8, 2.5, 0, Math.PI * 2);
+        ctx.arc(35, -6, 2.3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#111827';
+        ctx.beginPath();
+        ctx.arc(28.7, -8, 1.1, 0, Math.PI * 2);
+        ctx.arc(35.6, -6, 1, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.strokeStyle = isFlashing ? '#ffffff' : '#fef3c7';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(38, 4);
+      ctx.lineTo(41, 6);
+      ctx.moveTo(-20, 23 + stride * 3);
+      ctx.lineTo(-23, 25 + stride * 3);
+      ctx.moveTo(15, 25 + stride * 3);
+      ctx.lineTo(18, 27 + stride * 3);
+      ctx.stroke();
+
+      ctx.restore();
+    } else if (this.type === 'elite_tapir') {
+      // Massive tapir: barrel body, stubby hooves and the iconic flexible snout.
+      ctx.save();
+      const stride = Math.sin(this.animTimer * 2.4);
+      const earTwitch = Math.sin(this.animTimer * 1.3) * 1.5;
+
+      ctx.strokeStyle = isFlashing ? '#ffffff' : '#374151';
+      ctx.lineWidth = 7;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-21, 11);
+      ctx.lineTo(-23, 26 + stride * 2);
+      ctx.moveTo(-9, 13);
+      ctx.lineTo(-7, 27 - stride * 2);
+      ctx.moveTo(9, 13);
+      ctx.lineTo(11, 27 + stride * 2);
+      ctx.moveTo(20, 11);
+      ctx.lineTo(24, 26 - stride * 2);
+      ctx.stroke();
+      ctx.lineCap = 'butt';
+
+      ctx.strokeStyle = isFlashing ? '#ffffff' : '#4b5563';
+      ctx.lineWidth = 3.5;
+      ctx.beginPath();
+      ctx.moveTo(-30, -4);
+      ctx.lineTo(-36, 2);
+      ctx.stroke();
+
+      if (!isFlashing) {
+        const bodyGrad = ctx.createLinearGradient(0, -22, 0, 20);
+        bodyGrad.addColorStop(0, '#9ca3af');
+        bodyGrad.addColorStop(0.55, '#6b7280');
+        bodyGrad.addColorStop(1, '#4b5563');
+        ctx.fillStyle = bodyGrad;
+      }
+      ctx.beginPath();
+      ctx.ellipse(-5, 0, 30, 20, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#6b7280';
+      ctx.beginPath();
+      ctx.ellipse(22, -6, 15, 12, 0.06, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#4b5563';
+      ctx.beginPath();
+      ctx.ellipse(17, -17 + earTwitch * 0.2, 4.5, 7, -0.35, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#9ca3af';
+      ctx.beginPath();
+      ctx.moveTo(30, -13);
+      ctx.quadraticCurveTo(45, -12, 46, -2);
+      ctx.quadraticCurveTo(46, 5, 39, 4);
+      ctx.quadraticCurveTo(34, 2, 31, -2);
+      ctx.closePath();
+      ctx.fill();
+
+      if (!isFlashing) {
+        ctx.fillStyle = '#374151';
+        ctx.beginPath();
+        ctx.ellipse(45, -2, 2.4, 3.2, 0.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#374151';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(40, 4);
+        ctx.lineTo(45, 3);
+        ctx.stroke();
+      }
+
+      if (!isFlashing) ctx.fillStyle = 'rgba(209, 213, 219, 0.45)';
+      ctx.beginPath();
+      ctx.ellipse(-6, 10, 18, 8, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) {
+        ctx.fillStyle = '#111827';
+        ctx.beginPath();
+        ctx.arc(25, -10, 2.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#f9fafb';
+        ctx.beginPath();
+        ctx.arc(25.7, -10.7, 0.8, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      if (!isFlashing) {
+        ctx.fillStyle = '#1f2937';
+        ctx.beginPath();
+        ctx.ellipse(-23, 27 + stride * 2, 4.5, 3, 0, 0, Math.PI * 2);
+        ctx.ellipse(-7, 28 - stride * 2, 4.5, 3, 0, 0, Math.PI * 2);
+        ctx.ellipse(11, 28 + stride * 2, 4.5, 3, 0, 0, Math.PI * 2);
+        ctx.ellipse(24, 27 - stride * 2, 4.5, 3, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.restore();
+    } else if (this.type === 'elite_goliath_spider') {
+      // Goliath birdeater: eight jointed legs, huge abdomen and a cluster of eyes.
+      ctx.save();
+      const legPhase = this.animTimer * 3.4;
+
+      ctx.strokeStyle = isFlashing ? '#ffffff' : '#57534e';
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      for (let i = 0; i < 4; i++) {
+        const baseY = -7 + i * 5;
+        const reach = 18 + i * 4;
+        const wave = Math.sin(legPhase + i * 1.25) * 3;
+        ctx.beginPath();
+        ctx.moveTo(-8, baseY);
+        ctx.lineTo(-reach, baseY - 13 + wave);
+        ctx.lineTo(-reach - 9, baseY + 4 + wave);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(8, baseY);
+        ctx.lineTo(reach, baseY - 13 - wave);
+        ctx.lineTo(reach + 9, baseY + 4 - wave);
+        ctx.stroke();
+      }
+      ctx.lineCap = 'butt';
+
+      if (!isFlashing) {
+        const abdomenGrad = ctx.createRadialGradient(-18, -4, 3, -14, 2, 24);
+        abdomenGrad.addColorStop(0, '#92400e');
+        abdomenGrad.addColorStop(0.6, '#78350f');
+        abdomenGrad.addColorStop(1, '#451a03');
+        ctx.fillStyle = abdomenGrad;
+      }
+      ctx.beginPath();
+      ctx.ellipse(-15, 3, 21, 18, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#57534e';
+      ctx.beginPath();
+      ctx.ellipse(12, -1, 14, 12, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) {
+        ctx.fillStyle = '#292524';
+        ctx.beginPath();
+        ctx.ellipse(22, 6, 4.5, 5.5, 0.3, 0, Math.PI * 2);
+        ctx.ellipse(27, 4, 3.5, 4.5, 0.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#fca5a5';
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(23, 10);
+        ctx.lineTo(24, 14);
+        ctx.moveTo(27, 8);
+        ctx.lineTo(29, 12);
+        ctx.stroke();
+      }
+
+      if (!isFlashing) {
+        ctx.fillStyle = '#fbbf24';
+        ctx.beginPath();
+        ctx.arc(15, -6, 1.9, 0, Math.PI * 2);
+        ctx.arc(19, -7, 1.7, 0, Math.PI * 2);
+        ctx.arc(15, 0, 1.6, 0, Math.PI * 2);
+        ctx.arc(20, 1, 1.5, 0, Math.PI * 2);
+        ctx.arc(11, -8, 1.2, 0, Math.PI * 2);
+        ctx.arc(23, -3, 1.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath();
+        ctx.arc(16, -6, 0.8, 0, Math.PI * 2);
+        ctx.arc(20, -7, 0.7, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      if (!isFlashing) {
+        ctx.strokeStyle = '#b45309';
+        ctx.lineWidth = 1.2;
+        for (let i = 0; i < 10; i++) {
+          const angle = (i / 10) * Math.PI * 2;
+          const hx = -15 + Math.cos(angle) * 21;
+          const hy = 3 + Math.sin(angle) * 18;
+          ctx.beginPath();
+          ctx.moveTo(hx, hy);
+          ctx.lineTo(hx + Math.cos(angle) * 4, hy + Math.sin(angle) * 4);
+          ctx.stroke();
+        }
+      }
+
+      ctx.restore();
     } else if (this.type === 'elite_minotaur') {
       if (!isFlashing) ctx.fillStyle = this.skillState === 'dashing' ? '#dc2626' : '#991b1b';
       ctx.beginPath();
