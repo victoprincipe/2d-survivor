@@ -268,16 +268,28 @@ export class Enemy {
         ctx.fill();
       }
 
+      // Walking gait: bob up/down, sway side to side and lean on each step.
+      // Pivot at the feet so the sprite appears to step rather than float.
+      const walkPhase = this.animTimer * 0.8;
+      const walkBob = Math.abs(Math.sin(walkPhase)) * 4;
+      const walkSway = Math.sin(walkPhase) * 2;
+      const walkTilt = Math.sin(walkPhase) * 0.035;
+      const groundY = this.radius * 0.9;
+
+      ctx.save();
+      ctx.translate(walkSway, groundY - walkBob);
+      ctx.rotate(walkTilt);
+      ctx.translate(0, -groundY);
+
       const sprite = this.spriteImage;
       if (sprite && sprite.complete && sprite.naturalWidth > 0) {
         const spriteHeight = 96;
         const spriteWidth = spriteHeight * (sprite.naturalWidth / sprite.naturalHeight);
-        const bob = Math.sin(this.animTimer * 0.8) * 2;
         if (isFlashing) ctx.filter = 'brightness(0) invert(1)';
         ctx.drawImage(
           sprite,
           -spriteWidth / 2,
-          this.radius * 0.9 - spriteHeight + bob,
+          groundY - spriteHeight,
           spriteWidth,
           spriteHeight
         );
@@ -304,6 +316,8 @@ export class Enemy {
         ctx.fillRect(-3, -16, 2, 3);
         ctx.fillRect(2, -16, 2, 3);
       }
+
+      ctx.restore();
     }
 
     ctx.restore();
