@@ -20,7 +20,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ engineRef }) => {
       const rect = canvas.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
-      engineRef.current.input.handlePointerDown(x, y);
+      engineRef.current.handlePointerDown(x, y);
     };
 
     const handlePointerMove = (e: PointerEvent) => {

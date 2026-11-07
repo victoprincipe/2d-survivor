@@ -157,6 +157,7 @@ export class GameEngine {
   public resume(): void {
     this.isPaused = false;
     this.input.clearJump();
+    this.input.clearInteract();
     this.lastTime = performance.now();
   }
 
@@ -166,6 +167,24 @@ export class GameEngine {
     } else {
       this.pause();
     }
+  }
+
+  /**
+   * Canvas pointer input. Tapping the floating fruit prompt harvests the tree;
+   * every other tap keeps driving the virtual joystick.
+   */
+  public handlePointerDown(screenX: number, screenY: number): void {
+    const fruit = this.worldProps.collectFruitTreeAtScreenPoint(
+      screenX,
+      screenY,
+      this.camera,
+      this.player
+    );
+    if (fruit) {
+      this.handleFruitCollected(fruit);
+      return;
+    }
+    this.input.handlePointerDown(screenX, screenY);
   }
 
   private loop(currentTime: number): void {
@@ -309,11 +328,12 @@ export class GameEngine {
     }
 
     // 5. Update World Props (Torches and fruit trees)
-    const touchedFruits = this.worldProps.update(dt, this.player, (drop) =>
-      this.drops.push(drop)
-    );
-    for (let i = 0; i < touchedFruits.length; i++) {
-      this.handleFruitCollected(touchedFruits[i]);
+    this.worldProps.update(dt, this.player, (drop) => this.drops.push(drop));
+
+    // 5.1. Fruit trees are harvested only when the player presses E nearby.
+    if (this.input.consumeInteract()) {
+      const fruit = this.worldProps.collectNearbyFruitTree(this.player);
+      if (fruit) this.handleFruitCollected(fruit);
     }
 
     // 6. Update Weapons System
@@ -327,9 +347,6 @@ export class GameEngine {
       this.sound,
       (enemy) => this.onEnemyKilled(enemy)
     );
-
-    // 6.1. Fruit trees can also be harvested by attacks.
-    this.harvestFruitTreesByAttacks();
 
     // 6.5. Periodic Supply Drop on Map (every 75s)
     this.itemSpawnTimer += dt;
@@ -523,45 +540,6 @@ export class GameEngine {
         this.player.heal(35);
       }
       this.callbacks.onTreasureChest(goldBonus, chosenUpgrade);
-    }
-  }
-
-  private harvestFruitTreesByAttacks(): void {
-    const harvest = (x: number, y: number, radius: number) => {
-      const fruits = this.worldProps.harvestFruitTreesAt(x, y, radius);
-      for (let i = 0; i < fruits.length; i++) {
-        this.handleFruitCollected(fruits[i]);
-      }
-    };
-
-    const ws = this.weaponSystem;
-    for (let i = 0; i < ws.projectiles.length; i++) {
-      const p = ws.projectiles[i];
-      harvest(p.x, p.y, p.radius + 4);
-    }
-    for (let i = 0; i < ws.groundZones.length; i++) {
-      const z = ws.groundZones[i];
-      harvest(z.x, z.y, z.radius);
-    }
-    for (let i = 0; i < ws.whipSlashes.length; i++) {
-      const slash = ws.whipSlashes[i];
-      harvest(slash.x, slash.y, Math.max(slash.width, slash.height) * 0.5);
-    }
-    for (let i = 0; i < ws.lightningStrikes.length; i++) {
-      const strike = ws.lightningStrikes[i];
-      harvest(strike.x, strike.y, strike.radius);
-    }
-    for (let i = 0; i < ws.ringPulses.length; i++) {
-      const pulse = ws.ringPulses[i];
-      harvest(pulse.x, pulse.y, pulse.radius);
-    }
-
-    // Auras are continuous attacks centered on the hero.
-    if (ws.weapons.has('garlic')) {
-      harvest(this.player.x, this.player.y, ws.garlicRadius);
-    }
-    if (ws.weapons.has('bible') && ws.bibleIsActive) {
-      harvest(this.player.x, this.player.y, ws.bibleRadius + 26);
     }
   }
 
@@ -817,7 +795,7 @@ export class GameEngine {
     // 1. Clear & Render Floor Tile Pattern
     this.worldProps.renderFloor(ctx, camera);
     this.worldProps.renderTrees(ctx, camera);
-    this.worldProps.renderFruitTrees(ctx, camera);
+    this.worldProps.renderFruitTrees(ctx, camera, this.player);
 
     // 2. Render Torches & Props
     this.worldProps.renderTorches(ctx, camera);

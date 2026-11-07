@@ -214,7 +214,7 @@ export const GameContainer: React.FC = () => {
     const onPointerDown = (e: PointerEvent) => {
       if (!engineRef.current) return;
       const rect = canvas.getBoundingClientRect();
-      engineRef.current.input.handlePointerDown(e.clientX - rect.left, e.clientY - rect.top);
+      engineRef.current.handlePointerDown(e.clientX - rect.left, e.clientY - rect.top);
     };
 
     const onPointerMove = (e: PointerEvent) => {

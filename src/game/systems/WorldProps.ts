@@ -11,10 +11,14 @@ const FOREST_SIZE = 14000;
 const FOREST_HALF_SIZE = FOREST_SIZE / 2;
 const COLLISION_STEP = 8;
 
-// Fruit trees behave like the night plain's collectible props: touching or
-// attacking one harvests its fruit and sends it to another spot on the map.
+// Fruit trees are harvested on purpose: the player must stand close and press
+// E (or tap the floating prompt on touch devices), then the tree respawns
+// somewhere else on the map.
 const FRUIT_TREE_RESPAWN = 45;
 const FRUIT_TREE_PICKUP_RADIUS = 34;
+const FRUIT_TREE_PROMPT_WIDTH = 96;
+const FRUIT_TREE_PROMPT_HEIGHT = 24;
+const FRUIT_TREE_PROMPT_PADDING = 10;
 
 // Amazon water. For the player the river and lakes are purely visual, but
 // aquatic enemies use the stricter isNavigableWater check below to stay wet.
@@ -211,6 +215,89 @@ export class WorldSystem {
     tree.active = false;
     tree.respawnTimer = FRUIT_TREE_RESPAWN;
     return fruit;
+  }
+
+  /** Returns the closest active fruit tree within the player's reach. */
+  public getInteractableFruitTree(player: Player): FruitTreeProp | null {
+    if (this.mapId !== 'amazon_forest') return null;
+
+    const reach = player.radius + FRUIT_TREE_PICKUP_RADIUS;
+    let closest: FruitTreeProp | null = null;
+    let closestDistance = reach * reach;
+
+    for (let i = 0; i < this.fruitTrees.length; i++) {
+      const tree = this.fruitTrees[i];
+      if (!tree.active) continue;
+
+      const dx = player.x - tree.x;
+      const dy = player.y - tree.y;
+      const distance = dx * dx + dy * dy;
+      if (distance <= closestDistance) {
+        closest = tree;
+        closestDistance = distance;
+      }
+    }
+
+    return closest;
+  }
+
+  /** Harvests the nearby tree the player is prompting, if any. */
+  public collectNearbyFruitTree(player: Player): CollectedFruit | null {
+    const tree = this.getInteractableFruitTree(player);
+    return tree ? this.collectFruitTree(tree) : null;
+  }
+
+  /**
+   * Handles a tap/click on the floating prompt. Returns the harvested fruit
+   * when the pointer lands on the prompt of a tree that is in reach.
+   */
+  public collectFruitTreeAtScreenPoint(
+    screenX: number,
+    screenY: number,
+    camera: Camera,
+    player: Player
+  ): CollectedFruit | null {
+    const tree = this.getInteractableFruitTree(player);
+    if (!tree) return null;
+
+    const screen = camera.worldToScreen(tree.x, tree.y);
+    const promptY = screen.y + this.getFruitPromptOffsetY(tree);
+
+    const halfWidth = FRUIT_TREE_PROMPT_WIDTH / 2 + FRUIT_TREE_PROMPT_PADDING;
+    const halfHeight = FRUIT_TREE_PROMPT_HEIGHT / 2 + FRUIT_TREE_PROMPT_PADDING;
+    if (
+      Math.abs(screenX - screen.x) > halfWidth ||
+      Math.abs(screenY - promptY) > halfHeight
+    ) {
+      return null;
+    }
+
+    return this.collectFruitTree(tree);
+  }
+
+  private getFruitPromptOffsetY(tree: FruitTreeProp): number {
+    // Place the prompt just above each tree's canopy.
+    let offset: number;
+    switch (tree.kind) {
+      case 'castanha':
+        offset = -158;
+        break;
+      case 'buriti':
+        offset = -142;
+        break;
+      case 'pupunha':
+        offset = -128;
+        break;
+      case 'cupuacu':
+        offset = -112;
+        break;
+      case 'acai':
+      case 'araca':
+      default:
+        offset = -104;
+        break;
+    }
+    return offset + Math.sin(tree.animTimer * 2.2) * 2;
   }
 
   private generateForest(): void {
@@ -647,13 +734,7 @@ export class WorldSystem {
     return false;
   }
 
-  update(
-    dt: number,
-    player: Player,
-    onBuffSpawn?: (drop: Drop) => void
-  ): CollectedFruit[] {
-    const collectedFruits: CollectedFruit[] = [];
-
+  update(dt: number, player: Player, onBuffSpawn?: (drop: Drop) => void): void {
     this.torchSpawnTimer += dt;
 
     // Spawn new torches periodically near player
@@ -706,40 +787,8 @@ export class WorldSystem {
           }
           continue;
         }
-
-        const dx = player.x - tree.x;
-        const dy = player.y - tree.y;
-        const reach = player.radius + FRUIT_TREE_PICKUP_RADIUS;
-        if (dx * dx + dy * dy <= reach * reach) {
-          collectedFruits.push(this.collectFruitTree(tree));
-        }
       }
     }
-
-    return collectedFruits;
-  }
-
-  /**
-   * Harvests any active fruit tree touched by an attack hitbox. GameEngine
-   * feeds projectile, slash and area effects through this so shooting a tree
-   * also collects its fruit, not just walking into it.
-   */
-  public harvestFruitTreesAt(x: number, y: number, radius: number): CollectedFruit[] {
-    if (this.mapId !== 'amazon_forest') return [];
-
-    const collected: CollectedFruit[] = [];
-    for (let i = 0; i < this.fruitTrees.length; i++) {
-      const tree = this.fruitTrees[i];
-      if (!tree.active) continue;
-
-      const dx = x - tree.x;
-      const dy = y - tree.y;
-      const reach = radius + FRUIT_TREE_PICKUP_RADIUS;
-      if (dx * dx + dy * dy <= reach * reach) {
-        collected.push(this.collectFruitTree(tree));
-      }
-    }
-    return collected;
   }
 
   renderFloor(ctx: CanvasRenderingContext2D, camera: Camera): void {
@@ -1113,8 +1162,10 @@ export class WorldSystem {
     }
   }
 
-  renderFruitTrees(ctx: CanvasRenderingContext2D, camera: Camera): void {
+  renderFruitTrees(ctx: CanvasRenderingContext2D, camera: Camera, player?: Player): void {
     if (this.mapId !== 'amazon_forest') return;
+
+    const promptTree = player ? this.getInteractableFruitTree(player) : null;
 
     for (let i = 0; i < this.fruitTrees.length; i++) {
       const tree = this.fruitTrees[i];
@@ -1414,7 +1465,44 @@ export class WorldSystem {
       }
 
       ctx.restore();
+
+      if (tree === promptTree) {
+        this.renderFruitPrompt(
+          ctx,
+          screen.x,
+          screen.y + this.getFruitPromptOffsetY(tree)
+        );
+      }
     }
+  }
+
+  private renderFruitPrompt(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number
+  ): void {
+    const halfWidth = FRUIT_TREE_PROMPT_WIDTH / 2;
+    const halfHeight = FRUIT_TREE_PROMPT_HEIGHT / 2;
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(8, 15, 10, 0.85)';
+    ctx.fillRect(x - halfWidth, y - halfHeight, FRUIT_TREE_PROMPT_WIDTH, FRUIT_TREE_PROMPT_HEIGHT);
+
+    ctx.strokeStyle = 'rgba(250, 204, 21, 0.85)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(
+      x - halfWidth + 0.5,
+      y - halfHeight + 0.5,
+      FRUIT_TREE_PROMPT_WIDTH - 1,
+      FRUIT_TREE_PROMPT_HEIGHT - 1
+    );
+
+    ctx.font = 'bold 12px system-ui, -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#fef9c3';
+    ctx.fillText('[E] Coletar', x, y + 0.5);
+    ctx.restore();
   }
 
   renderTorches(ctx: CanvasRenderingContext2D, camera: Camera): void {
