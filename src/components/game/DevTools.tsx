@@ -6,6 +6,7 @@ import {
   PassiveId,
   SavedGameData,
   DevTelemetrySnapshot,
+  EnemyType,
 } from '@/game/types';
 import { GameEngine } from '@/game/engine/GameEngine';
 import { WEAPON_REGISTRY, PASSIVE_REGISTRY } from '@/game/data/upgrades';
@@ -32,6 +33,29 @@ import {
   Sparkles,
   Crosshair,
 } from 'lucide-react';
+
+const AMAZON_DEV_MONSTERS: { type: EnemyType; label: string }[] = [
+  { type: 'bullet_ant', label: '🐜 Formiga-bala' },
+  { type: 'leafcutter_ant', label: '🐜 Formiga-cortadeira' },
+  { type: 'blue_butterfly', label: '🦋 Borboleta-azul' },
+  { type: 'cicada', label: '🦗 Cigarra' },
+  { type: 'poison_dart_frog', label: '🐸 Rã-dardo-venenosa' },
+  { type: 'praying_mantis', label: '🦗 Louva-a-deus' },
+  { type: 'stick_bug', label: '🥢 Bicho-pau' },
+  { type: 'toucan', label: '🦜 Tucano' },
+  { type: 'capybara', label: '🦫 Capivara' },
+  { type: 'sloth', label: '🦥 Bicho-preguiça' },
+  { type: 'rhino_beetle', label: '🪲 Besouro-rinoceronte' },
+  { type: 'sawyer_beetle', label: '🪲 Besouro-serra-pau' },
+  { type: 'giant_centipede', label: '🐛 Lacraia-gigante' },
+  { type: 'elite_jaguar', label: '🐆 Onça-pintada' },
+  { type: 'elite_tapir', label: '🐗 Anta' },
+  { type: 'elite_goliath_spider', label: '🕷️ Aranha-golias' },
+  { type: 'piranha', label: '🐟 Piranha' },
+  { type: 'pink_river_dolphin', label: '🐬 Boto-cor-de-rosa' },
+  { type: 'giant_otter', label: '🦦 Ariranha' },
+  { type: 'elite_black_caiman', label: '🐊 Jacaré-açu' },
+];
 
 interface DevToolsProps {
   getEngine: () => GameEngine | null;
@@ -1154,6 +1178,33 @@ export const DevTools: React.FC<DevToolsProps> = ({
                         >
                           ⚔️ Minotauro Elite
                         </button>
+                      </div>
+
+                      {/* Spawn Amazon Forest Monsters Grid */}
+                      <div>
+                        <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider block mb-2">
+                          Animais da Floresta Amazônica
+                        </span>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                          {AMAZON_DEV_MONSTERS.map(({ type, label }) => (
+                            <button
+                              key={type}
+                              type="button"
+                              onClick={() => {
+                                const engine = getEngine();
+                                if (!engine) return;
+                                const count = type.startsWith('elite_')
+                                  ? Math.min(5, spawnMultiplier)
+                                  : spawnMultiplier;
+                                engine.devSpawnEnemy(type, count);
+                                setTelemetry(engine.getDevTelemetry());
+                              }}
+                              className="p-2 rounded-lg bg-emerald-950/40 hover:bg-emerald-900/60 border border-emerald-800/80 text-emerald-300 font-semibold text-[11px] transition cursor-pointer text-left"
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     </div>
 
