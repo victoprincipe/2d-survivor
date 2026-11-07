@@ -23,7 +23,7 @@ import { Drop } from '../entities/Drops';
 import { VFXManager } from '../entities/VFX';
 import { WeaponSystem } from '../weapons/WeaponSystem';
 import { WaveDirector } from '../systems/WaveDirector';
-import { WorldSystem } from '../systems/WorldProps';
+import { CollectedFruit, WorldSystem } from '../systems/WorldProps';
 import { WEAPON_REGISTRY, PASSIVE_REGISTRY } from '../data/upgrades';
 import { saveGameData, loadSavedData } from '../data/persistence';
 import { getDifficulty } from '../data/difficulties';
@@ -308,8 +308,13 @@ export class GameEngine {
       this.spatialGrid.insert(spawnedMinions[m]);
     }
 
-    // 5. Update World Props (Torches)
-    this.worldProps.update(dt, this.player, (drop) => this.drops.push(drop));
+    // 5. Update World Props (Torches and fruit trees)
+    const touchedFruits = this.worldProps.update(dt, this.player, (drop) =>
+      this.drops.push(drop)
+    );
+    for (let i = 0; i < touchedFruits.length; i++) {
+      this.handleFruitCollected(touchedFruits[i]);
+    }
 
     // 6. Update Weapons System
     this.weaponSystem.update(
@@ -322,6 +327,9 @@ export class GameEngine {
       this.sound,
       (enemy) => this.onEnemyKilled(enemy)
     );
+
+    // 6.1. Fruit trees can also be harvested by attacks.
+    this.harvestFruitTreesByAttacks();
 
     // 6.5. Periodic Supply Drop on Map (every 75s)
     this.itemSpawnTimer += dt;
@@ -518,6 +526,88 @@ export class GameEngine {
     }
   }
 
+  private harvestFruitTreesByAttacks(): void {
+    const harvest = (x: number, y: number, radius: number) => {
+      const fruits = this.worldProps.harvestFruitTreesAt(x, y, radius);
+      for (let i = 0; i < fruits.length; i++) {
+        this.handleFruitCollected(fruits[i]);
+      }
+    };
+
+    const ws = this.weaponSystem;
+    for (let i = 0; i < ws.projectiles.length; i++) {
+      const p = ws.projectiles[i];
+      harvest(p.x, p.y, p.radius + 4);
+    }
+    for (let i = 0; i < ws.groundZones.length; i++) {
+      const z = ws.groundZones[i];
+      harvest(z.x, z.y, z.radius);
+    }
+    for (let i = 0; i < ws.whipSlashes.length; i++) {
+      const slash = ws.whipSlashes[i];
+      harvest(slash.x, slash.y, Math.max(slash.width, slash.height) * 0.5);
+    }
+    for (let i = 0; i < ws.lightningStrikes.length; i++) {
+      const strike = ws.lightningStrikes[i];
+      harvest(strike.x, strike.y, strike.radius);
+    }
+    for (let i = 0; i < ws.ringPulses.length; i++) {
+      const pulse = ws.ringPulses[i];
+      harvest(pulse.x, pulse.y, pulse.radius);
+    }
+
+    // Auras are continuous attacks centered on the hero.
+    if (ws.weapons.has('garlic')) {
+      harvest(this.player.x, this.player.y, ws.garlicRadius);
+    }
+    if (ws.weapons.has('bible') && ws.bibleIsActive) {
+      harvest(this.player.x, this.player.y, ws.bibleRadius + 26);
+    }
+  }
+
+  private handleFruitCollected(fruit: CollectedFruit): void {
+    if (fruit.kind === 'acai') {
+      // Açaí: magnet every XP gem on the map toward the hero.
+      this.sound.playLevelUp();
+      this.vfx.triggerFlash('#38bdf8', 0.35);
+      this.vfx.addSparks(fruit.x, fruit.y, '#c084fc', 12);
+      for (let i = 0; i < this.drops.length; i++) {
+        const drop = this.drops[i];
+        if (
+          drop.type === 'gem_blue' ||
+          drop.type === 'gem_green' ||
+          drop.type === 'gem_red'
+        ) {
+          drop.isBeingMagnetPulled = true;
+        }
+      }
+    } else if (fruit.kind === 'cupuacu') {
+      // Cupuaçu: restore 35% of the player's maximum HP.
+      const healed = Math.max(1, Math.round(this.player.maxHp * 0.35));
+      this.player.heal(healed);
+      this.sound.playGemPickup(8);
+      this.vfx.addSparks(fruit.x, fruit.y, '#84cc16', 12);
+      this.vfx.addDamageNumber(this.player.x, this.player.y, healed, false, true);
+    } else {
+      // Castanha-do-Pará: drop an extra gold package.
+      this.sound.playGemPickup(4);
+      this.vfx.addSparks(fruit.x, fruit.y, '#fbbf24', 12);
+      const coins = 3;
+      for (let i = 0; i < coins; i++) {
+        const angle = (i / coins) * Math.PI * 2;
+        this.drops.push(
+          new Drop(
+            Date.now() + i + Math.random(),
+            'coin',
+            fruit.x + Math.cos(angle) * 18,
+            fruit.y + Math.sin(angle) * 18,
+            50
+          )
+        );
+      }
+    }
+  }
+
   public applyUpgrade(option: UpgradeOption): void {
     if (option.type === 'evolution') {
       if (option.baseId) {
@@ -690,6 +780,7 @@ export class GameEngine {
     // 1. Clear & Render Floor Tile Pattern
     this.worldProps.renderFloor(ctx, camera);
     this.worldProps.renderTrees(ctx, camera);
+    this.worldProps.renderFruitTrees(ctx, camera);
 
     // 2. Render Torches & Props
     this.worldProps.renderTorches(ctx, camera);

@@ -11,6 +11,11 @@ const FOREST_SIZE = 14000;
 const FOREST_HALF_SIZE = FOREST_SIZE / 2;
 const COLLISION_STEP = 8;
 
+// Fruit trees behave like the night plain's collectible props: touching or
+// attacking one harvests its fruit and sends it to another spot on the map.
+const FRUIT_TREE_RESPAWN = 45;
+const FRUIT_TREE_PICKUP_RADIUS = 34;
+
 // Amazon water. For the player the river and lakes are purely visual, but
 // aquatic enemies use the stricter isNavigableWater check below to stay wet.
 const RIVER_WIDTH = 980;
@@ -24,6 +29,24 @@ export interface TorchProp {
   radius: number;
   animTimer: number;
   buff: DropType;
+}
+
+export type FruitTreeKind = 'acai' | 'cupuacu' | 'castanha';
+
+export interface FruitTreeProp {
+  id: number;
+  kind: FruitTreeKind;
+  x: number;
+  y: number;
+  active: boolean;
+  respawnTimer: number;
+  animTimer: number;
+}
+
+export interface CollectedFruit {
+  kind: FruitTreeKind;
+  x: number;
+  y: number;
 }
 
 interface TreeProp {
@@ -91,6 +114,8 @@ export class WorldSystem {
 
   private mapId: MapId;
   private worldHalfSize: number = WORLD_HALF_SIZE;
+  public fruitTrees: FruitTreeProp[] = [];
+  private nextFruitTreeId: number = 1;
   private trees: TreeProp[] = [];
   private floorPatches: FloorPatch[] = [];
   private lakes: LakeProp[] = [];
@@ -107,8 +132,76 @@ export class WorldSystem {
     if (mapId === 'amazon_forest') {
       this.worldHalfSize = FOREST_HALF_SIZE;
       this.generateForest();
+      this.spawnInitialFruitTrees();
     }
     this.loadFloorTexture();
+  }
+
+  private spawnInitialFruitTrees(): void {
+    // The first three trees are hand-placed near the spawn area, one of each
+    // fruit, so every Amazon run starts with all three effects available.
+    const initial: { kind: FruitTreeKind; x: number; y: number }[] = [
+      { kind: 'acai', x: 420, y: -760 },
+      { kind: 'cupuacu', x: -440, y: 820 },
+      { kind: 'castanha', x: 820, y: -720 },
+    ];
+
+    for (let i = 0; i < initial.length; i++) {
+      const tree = initial[i];
+      this.fruitTrees.push({
+        id: this.nextFruitTreeId++,
+        kind: tree.kind,
+        x: tree.x,
+        y: tree.y,
+        active: true,
+        respawnTimer: 0,
+        animTimer: Math.random() * Math.PI * 2,
+      });
+    }
+  }
+
+  private findFruitTreeSpawn(player: Player): { x: number; y: number } {
+    const limit = FOREST_HALF_SIZE - 420;
+
+    for (let attempt = 0; attempt < 40; attempt++) {
+      const angle = Math.random() * Math.PI * 2;
+      const distance = 520 + Math.random() * 1000;
+      const x = player.x + Math.cos(angle) * distance;
+      const y = player.y + Math.sin(angle) * distance;
+
+      if (Math.abs(x) > limit || Math.abs(y) > limit) continue;
+      if (this.isInWater(x, y)) continue;
+      if (this.collidesWithTree(x, y, 70)) continue;
+
+      let overlapsFruitTree = false;
+      for (let i = 0; i < this.fruitTrees.length; i++) {
+        const other = this.fruitTrees[i];
+        if (!other.active) continue;
+        const dx = x - other.x;
+        const dy = y - other.y;
+        if (dx * dx + dy * dy < 220 * 220) {
+          overlapsFruitTree = true;
+          break;
+        }
+      }
+      if (overlapsFruitTree) continue;
+
+      return { x, y };
+    }
+
+    // Fallback: a short offset from the player, still clamped to the map.
+    const fallbackAngle = Math.random() * Math.PI * 2;
+    return {
+      x: Math.max(-limit, Math.min(limit, player.x + Math.cos(fallbackAngle) * 700)),
+      y: Math.max(-limit, Math.min(limit, player.y + Math.sin(fallbackAngle) * 700)),
+    };
+  }
+
+  private collectFruitTree(tree: FruitTreeProp): CollectedFruit {
+    const fruit = { kind: tree.kind, x: tree.x, y: tree.y };
+    tree.active = false;
+    tree.respawnTimer = FRUIT_TREE_RESPAWN;
+    return fruit;
   }
 
   private generateForest(): void {
@@ -466,6 +559,19 @@ export class WorldSystem {
       const dotSize = tree.size > 120 ? 2 : 1.5;
       ctx.fillRect(toX(tree.x) - dotSize / 2, toY(tree.y) - dotSize / 2, dotSize, dotSize);
     }
+
+    // Active fruit trees are highlighted as small yellow blips.
+    ctx.fillStyle = '#facc15';
+    for (let i = 0; i < this.fruitTrees.length; i++) {
+      const tree = this.fruitTrees[i];
+      if (!tree.active) continue;
+      if (Math.abs(tree.x - centerX) > viewRadius) continue;
+      if (Math.abs(tree.y - centerY) > viewRadius) continue;
+
+      ctx.beginPath();
+      ctx.arc(toX(tree.x), toY(tree.y), 2.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   private loadFloorTexture(): void {
@@ -532,7 +638,13 @@ export class WorldSystem {
     return false;
   }
 
-  update(dt: number, player: Player, onBuffSpawn?: (drop: Drop) => void): void {
+  update(
+    dt: number,
+    player: Player,
+    onBuffSpawn?: (drop: Drop) => void
+  ): CollectedFruit[] {
+    const collectedFruits: CollectedFruit[] = [];
+
     this.torchSpawnTimer += dt;
 
     // Spawn new torches periodically near player
@@ -568,6 +680,57 @@ export class WorldSystem {
         this.torches.splice(i, 1);
       }
     }
+
+    if (this.mapId === 'amazon_forest') {
+      for (let i = 0; i < this.fruitTrees.length; i++) {
+        const tree = this.fruitTrees[i];
+        tree.animTimer += dt * 1.6;
+
+        if (!tree.active) {
+          tree.respawnTimer -= dt;
+          if (tree.respawnTimer <= 0) {
+            const spawn = this.findFruitTreeSpawn(player);
+            tree.x = spawn.x;
+            tree.y = spawn.y;
+            tree.active = true;
+            tree.respawnTimer = 0;
+          }
+          continue;
+        }
+
+        const dx = player.x - tree.x;
+        const dy = player.y - tree.y;
+        const reach = player.radius + FRUIT_TREE_PICKUP_RADIUS;
+        if (dx * dx + dy * dy <= reach * reach) {
+          collectedFruits.push(this.collectFruitTree(tree));
+        }
+      }
+    }
+
+    return collectedFruits;
+  }
+
+  /**
+   * Harvests any active fruit tree touched by an attack hitbox. GameEngine
+   * feeds projectile, slash and area effects through this so shooting a tree
+   * also collects its fruit, not just walking into it.
+   */
+  public harvestFruitTreesAt(x: number, y: number, radius: number): CollectedFruit[] {
+    if (this.mapId !== 'amazon_forest') return [];
+
+    const collected: CollectedFruit[] = [];
+    for (let i = 0; i < this.fruitTrees.length; i++) {
+      const tree = this.fruitTrees[i];
+      if (!tree.active) continue;
+
+      const dx = x - tree.x;
+      const dy = y - tree.y;
+      const reach = radius + FRUIT_TREE_PICKUP_RADIUS;
+      if (dx * dx + dy * dy <= reach * reach) {
+        collected.push(this.collectFruitTree(tree));
+      }
+    }
+    return collected;
   }
 
   renderFloor(ctx: CanvasRenderingContext2D, camera: Camera): void {
@@ -936,6 +1099,163 @@ export class WorldSystem {
       ctx.arc(-size * 0.22, -size * 0.72, size * 0.34, 0, Math.PI * 2);
       ctx.arc(size * 0.24, -size * 0.7, size * 0.32, 0, Math.PI * 2);
       ctx.fill();
+
+      ctx.restore();
+    }
+  }
+
+  renderFruitTrees(ctx: CanvasRenderingContext2D, camera: Camera): void {
+    if (this.mapId !== 'amazon_forest') return;
+
+    for (let i = 0; i < this.fruitTrees.length; i++) {
+      const tree = this.fruitTrees[i];
+      if (!tree.active) continue;
+      if (!camera.isInView(tree.x, tree.y, 140)) continue;
+
+      const screen = camera.worldToScreen(tree.x, tree.y);
+      const sway = Math.sin(tree.animTimer) * 2;
+
+      ctx.save();
+      ctx.translate(screen.x, screen.y);
+
+      // Shared shadow and a soft golden glow that marks a harvestable tree.
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
+      ctx.beginPath();
+      ctx.ellipse(0, 8, 34, 12, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = 'rgba(250, 204, 21, 0.16)';
+      ctx.beginPath();
+      ctx.ellipse(0, 6, 46, 16, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (tree.kind === 'acai') {
+        // Açaizeiro: slender leaning palm with purple berry bunches.
+        const topX = 6 + sway;
+        const topY = -68;
+
+        ctx.strokeStyle = '#5b3a1e';
+        ctx.lineWidth = 7;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.quadraticCurveTo(2, -34, topX, topY);
+        ctx.stroke();
+
+        for (let f = 0; f < 8; f++) {
+          const angle = -Math.PI + (f / 7) * Math.PI;
+          const length = 30 + (f % 2) * 8;
+          ctx.strokeStyle = f % 2 === 0 ? '#166534' : '#15803d';
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.moveTo(topX, topY);
+          ctx.quadraticCurveTo(
+            topX + Math.cos(angle) * length * 0.55,
+            topY + Math.sin(angle) * length * 0.55 - 6,
+            topX + Math.cos(angle) * length,
+            topY + Math.sin(angle) * length * 0.65
+          );
+          ctx.stroke();
+        }
+
+        ctx.fillStyle = '#6b21a8';
+        for (let b = 0; b < 12; b++) {
+          const angle = (b / 12) * Math.PI * 2;
+          const radius = 7 + (b % 3) * 3;
+          ctx.beginPath();
+          ctx.arc(
+            topX + Math.cos(angle) * radius,
+            topY + 6 + Math.sin(angle) * radius * 0.7,
+            3.2,
+            0,
+            Math.PI * 2
+          );
+          ctx.fill();
+        }
+
+        ctx.fillStyle = '#c084fc';
+        ctx.beginPath();
+        ctx.arc(topX - 5, topY + 3, 1.6, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (tree.kind === 'cupuacu') {
+        // Cupuaçuzeiro: short thick trunk, broad canopy and big brown fruit.
+        ctx.fillStyle = '#5b3a1e';
+        ctx.fillRect(-6, -42, 12, 46);
+
+        ctx.fillStyle = '#166534';
+        ctx.beginPath();
+        ctx.arc(-18 + sway, -54, 24, 0, Math.PI * 2);
+        ctx.arc(18 + sway, -56, 26, 0, Math.PI * 2);
+        ctx.arc(0 + sway, -72, 28, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#15803d';
+        ctx.beginPath();
+        ctx.arc(-4 + sway, -66, 18, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Stems holding the two large fruits.
+        ctx.strokeStyle = '#4a2f1b';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-20 + sway, -56);
+        ctx.lineTo(-20, -46);
+        ctx.moveTo(18 + sway, -54);
+        ctx.lineTo(18, -44);
+        ctx.stroke();
+
+        ctx.fillStyle = '#7c4a21';
+        ctx.beginPath();
+        ctx.ellipse(-20, -38, 12, 16, 0.2, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#9a5f2d';
+        ctx.beginPath();
+        ctx.ellipse(18, -34, 11, 15, -0.2, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(253, 230, 138, 0.35)';
+        ctx.beginPath();
+        ctx.ellipse(-23, -43, 4, 6, 0.2, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        // Castanheira-do-Brasil: tall trunk, high canopy and spiky seed pods.
+        ctx.fillStyle = '#5b3a1e';
+        ctx.fillRect(-7, -92, 14, 96);
+
+        ctx.fillStyle = '#14532d';
+        ctx.beginPath();
+        ctx.arc(-24 + sway, -96, 26, 0, Math.PI * 2);
+        ctx.arc(24 + sway, -96, 26, 0, Math.PI * 2);
+        ctx.arc(0 + sway, -112, 34, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#15803d';
+        ctx.beginPath();
+        ctx.arc(0 + sway, -104, 22, 0, Math.PI * 2);
+        ctx.fill();
+
+        const pods: { x: number; y: number }[] = [
+          { x: -18 + sway, y: -80 },
+          { x: 18 + sway, y: -78 },
+          { x: sway, y: -90 },
+        ];
+        for (let p = 0; p < pods.length; p++) {
+          const pod = pods[p];
+          ctx.fillStyle = '#6b4423';
+          ctx.beginPath();
+          for (let s = 0; s < 8; s++) {
+            const angle = (s / 8) * Math.PI * 2;
+            const radius = s % 2 === 0 ? 10 : 5;
+            const px = pod.x + Math.cos(angle) * radius;
+            const py = pod.y + Math.sin(angle) * radius;
+            if (s === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+          }
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
 
       ctx.restore();
     }
