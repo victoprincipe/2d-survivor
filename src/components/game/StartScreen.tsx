@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import Image from 'next/image';
 import { CharacterConfig, DifficultyId, SavedGameData } from '@/game/types';
 import { CHARACTERS } from '@/game/data/characters';
@@ -57,10 +57,21 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
   const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyId>(
     savedData.difficulty ?? 'normal'
   );
+  const selectionAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const selectedChar = CHARACTERS[selectedCharIndex];
   const difficultyMeta = getDifficulty(selectedDifficulty);
   const claimableMissions = countClaimableMissions(savedData);
+
+  const handleSelectCharacter = (index: number) => {
+    setSelectedCharIndex(index);
+    if (CHARACTERS[index].id === 'kayrurururu') {
+      selectionAudioRef.current?.pause();
+      const audio = new Audio('/audio/job-52-audio-1.mp3');
+      selectionAudioRef.current = audio;
+      audio.play().catch(() => {});
+    }
+  };
 
   const handleSelectDifficulty = (difficulty: DifficultyId) => {
     setSelectedDifficulty(difficulty);
@@ -221,7 +232,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
                 return (
                   <button
                     key={char.id}
-                    onClick={() => setSelectedCharIndex(index)}
+                    onClick={() => handleSelectCharacter(index)}
                     className={`char-card ${isSelected ? 'char-card-active' : ''}`}
                   >
                     <div>
@@ -270,7 +281,10 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
 
             {/* Play Button */}
             <button
-              onClick={() => onStartGame(selectedChar, savedData, selectedDifficulty)}
+              onClick={() => {
+                selectionAudioRef.current?.pause();
+                onStartGame(selectedChar, savedData, selectedDifficulty);
+              }}
               className="cta-btn"
             >
               <Play className="h-5 w-5 fill-white" />
