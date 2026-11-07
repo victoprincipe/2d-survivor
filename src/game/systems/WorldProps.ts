@@ -6,8 +6,8 @@ import { DropType, MapId } from '../types';
 // The night plain is effectively open, so this is only a large safety limit
 // that prevents the player from wandering out of the coordinate space.
 const WORLD_HALF_SIZE = 100000;
-// The Amazon Forest is a finite 10500x10500 map centered on the origin.
-const FOREST_SIZE = 10500;
+// The Amazon Forest is a finite 21000x21000 map centered on the origin.
+const FOREST_SIZE = 21000;
 const FOREST_HALF_SIZE = FOREST_SIZE / 2;
 const COLLISION_STEP = 8;
 
@@ -223,7 +223,7 @@ export class WorldSystem {
       ctx.fillStyle = '#08120b';
       ctx.fillRect(0, 0, camera.viewportWidth, camera.viewportHeight);
 
-      // Dark green grass base restricted to the 10500x10500 playable square.
+      // Dark green grass base restricted to the 21000x21000 playable square.
       const origin = camera.worldToScreen(-FOREST_HALF_SIZE, -FOREST_HALF_SIZE);
       ctx.fillStyle = '#14351d';
       ctx.fillRect(origin.x, origin.y, FOREST_SIZE, FOREST_SIZE);
