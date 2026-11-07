@@ -1,5 +1,6 @@
 import { PermanentPowerUp, SavedGameData } from '../types';
 import { DEFAULT_DIFFICULTY, DIFFICULTIES } from './difficulties';
+import { createInitialMissionState, normalizeMissionState } from './missions';
 
 export const POWER_UP_DEFINITIONS: PermanentPowerUp[] = [
   {
@@ -63,6 +64,7 @@ const STORAGE_KEY = 'vampire_survivors_2d_save';
 export function getInitialSave(): SavedGameData {
   return {
     gold: 0,
+    accountXp: 0,
     powerUps: {},
     difficulty: DEFAULT_DIFFICULTY,
     highScore: {
@@ -71,6 +73,7 @@ export function getInitialSave(): SavedGameData {
       highestLevel: 0,
       wins: 0,
     },
+    missions: createInitialMissionState(),
   };
 }
 
@@ -80,17 +83,33 @@ export function loadSavedData(): SavedGameData {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return getInitialSave();
     const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return getInitialSave();
+    }
+
     const savedDifficulty = DIFFICULTIES.find((d) => d.id === parsed.difficulty)?.id;
+    const highScore =
+      parsed.highScore && typeof parsed.highScore === 'object' ? parsed.highScore : {};
+
     return {
-      gold: parsed.gold ?? 0,
-      powerUps: parsed.powerUps ?? {},
+      ...parsed,
+      gold: typeof parsed.gold === 'number' && Number.isFinite(parsed.gold) ? parsed.gold : 0,
+      accountXp:
+        typeof parsed.accountXp === 'number' && Number.isFinite(parsed.accountXp)
+          ? Math.max(0, parsed.accountXp)
+          : 0,
+      powerUps:
+        parsed.powerUps && typeof parsed.powerUps === 'object' && !Array.isArray(parsed.powerUps)
+          ? parsed.powerUps
+          : {},
       difficulty: savedDifficulty ?? DEFAULT_DIFFICULTY,
       highScore: {
-        timeSurvived: parsed.highScore?.timeSurvived ?? 0,
-        kills: parsed.highScore?.kills ?? 0,
-        highestLevel: parsed.highScore?.highestLevel ?? 0,
-        wins: parsed.highScore?.wins ?? 0,
+        timeSurvived: highScore.timeSurvived ?? 0,
+        kills: highScore.kills ?? 0,
+        highestLevel: highScore.highestLevel ?? 0,
+        wins: highScore.wins ?? 0,
       },
+      missions: normalizeMissionState(parsed.missions),
     };
   } catch {
     return getInitialSave();

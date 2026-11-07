@@ -23,6 +23,7 @@ import { WorldSystem } from '../systems/WorldProps';
 import { WEAPON_REGISTRY, PASSIVE_REGISTRY } from '../data/upgrades';
 import { saveGameData, loadSavedData } from '../data/persistence';
 import { getDifficulty } from '../data/difficulties';
+import { applyRunToMissions } from '../data/missions';
 
 export interface GameEngineCallbacks {
   onHUDUpdate: (hud: HUDState) => void;
@@ -53,6 +54,7 @@ export class GameEngine {
 
   public kills: number = 0;
   public goldCollected: number = 0;
+  public bossesDefeated: number = 0;
   public isPaused: boolean = false;
   public isGameOver: boolean = false;
   public hasWon: boolean = false;
@@ -63,6 +65,7 @@ export class GameEngine {
   private hudThrottleTimer: number = 0;
   private gemStreak: number = 0;
   private gemStreakTimer: number = 0;
+  private missionSnapshot = { kills: 0, survivalSeconds: 0, goldCollected: 0, bossesDefeated: 0 };
 
   private callbacks: GameEngineCallbacks;
 
@@ -260,6 +263,7 @@ export class GameEngine {
 
     if (enemy.isBoss) {
       // Crimson Vampire Boss defeated!
+      this.bossesDefeated += 1;
       const bossXp = Math.round(250 * this.difficulty.xpMultiplier);
       this.drops.push(new Drop(Date.now(), 'chest', enemy.x, enemy.y));
       this.drops.push(new Drop(Date.now() + 1, 'gem_red', enemy.x + 20, enemy.y, bossXp));
@@ -404,6 +408,7 @@ export class GameEngine {
       won,
       survivalTime: timeSurvived,
       kills: this.kills,
+      bossesDefeated: this.bossesDefeated,
       level: this.player.level,
       goldEarned: this.goldCollected,
       totalDamage: Math.round(totalDmg),
@@ -421,7 +426,25 @@ export class GameEngine {
     data.highScore.kills = Math.max(data.highScore.kills, this.kills);
     data.highScore.highestLevel = Math.max(data.highScore.highestLevel, this.player.level);
     if (won) data.highScore.wins += 1;
-    saveGameData(data);
+
+    const current = {
+      kills: this.kills,
+      survivalSeconds: Math.floor(this.waveDirector.survivalTime),
+      goldCollected: this.goldCollected,
+      bossesDefeated: this.bossesDefeated,
+    };
+    const missionData = applyRunToMissions(data, {
+      kills: Math.max(0, current.kills - this.missionSnapshot.kills),
+      survivalSeconds: Math.max(0, current.survivalSeconds - this.missionSnapshot.survivalSeconds),
+      goldCollected: Math.max(0, current.goldCollected - this.missionSnapshot.goldCollected),
+      bossesDefeated: Math.max(
+        0,
+        current.bossesDefeated - this.missionSnapshot.bossesDefeated
+      ),
+      wins: won ? 1 : 0,
+    });
+    this.missionSnapshot = current;
+    saveGameData(missionData);
   }
 
   private syncHUD(): void {
