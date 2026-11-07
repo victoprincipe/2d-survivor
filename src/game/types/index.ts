@@ -96,8 +96,49 @@ export interface DifficultyConfig {
   goldMultiplier: number;
 }
 
+export type MissionPeriod = 'daily' | 'weekly' | 'secret';
+export type MissionMetric =
+  | 'kills'
+  | 'survivalSeconds'
+  | 'goldCollected'
+  | 'bossesDefeated'
+  | 'wins';
+
+export interface MissionDefinition {
+  id: string;
+  period: MissionPeriod;
+  title: string;
+  description: string;
+  metric: MissionMetric;
+  target: number;
+  goldReward: number;
+  xpReward: number;
+  secret?: boolean;
+}
+
+export interface MissionProgressBucket {
+  periodKey: string;
+  progress: Record<string, number>;
+  claimed: string[];
+}
+
+export interface MissionSaveState {
+  daily: MissionProgressBucket;
+  weekly: MissionProgressBucket;
+  secret: MissionProgressBucket;
+}
+
+export interface MissionRunStats {
+  kills: number;
+  survivalSeconds: number;
+  goldCollected: number;
+  bossesDefeated: number;
+  wins: number;
+}
+
 export interface SavedGameData {
   gold: number;
+  accountXp: number;
   powerUps: Record<string, number>;
   difficulty: DifficultyId;
   highScore: {
@@ -106,6 +147,7 @@ export interface SavedGameData {
     highestLevel: number;
     wins: number;
   };
+  missions: MissionSaveState;
 }
 
 export type EnemyType = 'bat' | 'skeleton' | 'zombie' | 'ghost' | 'elite_minotaur' | 'boss_vampire';
@@ -153,6 +195,7 @@ export interface GameEndSummary {
   won: boolean;
   survivalTime: number;
   kills: number;
+  bossesDefeated: number;
   level: number;
   goldEarned: number;
   totalDamage: number;

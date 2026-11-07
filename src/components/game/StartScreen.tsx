@@ -6,7 +6,9 @@ import { CharacterConfig, DifficultyId, SavedGameData } from '@/game/types';
 import { CHARACTERS } from '@/game/data/characters';
 import { POWER_UP_DEFINITIONS, getPowerUpCost, saveGameData } from '@/game/data/persistence';
 import { DIFFICULTIES, getDifficulty } from '@/game/data/difficulties';
+import { countClaimableMissions, getAccountLevel } from '@/game/data/missions';
 import { WEAPON_REGISTRY } from '@/game/data/upgrades';
+import { MissionsTab } from './MissionsTab';
 import {
   Flame,
   Sword,
@@ -30,6 +32,7 @@ import {
   Bike,
   Utensils,
   Syringe,
+  Target,
 } from 'lucide-react';
 
 interface StartScreenProps {
@@ -70,13 +73,14 @@ const CHARACTER_ICONS: Record<string, React.ReactNode> = {
 
 export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame, onUpdateSave }) => {
   const [selectedCharIndex, setSelectedCharIndex] = useState(0);
-  const [activeTab, setActiveTab] = useState<'character' | 'shop'>('character');
+  const [activeTab, setActiveTab] = useState<'character' | 'shop' | 'missions'>('character');
   const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyId>(
     savedData.difficulty ?? 'normal'
   );
 
   const selectedChar = CHARACTERS[selectedCharIndex];
   const difficultyMeta = getDifficulty(selectedDifficulty);
+  const claimableMissions = countClaimableMissions(savedData);
 
   const handleSelectDifficulty = (difficulty: DifficultyId) => {
     setSelectedDifficulty(difficulty);
@@ -131,10 +135,20 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
         </div>
 
         {/* Top Currency & Records Bar */}
-        <div className="w-full flex justify-between items-center bg-slate-950/80 border border-slate-800 rounded-2xl px-4 py-2.5 mb-5 shadow-xl">
-          <div className="flex items-center gap-2 text-yellow-400 font-mono font-bold text-base">
-            <Coins className="w-5 h-5 text-yellow-500" />
-            <span>{savedData.gold} Ouro</span>
+        <div className="w-full flex flex-wrap justify-between items-center gap-2 bg-slate-950/80 border border-slate-800 rounded-2xl px-4 py-2.5 mb-5 shadow-xl">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 text-yellow-400 font-mono font-bold text-base">
+              <Coins className="w-5 h-5 text-yellow-500" />
+              <span>{savedData.gold} Ouro</span>
+            </div>
+            <div
+              className="flex items-center gap-1 text-purple-300 font-mono font-bold text-xs"
+              title="XP da conta"
+            >
+              <Sparkles className="w-4 h-4 text-purple-400" />
+              <span>Nv. {getAccountLevel(savedData.accountXp)}</span>
+              <span className="text-slate-500 text-[10px]">{savedData.accountXp} XP</span>
+            </div>
           </div>
 
           <div className="flex gap-4 text-xs font-mono text-slate-300">
@@ -207,6 +221,22 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
           >
             <ShoppingBag className="w-4 h-4 text-yellow-400" />
             Loja de Power-Ups
+          </button>
+          <button
+            onClick={() => setActiveTab('missions')}
+            className={`flex-1 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition cursor-pointer flex items-center justify-center gap-2 border ${
+              activeTab === 'missions'
+                ? 'bg-purple-950/80 border-purple-500 text-white shadow-lg'
+                : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+            }`}
+          >
+            <Target className="w-4 h-4 text-purple-400" />
+            Missões
+            {claimableMissions > 0 && (
+              <span className="min-w-4 h-4 px-1 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black flex items-center justify-center">
+                {claimableMissions}
+              </span>
+            )}
           </button>
         </div>
 
@@ -325,6 +355,11 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
               );
             })}
           </div>
+        )}
+
+        {/* TAB 3: Missions */}
+        {activeTab === 'missions' && (
+          <MissionsTab savedData={savedData} onUpdateSave={onUpdateSave} />
         )}
 
         {/* Instructions footer */}
