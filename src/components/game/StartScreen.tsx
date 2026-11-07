@@ -26,6 +26,7 @@ import {
   ShoppingBag,
   Info,
   Target,
+  Volume2,
 } from 'lucide-react';
 
 interface StartScreenProps {
@@ -56,12 +57,21 @@ const CHARACTER_SELECTION_MUSIC: Record<string, string> = {
   derson: '/audio/job-54-audio-1.mp3',
 };
 
+// Per-character music volume multiplier, applied on top of the selection volume slider.
+const CHARACTER_SELECTION_MUSIC_VOLUME: Record<string, number> = {
+  derson: 0.5,
+};
+
+const getSelectionMusicVolume = (characterId: string, masterVolume: number) =>
+  masterVolume * (CHARACTER_SELECTION_MUSIC_VOLUME[characterId] ?? 1);
+
 export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame, onUpdateSave }) => {
   const [selectedCharIndex, setSelectedCharIndex] = useState(0);
   const [activeTab, setActiveTab] = useState<'character' | 'shop' | 'missions'>('character');
   const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyId>(
     savedData.difficulty ?? 'normal'
   );
+  const [selectionVolume, setSelectionVolume] = useState(1);
   const selectionAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const selectedChar = CHARACTERS[selectedCharIndex];
@@ -74,11 +84,19 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
     if (musicUrl) {
       selectionAudioRef.current?.pause();
       const audio = new Audio(musicUrl);
+      audio.volume = getSelectionMusicVolume(CHARACTERS[index].id, selectionVolume);
       selectionAudioRef.current = audio;
       audio.play().catch(() => {});
     } else {
       selectionAudioRef.current?.pause();
       selectionAudioRef.current = null;
+    }
+  };
+
+  const handleSelectionVolumeChange = (vol: number) => {
+    setSelectionVolume(vol);
+    if (selectionAudioRef.current) {
+      selectionAudioRef.current.volume = getSelectionMusicVolume(selectedChar.id, vol);
     }
   };
 
@@ -234,6 +252,28 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
         {/* TAB 1: Character Select */}
         {activeTab === 'character' && (
           <div className="flex w-full flex-col gap-4">
+            <div className="flex w-full justify-end">
+              <label className="stone-panel flex items-center gap-2 px-3 py-1.5">
+                <Volume2 className="h-4 w-4 text-[#e69f22]" />
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[#9ca3af]">
+                  Volume
+                </span>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={selectionVolume}
+                  onChange={(e) => handleSelectionVolumeChange(parseFloat(e.target.value))}
+                  className="w-24 cursor-pointer accent-amber-500"
+                  aria-label="Volume da música de seleção"
+                />
+                <span className="w-8 text-right font-mono text-[11px] text-[#cbd5e1]">
+                  {Math.round(selectionVolume * 100)}%
+                </span>
+              </label>
+            </div>
+
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               {CHARACTERS.map((char, index) => {
                 const isSelected = selectedCharIndex === index;
