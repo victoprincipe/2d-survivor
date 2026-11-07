@@ -11,6 +11,13 @@ const AMAZON_BASIC_ENEMIES: EnemyType[] = [
   'cicada',
 ];
 
+const AMAZON_MEDIUM_ENEMIES: EnemyType[] = [
+  'poison_dart_frog',
+  'praying_mantis',
+  'stick_bug',
+  'toucan',
+];
+
 export class WaveDirector {
   public survivalTime: number = 0;
   public difficulty: DifficultyConfig;
@@ -209,8 +216,11 @@ export class WaveDirector {
     const roll = Math.random();
 
     if (this.isAmazonForest) {
-      // This map only has its own basic insects, all weak and quick.
-      type = AMAZON_BASIC_ENEMIES[Math.floor(Math.random() * AMAZON_BASIC_ENEMIES.length)];
+      // The forest starts with its fast basic fauna and gradually mixes in
+      // tougher medium threats as the run goes on.
+      const mediumChance = Math.min(0.55, Math.max(0, (minutes - 0.5) * 0.16));
+      const pool = Math.random() < mediumChance ? AMAZON_MEDIUM_ENEMIES : AMAZON_BASIC_ENEMIES;
+      type = pool[Math.floor(Math.random() * pool.length)];
     } else if (minutes < 1) {
       type = roll < 0.68 ? 'bat' : roll < 0.9 ? 'skeleton' : 'zombie';
     } else if (minutes < 2) {

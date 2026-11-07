@@ -130,6 +130,44 @@ export class Enemy {
         this.xpValue = 6;
         this.knockbackResistance = 1.1;
         break;
+      // Amazon Forest medium threats: tougher than the local insects, but
+      // still well below elite level.
+      case 'poison_dart_frog':
+        this.name = 'Rã-dardo-venenosa';
+        this.radius = 14;
+        this.maxHp = Math.round(44 * hpMultiplier);
+        this.speed = 120;
+        this.damage = 13;
+        this.xpValue = 14;
+        this.knockbackResistance = 0.8;
+        break;
+      case 'praying_mantis':
+        this.name = 'Louva-a-deus';
+        this.radius = 15;
+        this.maxHp = Math.round(38 * hpMultiplier);
+        this.speed = 148;
+        this.damage = 16;
+        this.xpValue = 15;
+        this.knockbackResistance = 0.9;
+        break;
+      case 'stick_bug':
+        this.name = 'Bicho-pau';
+        this.radius = 17;
+        this.maxHp = Math.round(72 * hpMultiplier);
+        this.speed = 70;
+        this.damage = 14;
+        this.xpValue = 18;
+        this.knockbackResistance = 0.4;
+        break;
+      case 'toucan':
+        this.name = 'Tucano';
+        this.radius = 13;
+        this.maxHp = Math.round(34 * hpMultiplier);
+        this.speed = 170;
+        this.damage = 12;
+        this.xpValue = 14;
+        this.knockbackResistance = 1.05;
+        break;
       case 'ghost':
         this.name = 'Espectro Noturno';
         this.radius = 16;
@@ -671,6 +709,198 @@ export class Enemy {
         ctx.lineTo(-12, -3 + wingLift);
         ctx.moveTo(3, 0);
         ctx.lineTo(12, -3 + wingLift);
+        ctx.stroke();
+      }
+    } else if (this.type === 'poison_dart_frog') {
+      // Warning colors: blue body, yellow dorsal stripe and black spots.
+      const hop = Math.abs(Math.sin(this.animTimer * 2.4)) * 2;
+      ctx.strokeStyle = isFlashing ? '#ffffff' : '#0891b2';
+      ctx.lineWidth = 2.4;
+      ctx.beginPath();
+      ctx.moveTo(-8, 4 + hop);
+      ctx.lineTo(-14, 9 + hop);
+      ctx.moveTo(8, 4 + hop);
+      ctx.lineTo(14, 9 + hop);
+      ctx.stroke();
+
+      if (!isFlashing) ctx.fillStyle = '#22d3ee';
+      ctx.beginPath();
+      ctx.ellipse(0, 1 + hop, 13, 9, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#facc15';
+      ctx.beginPath();
+      ctx.ellipse(0, -1 + hop, 9.5, 2.6, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#0f172a';
+      ctx.beginPath();
+      ctx.arc(-6, 4 + hop, 2.1, 0, Math.PI * 2);
+      ctx.arc(5, 5 + hop, 1.8, 0, Math.PI * 2);
+      ctx.arc(-1, -4 + hop, 1.4, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#fef08a';
+      ctx.beginPath();
+      ctx.arc(-5, -8 + hop, 3.4, 0, Math.PI * 2);
+      ctx.arc(5, -8 + hop, 3.4, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#111827';
+      ctx.beginPath();
+      ctx.arc(-5, -8 + hop, 1.6, 0, Math.PI * 2);
+      ctx.arc(5, -8 + hop, 1.6, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (this.type === 'praying_mantis') {
+      // Slender mantis with folded raptorial forelegs and a triangular head.
+      const stride = Math.sin(this.animTimer * 3.4);
+      ctx.strokeStyle = isFlashing ? '#ffffff' : '#3f6212';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.moveTo(-4, 6);
+      ctx.lineTo(-11, 13 + stride * 2);
+      ctx.moveTo(-2, 7);
+      ctx.lineTo(-6, 15 - stride * 2);
+      ctx.moveTo(4, 6);
+      ctx.lineTo(11, 13 - stride * 2);
+      ctx.moveTo(2, 7);
+      ctx.lineTo(6, 15 + stride * 2);
+      ctx.stroke();
+
+      if (!isFlashing) ctx.fillStyle = '#65a30d';
+      ctx.beginPath();
+      ctx.ellipse(-3, 4, 6.5, 12, 0.22, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#4d7c0f';
+      ctx.beginPath();
+      ctx.moveTo(1, -13);
+      ctx.lineTo(-6, -3);
+      ctx.lineTo(8, -3);
+      ctx.closePath();
+      ctx.fill();
+
+      // Folded front arms.
+      ctx.strokeStyle = isFlashing ? '#ffffff' : '#3f6212';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-3, -1);
+      ctx.lineTo(-11, -9);
+      ctx.moveTo(6, -1);
+      ctx.lineTo(13, -8);
+      ctx.stroke();
+
+      // Antennae.
+      ctx.strokeStyle = isFlashing ? '#ffffff' : '#365314';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(-1, -13);
+      ctx.lineTo(-6, -19);
+      ctx.moveTo(3, -13);
+      ctx.lineTo(8, -19);
+      ctx.stroke();
+
+      if (!isFlashing) ctx.fillStyle = '#ecfccb';
+      ctx.beginPath();
+      ctx.arc(-2, -7, 1.8, 0, Math.PI * 2);
+      ctx.arc(4, -7, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (this.type === 'stick_bug') {
+      // Long twig-like body with branch legs and a tiny head.
+      const sway = Math.sin(this.animTimer * 1.6) * 1.8;
+      ctx.strokeStyle = isFlashing ? '#ffffff' : '#422006';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-9, 5);
+      ctx.lineTo(-15, 11 + sway);
+      ctx.moveTo(-7, 5);
+      ctx.lineTo(-11, 13 - sway);
+      ctx.moveTo(6, 5);
+      ctx.lineTo(13, 11 - sway);
+      ctx.moveTo(8, 5);
+      ctx.lineTo(10, 13 + sway);
+      ctx.stroke();
+
+      ctx.strokeStyle = isFlashing ? '#ffffff' : '#78350f';
+      ctx.lineWidth = 4;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-15, 1 + sway);
+      ctx.lineTo(13, -2 + sway);
+      ctx.stroke();
+      ctx.lineCap = 'butt';
+
+      ctx.strokeStyle = isFlashing ? '#ffffff' : '#92400e';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(-6, 0 + sway);
+      ctx.lineTo(-13, -3 + sway);
+      ctx.moveTo(3, -1 + sway);
+      ctx.lineTo(10, -5 + sway);
+      ctx.stroke();
+
+      if (!isFlashing) ctx.fillStyle = '#451a03';
+      ctx.beginPath();
+      ctx.arc(15, -2 + sway, 3.2, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#fde68a';
+      ctx.fillRect(15, -3 + sway, 1.5, 1.5);
+    } else if (this.type === 'toucan') {
+      // Black bird with a huge orange beak and flapping wings.
+      const flap = Math.sin(this.animTimer * 2.6) * 4;
+      if (!isFlashing) ctx.fillStyle = '#1f2937';
+      ctx.beginPath();
+      ctx.ellipse(-10, -1, 6, 9 + flap * 0.4, -0.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(10, -1, 6, 9 - flap * 0.4, 0.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#111827';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 9, 11, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#fde047';
+      ctx.beginPath();
+      ctx.ellipse(4, 3, 5, 6.5, 0.1, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#f97316';
+      ctx.beginPath();
+      ctx.moveTo(6, -5);
+      ctx.lineTo(21, -1);
+      ctx.lineTo(7, 4);
+      ctx.closePath();
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#fbbf24';
+      ctx.beginPath();
+      ctx.moveTo(7, -1);
+      ctx.lineTo(18, -1);
+      ctx.lineTo(7, 2);
+      ctx.closePath();
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(2, -6, 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#0f172a';
+      ctx.beginPath();
+      ctx.arc(3, -6, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) {
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(-2, 10);
+        ctx.lineTo(-4, 15);
+        ctx.moveTo(3, 10);
+        ctx.lineTo(5, 15);
         ctx.stroke();
       }
     } else if (this.type === 'ghost') {

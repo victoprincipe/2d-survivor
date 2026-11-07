@@ -193,7 +193,12 @@ export type EnemyType =
   | 'bullet_ant'
   | 'leafcutter_ant'
   | 'blue_butterfly'
-  | 'cicada';
+  | 'cicada'
+  // Medium threats exclusive to the Amazon Forest map.
+  | 'poison_dart_frog'
+  | 'praying_mantis'
+  | 'stick_bug'
+  | 'toucan';
 
 export type DropType =
   | 'gem_blue'
