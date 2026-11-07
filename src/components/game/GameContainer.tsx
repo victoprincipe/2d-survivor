@@ -14,6 +14,7 @@ import { LevelUpModal } from './LevelUpModal';
 import { TreasureChestModal } from './TreasureChestModal';
 import { EndGameModal } from './EndGameModal';
 import { PauseModal } from './PauseModal';
+import { DevTools } from './DevTools';
 
 type GameState = 'menu' | 'playing' | 'paused' | 'level_up' | 'chest' | 'game_over' | 'victory';
 
@@ -318,6 +319,14 @@ export const GameContainer: React.FC = () => {
           onContinueEndless={gameState === 'victory' ? handleContinueEndless : undefined}
         />
       )}
+
+      {/* Developer Tools Floating Trigger & Drawer */}
+      <DevTools
+        getEngine={() => engineRef.current}
+        savedData={savedData}
+        onUpdateSave={(newData) => setSavedData(newData)}
+        gameState={gameState}
+      />
     </div>
   );
 };

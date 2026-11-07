@@ -264,6 +264,56 @@ export class WeaponSystem {
     }
   }
 
+  devSetWeaponLevel(id: WeaponId, level: number, evolved?: boolean): void {
+    let w = this.weapons.get(id);
+    if (!w) {
+      this.addWeapon(id);
+      w = this.weapons.get(id)!;
+    }
+    w.level = Math.max(1, Math.min(WEAPON_REGISTRY[id].maxLevel, level));
+    if (evolved !== undefined) {
+      w.evolved = evolved;
+      w.evolvedId = evolved ? WEAPON_REGISTRY[id].evolvedId : undefined;
+      if (id === 'bible' && evolved) {
+        this.bibleIsActive = true;
+      }
+    }
+  }
+
+  devRemoveWeapon(id: WeaponId): void {
+    this.weapons.delete(id);
+    this.projectiles = this.projectiles.filter((p) => p.weaponId !== id);
+    this.groundZones = this.groundZones.filter((z) => z.weaponId !== id);
+  }
+
+  devSetPassiveLevel(id: PassiveId, level: number, player: Player): void {
+    const prevMaxHp = player.maxHp;
+    if (level <= 0) {
+      this.passives.delete(id);
+    } else {
+      const p = this.passives.get(id);
+      if (!p) {
+        this.passives.set(id, {
+          id,
+          level: Math.min(PASSIVE_REGISTRY[id].maxLevel, level),
+          maxLevel: PASSIVE_REGISTRY[id].maxLevel,
+        });
+      } else {
+        p.level = Math.min(p.maxLevel, level);
+      }
+    }
+    this.recalculatePlayerStats(player);
+    const gainedMaxHp = player.maxHp - prevMaxHp;
+    if (gainedMaxHp > 0) {
+      player.heal(gainedMaxHp);
+    }
+  }
+
+  devRemovePassive(id: PassiveId, player: Player): void {
+    this.passives.delete(id);
+    this.recalculatePlayerStats(player);
+  }
+
   recalculatePlayerStats(player: Player): void {
     const b = player.character.statBonuses;
     const perm = player.powerUps;

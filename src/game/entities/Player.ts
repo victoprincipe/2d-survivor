@@ -96,6 +96,10 @@ export class Player {
   private dashDirY: number = 0;
   public collisionResolver?: PlayerCollisionResolver;
 
+  // DevTools / Cheats
+  public godMode: boolean = false;
+  public infiniteStamina: boolean = false;
+
   // Progression
   public level: number = 1;
   public xp: number = 0;
@@ -209,8 +213,12 @@ export class Player {
 
     const config = this.movementConfig;
 
-    // Stamina regeneration starts only after the configured delay.
-    if (this.staminaRegenTimer > 0) {
+    if (this.infiniteStamina) {
+      this.stamina = config.maxStamina;
+      this.dashCooldownTimer = 0;
+      this.jumpCooldownTimer = 0;
+    } else if (this.staminaRegenTimer > 0) {
+      // Stamina regeneration starts only after the configured delay.
       this.staminaRegenTimer = Math.max(0, this.staminaRegenTimer - dt);
     } else if (this.stamina < config.maxStamina) {
       this.stamina = Math.min(
@@ -304,6 +312,7 @@ export class Player {
   }
 
   takeDamage(amount: number): boolean {
+    if (this.godMode) return false;
     if (this.invulnerableTimer > 0) return false;
 
     const reducedAmount = Math.max(1, Math.round(amount - this.armor));

@@ -9,6 +9,9 @@ import {
   SavedGameData,
   WeaponId,
   PassiveId,
+  DevDebugConfig,
+  DevTelemetrySnapshot,
+  EnemyType,
 } from '../types';
 import { Camera } from './Camera';
 import { InputManager } from './Input';
@@ -59,6 +62,20 @@ export class GameEngine {
   public isPaused: boolean = false;
   public isGameOver: boolean = false;
   public hasWon: boolean = false;
+
+  // DevTools / Telemetry / Debug
+  public debugConfig: DevDebugConfig = {
+    showHitboxes: false,
+    showRanges: false,
+    showSpatialGrid: false,
+    timeScale: 1.0,
+    freezeSpawns: false,
+    cameraZoom: 1.0,
+  };
+  public currentFps: number = 60;
+  public currentFrameTimeMs: number = 16.6;
+  private frameCount: number = 0;
+  private fpsTimer: number = 0;
 
   private isRunning: boolean = false;
   private lastTime: number = 0;
@@ -154,9 +171,20 @@ export class GameEngine {
   private loop(currentTime: number): void {
     if (!this.isRunning) return;
 
+    const frameTime = currentTime - this.lastTime;
+    this.currentFrameTimeMs = Math.round(frameTime * 10) / 10;
+    this.frameCount++;
+    this.fpsTimer += frameTime;
+    if (this.fpsTimer >= 400) {
+      this.currentFps = Math.max(1, Math.round((this.frameCount * 1000) / this.fpsTimer));
+      this.frameCount = 0;
+      this.fpsTimer = 0;
+    }
+
     const rawDt = (currentTime - this.lastTime) / 1000;
     this.lastTime = currentTime;
-    const dt = Math.min(rawDt, 0.1);
+    const timeScale = Math.max(0.1, Math.min(10, this.debugConfig.timeScale || 1.0));
+    const dt = Math.min(rawDt, 0.1) * timeScale;
 
     if (!this.isPaused && !this.isGameOver) {
       this.update(dt);
@@ -658,6 +686,9 @@ export class GameEngine {
     // 7. Render VFX (Damage numbers, death particles, screen flash)
     this.vfx.render(ctx, camera);
 
+    // 7.5. Render Debug Overlay (Hitboxes, Ranges, Spatial Grid)
+    this.renderDebugOverlay();
+
     // 8. Render Virtual Joystick if active
     if (this.input.joystick.active) {
       const { startX, startY, currentX, currentY, radius } = this.input.joystick;
@@ -769,6 +800,365 @@ export class GameEngine {
     ctx.lineWidth = 1.5;
     ctx.stroke();
     ctx.restore();
+  }
+
+  private renderDebugOverlay(): void {
+    const { ctx, camera, debugConfig, player } = this;
+    if (!debugConfig.showHitboxes && !debugConfig.showRanges && !debugConfig.showSpatialGrid) {
+      return;
+    }
+
+    ctx.save();
+
+    // 1. Spatial Grid
+    if (debugConfig.showSpatialGrid) {
+      const cellSize = 110;
+      const left = camera.x - camera.viewportWidth / 2;
+      const top = camera.y - camera.viewportHeight / 2;
+      const right = camera.x + camera.viewportWidth / 2;
+      const bottom = camera.y + camera.viewportHeight / 2;
+
+      const startCol = Math.floor(left / cellSize);
+      const endCol = Math.floor(right / cellSize);
+      const startRow = Math.floor(top / cellSize);
+      const endRow = Math.floor(bottom / cellSize);
+
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.25)';
+      ctx.lineWidth = 1;
+      for (let c = startCol; c <= endCol; c++) {
+        const sx = c * cellSize - camera.x + camera.viewportWidth / 2 + camera.shakeOffsetX;
+        ctx.beginPath();
+        ctx.moveTo(sx, 0);
+        ctx.lineTo(sx, camera.viewportHeight);
+        ctx.stroke();
+      }
+      for (let r = startRow; r <= endRow; r++) {
+        const sy = r * cellSize - camera.y + camera.viewportHeight / 2 + camera.shakeOffsetY;
+        ctx.beginPath();
+        ctx.moveTo(0, sy);
+        ctx.lineTo(camera.viewportWidth, sy);
+        ctx.stroke();
+      }
+    }
+
+    // 2. Ranges (Pickup radius, Bible orbital, Garlic aura)
+    if (debugConfig.showRanges) {
+      const pScreen = camera.worldToScreen(player.x, player.y);
+
+      // Pickup radius
+      ctx.strokeStyle = 'rgba(168, 85, 247, 0.7)';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.arc(pScreen.x, pScreen.y, player.pickupRadius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Garlic aura
+      if (this.weaponSystem.weapons.has('garlic')) {
+        const gRadius = this.weaponSystem.garlicRadius * player.areaMultiplier;
+        ctx.strokeStyle = 'rgba(234, 179, 8, 0.6)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(pScreen.x, pScreen.y, gRadius, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // Bible orbit
+      if (this.weaponSystem.weapons.has('bible')) {
+        const bRadius = this.weaponSystem.bibleRadius * player.areaMultiplier;
+        ctx.strokeStyle = 'rgba(99, 102, 241, 0.6)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(pScreen.x, pScreen.y, bRadius, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+
+    // 3. Hitboxes (Player, Enemies, Projectiles, Ground Zones)
+    if (debugConfig.showHitboxes) {
+      // Player
+      const pScreen = camera.worldToScreen(player.x, player.y);
+      ctx.strokeStyle = '#22c55e';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(pScreen.x, pScreen.y, player.radius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Enemies
+      for (let i = 0; i < this.enemies.length; i++) {
+        const e = this.enemies[i];
+        if (!camera.isInView(e.x, e.y, e.radius)) continue;
+        const eScreen = camera.worldToScreen(e.x, e.y);
+        ctx.strokeStyle = e.isBoss ? '#f43f5e' : e.isElite ? '#f59e0b' : '#ef4444';
+        ctx.lineWidth = e.isBoss ? 2.5 : 1.5;
+        ctx.beginPath();
+        ctx.arc(eScreen.x, eScreen.y, e.radius, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Boss nova radius telegraph
+        if (e.isBoss && e.skillState === 'telegraph_nova') {
+          ctx.strokeStyle = 'rgba(239, 68, 68, 0.5)';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(eScreen.x, eScreen.y, e.novaRadius, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
+
+      // Projectiles
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 1.5;
+      for (let i = 0; i < this.weaponSystem.projectiles.length; i++) {
+        const p = this.weaponSystem.projectiles[i];
+        if (!camera.isInView(p.x, p.y, p.radius)) continue;
+        const pScreen = camera.worldToScreen(p.x, p.y);
+        ctx.beginPath();
+        ctx.arc(pScreen.x, pScreen.y, p.radius, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // Ground Zones
+      for (let i = 0; i < this.weaponSystem.groundZones.length; i++) {
+        const z = this.weaponSystem.groundZones[i];
+        if (!camera.isInView(z.x, z.y, z.radius)) continue;
+        const zScreen = camera.worldToScreen(z.x, z.y);
+        ctx.strokeStyle = '#f97316';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(zScreen.x, zScreen.y, z.radius, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+
+    ctx.restore();
+  }
+
+  // --- DevTools Public API ---
+
+  public devSpawnEnemy(type: EnemyType, count: number = 1): void {
+    const minutes = this.waveDirector.survivalTime / 60;
+    const hpMult = (1.0 + minutes * 0.52) * this.difficulty.enemyHp;
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 120 + Math.random() * 150;
+      const x = this.player.x + Math.cos(angle) * dist;
+      const y = this.player.y + Math.sin(angle) * dist;
+      const enemy = this.waveDirector.createEnemy(type, x, y, hpMult);
+      this.enemies.push(enemy);
+      this.spatialGrid.insert(enemy);
+    }
+  }
+
+  public devSpawnDummy(): void {
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 130;
+    const x = this.player.x + Math.cos(angle) * dist;
+    const y = this.player.y + Math.sin(angle) * dist;
+    const dummy = new Enemy(Date.now() + Math.random() * 1000, 'zombie', x, y, 100);
+    dummy.name = '🎯 Boneco de Treino (Dummy)';
+    dummy.maxHp = 1000000;
+    dummy.hp = 1000000;
+    dummy.speed = 0;
+    dummy.damage = 0;
+    dummy.knockbackResistance = 0;
+    this.enemies.push(dummy);
+    this.spatialGrid.insert(dummy);
+  }
+
+  public devSpawnDrop(type: Drop['type'], count: number = 1): void {
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 40 + Math.random() * 60;
+      const x = this.player.x + Math.cos(angle) * dist;
+      const y = this.player.y + Math.sin(angle) * dist;
+      const val = type === 'gem_red' ? 250 : type === 'gem_green' ? 25 : type === 'coin' ? 20 : 5;
+      this.drops.push(new Drop(Date.now() + Math.random(), type, x, y, val));
+    }
+  }
+
+  public devKillAllEnemies(withDrops: boolean = true): void {
+    for (let i = this.enemies.length - 1; i >= 0; i--) {
+      const e = this.enemies[i];
+      if (withDrops) {
+        this.onEnemyKilled(e);
+      }
+    }
+    this.enemies = [];
+    this.spatialGrid.clear();
+  }
+
+  public devSkipTime(seconds: number): void {
+    this.waveDirector.survivalTime = Math.max(0, this.waveDirector.survivalTime + seconds);
+    this.syncHUD();
+  }
+
+  public devForceLevelUp(): void {
+    const needed = Math.max(1, this.player.xpToNextLevel - this.player.xp);
+    this.player.addXp(needed);
+    const options = this.weaponSystem.generateUpgradeOptions();
+    if (options.length > 0) {
+      this.sound.playLevelUp();
+      this.pause();
+      this.callbacks.onLevelUp(options);
+    }
+  }
+
+  public devDirectAddLevel(amount: number = 1): void {
+    for (let i = 0; i < amount; i++) {
+      this.player.level += 1;
+      this.player.xpToNextLevel = Player.computeXpToNextLevel(this.player.level);
+    }
+    this.syncHUD();
+  }
+
+  public devMagnetAll(): void {
+    this.sound.playLevelUp();
+    this.vfx.triggerFlash('#38bdf8', 0.4);
+    for (let i = 0; i < this.drops.length; i++) {
+      this.drops[i].isBeingMagnetPulled = true;
+    }
+  }
+
+  public devHealPlayer(): void {
+    this.player.hp = this.player.maxHp;
+    this.vfx.addDamageNumber(this.player.x, this.player.y, this.player.maxHp, false, true);
+    this.sound.playGemPickup(8);
+    this.syncHUD();
+  }
+
+  public devAddGold(amount: number = 500): void {
+    this.goldCollected += amount;
+    this.vfx.addDamageNumber(this.player.x, this.player.y, amount, true, true);
+    this.sound.playGemPickup(4);
+    this.syncHUD();
+  }
+
+  public devForceVictory(): void {
+    this.handleVictory();
+  }
+
+  public devForceGameOver(): void {
+    this.handlePlayerDeath();
+  }
+
+  public devSetFreezeSpawns(freeze: boolean): void {
+    this.debugConfig.freezeSpawns = freeze;
+    this.waveDirector.freezeSpawns = freeze;
+  }
+
+  public devToggleGodMode(): boolean {
+    this.player.godMode = !this.player.godMode;
+    return this.player.godMode;
+  }
+
+  public devToggleInfiniteStamina(): boolean {
+    this.player.infiniteStamina = !this.player.infiniteStamina;
+    return this.player.infiniteStamina;
+  }
+
+  public devToggleHitboxes(): boolean {
+    this.debugConfig.showHitboxes = !this.debugConfig.showHitboxes;
+    return this.debugConfig.showHitboxes;
+  }
+
+  public devToggleRanges(): boolean {
+    this.debugConfig.showRanges = !this.debugConfig.showRanges;
+    return this.debugConfig.showRanges;
+  }
+
+  public devToggleSpatialGrid(): boolean {
+    this.debugConfig.showSpatialGrid = !this.debugConfig.showSpatialGrid;
+    return this.debugConfig.showSpatialGrid;
+  }
+
+  public devSetTimeScale(scale: number): void {
+    this.debugConfig.timeScale = scale;
+  }
+
+  public devModifyStat(
+    stat: 'might' | 'speed' | 'cooldownReduction' | 'pickupRadius',
+    delta: number
+  ): void {
+    if (stat === 'might') {
+      this.player.might = Math.max(0.5, Math.min(10, this.player.might + delta));
+    } else if (stat === 'speed') {
+      this.player.speed = Math.max(60, Math.min(600, this.player.speed + delta));
+    } else if (stat === 'cooldownReduction') {
+      this.player.cooldownReduction = Math.max(0, Math.min(0.7, this.player.cooldownReduction + delta));
+    } else if (stat === 'pickupRadius') {
+      this.player.pickupRadius = Math.max(20, Math.min(500, this.player.pickupRadius + delta));
+    }
+  }
+
+  public devMaximizeAllEquipped(): void {
+    this.weaponSystem.weapons.forEach((w) => {
+      this.weaponSystem.devSetWeaponLevel(w.id, w.maxLevel);
+    });
+    this.weaponSystem.passives.forEach((p) => {
+      this.weaponSystem.devSetPassiveLevel(p.id, p.maxLevel, this.player);
+    });
+  }
+
+  public devEvolveAllEquipped(): void {
+    this.weaponSystem.weapons.forEach((w) => {
+      this.weaponSystem.devSetWeaponLevel(w.id, w.maxLevel, true);
+    });
+  }
+
+  public devClearExtraWeapons(): void {
+    const initial = this.player.character.startingWeapon;
+    this.weaponSystem.weapons.forEach((_, id) => {
+      if (id !== initial) {
+        this.weaponSystem.devRemoveWeapon(id);
+      }
+    });
+    this.weaponSystem.passives.forEach((_, id) => {
+      this.weaponSystem.devRemovePassive(id, this.player);
+    });
+  }
+
+  public getDevTelemetry(): DevTelemetrySnapshot {
+    const timeSurvived = Math.max(1, Math.floor(this.waveDirector.survivalTime));
+    const weapons = Array.from(this.weaponSystem.weapons.values()).map((w) => {
+      const meta = WEAPON_REGISTRY[w.id];
+      return {
+        id: w.id,
+        level: w.level,
+        evolved: w.evolved,
+        name: w.evolved ? meta.evolvedName : meta.name,
+        totalDamage: Math.round(w.totalDamageDealt),
+        dps: Math.round((w.totalDamageDealt / timeSurvived) * 10) / 10,
+      };
+    });
+
+    return {
+      fps: this.currentFps,
+      frameTimeMs: this.currentFrameTimeMs,
+      enemyCount: this.enemies.length,
+      projectileCount: this.weaponSystem.projectiles.length,
+      groundZoneCount: this.weaponSystem.groundZones.length,
+      dropCount: this.drops.length,
+      vfxCount: this.vfx.count,
+      godMode: this.player.godMode,
+      infiniteStamina: this.player.infiniteStamina,
+      timeScale: this.debugConfig.timeScale,
+      freezeSpawns: this.debugConfig.freezeSpawns,
+      survivalTime: Math.floor(this.waveDirector.survivalTime),
+      playerLevel: this.player.level,
+      playerHp: Math.round(this.player.hp),
+      playerMaxHp: Math.round(this.player.maxHp),
+      stamina: Math.round(this.player.stamina),
+      maxStamina: Math.round(this.player.movementConfig.maxStamina),
+      might: Math.round(this.player.might * 100) / 100,
+      speed: Math.round(this.player.speed),
+      cooldownReduction: Math.round(this.player.cooldownReduction * 100),
+      areaMultiplier: Math.round(this.player.areaMultiplier * 100) / 100,
+      pickupRadius: Math.round(this.player.pickupRadius),
+      critChance: Math.round(this.player.critChance * 100),
+      luck: Math.round(this.player.luck * 100),
+      weapons,
+    };
   }
 
   public destroy(): void {

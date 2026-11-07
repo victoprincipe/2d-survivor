@@ -20,6 +20,7 @@ export class WaveDirector {
   private triggeredEvents: Set<string> = new Set();
   public bossActive: Enemy | null = null;
   public isEndless: boolean = false;
+  public freezeSpawns: boolean = false;
 
   update(
     dt: number,
@@ -55,9 +56,13 @@ export class WaveDirector {
     );
 
     // Regular interval spawning
-    if (this.spawnTimer >= spawnInterval && enemies.length < maxEnemies) {
+    if (!this.freezeSpawns && this.spawnTimer >= spawnInterval && enemies.length < maxEnemies) {
       this.spawnTimer = 0;
       this.spawnRegularEnemy(player, camera, hpMultiplier, onSpawn);
+    }
+
+    if (this.freezeSpawns) {
+      return;
     }
 
     // Timed Events (4 Elite Chests before 05:00 + Final Boss + Endless Loop)

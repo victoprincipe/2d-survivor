@@ -28,6 +28,10 @@ export class VFXManager {
   public screenFlashColor: string = '#ffffff';
   public screenFlashAlpha: number = 0;
 
+  public get count(): number {
+    return this.damageNumbers.length + this.particles.length;
+  }
+
   addDamageNumber(x: number, y: number, damage: number, isCrit: boolean = false, isHeal: boolean = false): void {
     const text = isHeal ? `+${damage}` : `${Math.round(damage)}`;
     const color = isHeal ? '#22c55e' : isCrit ? '#f97316' : '#ffffff';

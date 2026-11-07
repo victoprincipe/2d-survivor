@@ -245,3 +245,48 @@ export interface GameEndSummary {
     percentage: number;
   }[];
 }
+
+export interface DevDebugConfig {
+  showHitboxes: boolean;
+  showRanges: boolean;
+  showSpatialGrid: boolean;
+  timeScale: number;
+  freezeSpawns: boolean;
+  cameraZoom: number;
+}
+
+export interface DevTelemetrySnapshot {
+  fps: number;
+  frameTimeMs: number;
+  enemyCount: number;
+  projectileCount: number;
+  groundZoneCount: number;
+  dropCount: number;
+  vfxCount: number;
+  godMode: boolean;
+  infiniteStamina: boolean;
+  timeScale: number;
+  freezeSpawns: boolean;
+  survivalTime: number;
+  playerLevel: number;
+  playerHp: number;
+  playerMaxHp: number;
+  stamina: number;
+  maxStamina: number;
+  might: number;
+  speed: number;
+  cooldownReduction: number;
+  areaMultiplier: number;
+  pickupRadius: number;
+  critChance: number;
+  luck: number;
+  weapons: {
+    id: WeaponId;
+    level: number;
+    evolved: boolean;
+    name: string;
+    totalDamage: number;
+    dps: number;
+  }[];
+}
+
