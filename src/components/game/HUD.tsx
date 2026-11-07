@@ -132,6 +132,24 @@ export const HUD: React.FC<HUDProps> = ({ hud, onPause, isMuted, onToggleMute })
               </span>
             </div>
 
+            {/* Character signature ability cooldown */}
+            {hud.ability && (
+              <div
+                className={`flex items-center gap-2 rounded-lg px-2.5 py-1 backdrop-blur-sm border shadow text-[10px] font-bold uppercase tracking-wide ${
+                  hud.ability.remaining > 0
+                    ? 'bg-slate-900/80 border-slate-700 text-slate-400'
+                    : 'bg-amber-950/80 border-amber-500 text-amber-200'
+                }`}
+                title={hud.ability.description}
+              >
+                <Zap className={`w-3.5 h-3.5 ${hud.ability.remaining > 0 ? 'text-slate-500' : 'text-amber-300'}`} />
+                <span>{hud.ability.name}</span>
+                <span className="font-mono text-amber-300">
+                  {hud.ability.remaining > 0 ? `${Math.ceil(hud.ability.remaining)}s` : 'PRONTA'}
+                </span>
+              </div>
+            )}
+
             {/* Weapons & Passives Slots */}
             <div className="flex gap-1">
               {hud.weapons.map((w) => (
@@ -160,15 +178,39 @@ export const HUD: React.FC<HUDProps> = ({ hud, onPause, isMuted, onToggleMute })
                   </span>
                 </div>
               ))}
+              {hud.relics.map((relic) => (
+                <div
+                  key={relic.id}
+                  className={`p-1 rounded-md border bg-slate-900/85 backdrop-blur-sm flex items-center justify-center ${
+                    relic.rarity === 'lendaria'
+                      ? 'border-amber-400 shadow-amber-500/30 shadow'
+                      : relic.rarity === 'epica'
+                        ? 'border-purple-500'
+                        : relic.rarity === 'rara'
+                          ? 'border-sky-500'
+                          : 'border-slate-600'
+                  }`}
+                  title={`${relic.name} (${relic.rarity})`}
+                >
+                  <Sparkles className="w-4 h-4 text-fuchsia-300" />
+                </div>
+              ))}
             </div>
           </div>
 
           {/* Center: Clock */}
-          <div className="bg-slate-900/90 border-2 border-slate-700 rounded-xl px-4 py-1.5 flex items-center gap-2 shadow-2xl backdrop-blur-md">
-            <Clock className="w-5 h-5 text-amber-400" />
-            <span className="font-mono text-xl sm:text-2xl font-black tracking-widest text-white">
-              {formatTime(hud.survivalTime)}
-            </span>
+          <div className="flex flex-col items-center gap-1">
+            <div className="bg-slate-900/90 border-2 border-slate-700 rounded-xl px-4 py-1.5 flex items-center gap-2 shadow-2xl backdrop-blur-md">
+              <Clock className="w-5 h-5 text-amber-400" />
+              <span className="font-mono text-xl sm:text-2xl font-black tracking-widest text-white">
+                {formatTime(hud.survivalTime)}
+              </span>
+            </div>
+            {hud.difficultyName && (
+              <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-300/80">
+                {hud.difficultyName}
+              </span>
+            )}
           </div>
 
           {/* Right: Kills, Gold, and Controls */}

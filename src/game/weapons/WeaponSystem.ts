@@ -1,5 +1,6 @@
-import { WeaponId, PassiveId, UpgradeOption, WeaponInstance, PassiveInstance } from '../types';
+import { WeaponId, PassiveId, UpgradeOption, WeaponInstance, PassiveInstance, RelicId } from '../types';
 import { WEAPON_REGISTRY, PASSIVE_REGISTRY } from '../data/upgrades';
+import { getRelic } from '../data/items';
 import { Player } from '../entities/Player';
 import { Enemy } from '../entities/Enemy';
 import { Drop } from '../entities/Drops';
@@ -56,6 +57,7 @@ export interface LightningStrikeEffect {
 export class WeaponSystem {
   public weapons: Map<WeaponId, WeaponInstance> = new Map();
   public passives: Map<PassiveId, PassiveInstance> = new Map();
+  public relics: RelicId[] = [];
 
   public projectiles: Projectile[] = [];
   public whipSlashes: WhipSlashEffect[] = [];
@@ -118,11 +120,15 @@ export class WeaponSystem {
   }
 
   recalculatePlayerStats(player: Player): void {
-    // Reset player modifiers to character base
-    player.might = 1.0 + (player.character.statBonuses.might || 0);
-    player.armor = player.character.statBonuses.armor || 0;
-    player.cooldownReduction = player.character.statBonuses.cooldownReduction || 0;
-    player.pickupRadius = 65 + (player.character.statBonuses.pickupRadius || 0);
+    // Reset player modifiers to their character + permanent power-up base.
+    player.might = player.baseMight;
+    player.armor = player.baseArmor;
+    player.cooldownReduction = player.baseCooldownReduction;
+    player.pickupRadius = player.basePickupRadius;
+    player.maxHp = player.baseMaxHp;
+    player.recoveryPerSec = player.baseRecoveryPerSec;
+    player.xpMultiplier = player.baseXpMultiplier;
+    player.goldMultiplier = player.baseGoldMultiplier;
     player.speed = player.baseSpeed;
 
     // Apply passives
@@ -130,13 +136,12 @@ export class WeaponSystem {
     if (spinach) player.might += spinach.level * 0.1;
 
     const wings = this.passives.get('wings');
-    if (wings) player.speed *= (1 + wings.level * 0.1);
+    if (wings) player.speed *= 1 + wings.level * 0.1;
 
     const heart = this.passives.get('heart');
     if (heart) {
-      const bonusHp = heart.level * 20;
-      player.maxHp = 100 + (player.character.statBonuses.maxHp || 0) + bonusHp;
-      player.recoveryPerSec = heart.level * 0.5;
+      player.maxHp += heart.level * 20;
+      player.recoveryPerSec += heart.level * 0.5;
     }
 
     const tome = this.passives.get('tome');
@@ -144,6 +149,28 @@ export class WeaponSystem {
 
     const magnet = this.passives.get('magnet');
     if (magnet) player.pickupRadius += magnet.level * 25;
+
+    // Relics (rare run items)
+    for (const relicId of this.relics) {
+      const effects = getRelic(relicId).effects;
+      player.might += effects.might ?? 0;
+      player.armor += effects.armor ?? 0;
+      player.maxHp += effects.maxHp ?? 0;
+      player.speed *= 1 + (effects.speed ?? 0);
+      player.cooldownReduction += effects.cooldownReduction ?? 0;
+      player.xpMultiplier += effects.xpMultiplier ?? 0;
+      player.pickupRadius += effects.pickupRadius ?? 0;
+      player.recoveryPerSec += effects.recoveryPerSec ?? 0;
+      player.goldMultiplier += effects.goldMultiplier ?? 0;
+    }
+
+    player.hp = Math.min(player.hp, player.maxHp);
+  }
+
+  addRelic(id: RelicId, player: Player): void {
+    if (this.relics.includes(id)) return;
+    this.relics.push(id);
+    this.recalculatePlayerStats(player);
   }
 
   update(

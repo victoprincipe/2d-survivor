@@ -1,4 +1,43 @@
-import { CharacterConfig } from '../types';
+import { CharacterConfig, CharacterSkinConfig } from '../types';
+
+export const CHARACTER_SKINS: CharacterSkinConfig[] = [
+  {
+    id: 'classico',
+    name: 'Clássico',
+    description: 'As cores originais de cada sobrevivente.',
+    color: '',
+    portraitColor: '',
+    accentColor: '#f59e0b',
+    unlockLevel: 1,
+  },
+  {
+    id: 'sombrio',
+    name: 'Sombrio',
+    description: 'Paleta sombria com detalhes violeta.',
+    color: '#3b0764',
+    portraitColor: '#1e1b4b',
+    accentColor: '#a855f7',
+    unlockLevel: 2,
+  },
+  {
+    id: 'dourado',
+    name: 'Dourado',
+    description: 'Armadura banhada a ouro e brasas.',
+    color: '#92400e',
+    portraitColor: '#451a03',
+    accentColor: '#fbbf24',
+    unlockLevel: 6,
+  },
+  {
+    id: 'espectral',
+    name: 'Espectral',
+    description: 'Aura etérea de um espírito vingativo.',
+    color: '#0f766e',
+    portraitColor: '#042f2e',
+    accentColor: '#5eead4',
+    unlockLevel: 10,
+  },
+];
 
 export const CHARACTERS: CharacterConfig[] = [
   {
@@ -16,6 +55,14 @@ export const CHARACTERS: CharacterConfig[] = [
       speed: 0.1,
       pickupRadius: 15,
     },
+    specialAbility: {
+      name: 'Entrega Turbo',
+      description: 'Acelera 40% por 5s ao apertar o ritmo da entrega.',
+      kind: 'haste',
+      cooldown: 16,
+      power: 1.4,
+      duration: 5,
+    },
   },
   {
     id: 'antonio',
@@ -30,6 +77,14 @@ export const CHARACTERS: CharacterConfig[] = [
       maxHp: 20,
       might: 0.15,
       armor: 1,
+    },
+    specialAbility: {
+      name: 'Julgamento Sagrado',
+      description: 'Uma onda de luz fere todos os inimigos ao redor.',
+      kind: 'nova',
+      cooldown: 15,
+      power: 45,
+      radius: 165,
     },
   },
   {
@@ -46,6 +101,14 @@ export const CHARACTERS: CharacterConfig[] = [
       cooldownReduction: 0.1,
       speed: 0.05,
     },
+    specialAbility: {
+      name: 'Círculo Arcano',
+      description: 'Detona um círculo de energia arcana ao redor.',
+      kind: 'nova',
+      cooldown: 13,
+      power: 35,
+      radius: 190,
+    },
   },
   {
     id: 'gennaro',
@@ -60,6 +123,14 @@ export const CHARACTERS: CharacterConfig[] = [
       speed: 0.2,
       might: 0.05,
       pickupRadius: 20,
+    },
+    specialAbility: {
+      name: 'Dança das Lâminas',
+      description: 'Acelera 50% por 4s para reposicionar suas adagas.',
+      kind: 'haste',
+      cooldown: 12,
+      power: 1.5,
+      duration: 4,
     },
   },
   {
@@ -77,6 +148,13 @@ export const CHARACTERS: CharacterConfig[] = [
       might: 0.12,
       armor: 1,
     },
+    specialAbility: {
+      name: 'Fúria da Selva',
+      description: 'Recupera 22 de vida com um rugido amazônico.',
+      kind: 'heal',
+      cooldown: 18,
+      power: 22,
+    },
   },
   {
     id: 'bianca',
@@ -91,6 +169,14 @@ export const CHARACTERS: CharacterConfig[] = [
       maxHp: 30,
       armor: 2,
       speed: 0.05,
+    },
+    specialAbility: {
+      name: 'Bênção do Alho',
+      description: 'Fica invulnerável por 2.5s graças à barreira de alho.',
+      kind: 'shield',
+      cooldown: 20,
+      power: 1,
+      duration: 2.5,
     },
   },
   {
@@ -108,6 +194,13 @@ export const CHARACTERS: CharacterConfig[] = [
       cooldownReduction: 0.1,
       pickupRadius: 15,
     },
+    specialAbility: {
+      name: 'Emergência Médica',
+      description: 'Aplica um soro de emergência curando 20 de vida.',
+      kind: 'heal',
+      cooldown: 15,
+      power: 20,
+    },
   },
   {
     id: 'dukarai',
@@ -123,6 +216,63 @@ export const CHARACTERS: CharacterConfig[] = [
       maxHp: 15,
       speed: 0.1,
       cooldownReduction: 0.05,
+    },
+    specialAbility: {
+      name: 'Combo Relâmpago',
+      description: 'Serve um combo energético: +50% de velocidade por 4s.',
+      kind: 'haste',
+      cooldown: 17,
+      power: 1.5,
+      duration: 4,
+    },
+  },
+  {
+    id: 'valkira',
+    name: 'Valkira Sombria',
+    title: 'Lâmina do Eclipse',
+    description: 'Assassina treinada nas noites eternas. Alterna adagas velozes com explosões de energia lunar.',
+    startingWeapon: 'knife',
+    iconName: 'Swords',
+    color: '#7c3aed',
+    portraitColor: '#2e1065',
+    unlockLevel: 3,
+    statBonuses: {
+      might: 0.08,
+      speed: 0.05,
+      cooldownReduction: 0.15,
+    },
+    specialAbility: {
+      name: 'Eclipse',
+      description: 'Libera uma explosão lunar que atinge todos ao redor.',
+      kind: 'nova',
+      cooldown: 15,
+      power: 50,
+      radius: 180,
+    },
+  },
+  {
+    id: 'orfeu',
+    name: 'Orfeu Cinzento',
+    title: 'Cantor do Abismo',
+    description: 'Músico errante que usa tomos proibidos para proteger aliados e atrair almas perdidas.',
+    startingWeapon: 'bible',
+    iconName: 'BookOpen',
+    color: '#0ea5e9',
+    portraitColor: '#0c4a6e',
+    unlockLevel: 5,
+    statBonuses: {
+      maxHp: 15,
+      xpMultiplier: 0.2,
+      pickupRadius: 20,
+      cooldownReduction: 0.05,
+    },
+    specialAbility: {
+      name: 'Réquiem',
+      description: 'Um coral espectral concede 3s de invulnerabilidade.',
+      kind: 'shield',
+      cooldown: 18,
+      power: 1,
+      duration: 3,
     },
   },
 ];

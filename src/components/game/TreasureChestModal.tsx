@@ -2,16 +2,18 @@
 
 import React, { useEffect } from 'react';
 import confetti from 'canvas-confetti';
-import { UpgradeOption } from '@/game/types';
+import { RelicConfig, UpgradeOption } from '@/game/types';
+import { RARITY_COLOR, RARITY_LABEL } from '@/game/data/items';
 import { Coins, Sparkles } from 'lucide-react';
 
 interface TreasureChestModalProps {
   gold: number;
   upgrade?: UpgradeOption;
+  relic?: RelicConfig;
   onClose: () => void;
 }
 
-export const TreasureChestModal: React.FC<TreasureChestModalProps> = ({ gold, upgrade, onClose }) => {
+export const TreasureChestModal: React.FC<TreasureChestModalProps> = ({ gold, upgrade, relic, onClose }) => {
   useEffect(() => {
     // Fire festive golden confetti burst
     try {
@@ -58,6 +60,22 @@ export const TreasureChestModal: React.FC<TreasureChestModalProps> = ({ gold, up
               </span>
               <span className="text-white font-bold text-base">{upgrade.name}</span>
               <span className="text-slate-400 text-xs mt-0.5">{upgrade.description}</span>
+            </div>
+          )}
+
+          {/* Relic reward if provided */}
+          {relic && (
+            <div
+              className="border-t border-slate-800 pt-3 flex flex-col items-center"
+              style={{ color: RARITY_COLOR[relic.rarity] }}
+            >
+              <span className="text-[10px] uppercase font-black tracking-wider mb-1">
+                Relíquia {RARITY_LABEL[relic.rarity]} Encontrada:
+              </span>
+              <span className="font-bold text-base" style={{ color: RARITY_COLOR[relic.rarity] }}>
+                {relic.name}
+              </span>
+              <span className="text-slate-400 text-xs mt-0.5">{relic.description}</span>
             </div>
           )}
         </div>
