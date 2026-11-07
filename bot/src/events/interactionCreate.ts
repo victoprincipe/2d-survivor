@@ -1,12 +1,26 @@
 import { Events, Interaction, MessageFlags } from 'discord.js';
 import { commandMap } from '../commands';
-import { createLogger } from '../logger';
+import { handleModalSubmit } from '../handlers/modalSubmit';
+import { appendBotError, createLogger } from '../logger';
 import { handlePlanButton } from './planButtons';
 
 const log = createLogger('interaction');
 
 export const name = Events.InteractionCreate;
 export const once = false;
+
+function interactionContext(interaction: Interaction): string {
+  if (interaction.isChatInputCommand()) {
+    return `chat-input /${interaction.commandName} user=${interaction.user.id} guild=${interaction.guildId ?? '-'}`;
+  }
+  if (interaction.isModalSubmit()) {
+    return `modal ${interaction.customId} user=${interaction.user.id} guild=${interaction.guildId ?? '-'}`;
+  }
+  if (interaction.isButton()) {
+    return `button ${interaction.customId} user=${interaction.user.id} guild=${interaction.guildId ?? '-'}`;
+  }
+  return `interaction type=${interaction.type} user=${interaction.user?.id ?? '-'}`;
+}
 
 export async function execute(interaction: Interaction): Promise<void> {
   try {
@@ -29,6 +43,11 @@ export async function execute(interaction: Interaction): Promise<void> {
       return;
     }
 
+    if (interaction.isModalSubmit()) {
+      await handleModalSubmit(interaction);
+      return;
+    }
+
     if (interaction.isButton()) {
       const match = /^plan:(approve|reject):(\d+)$/.exec(interaction.customId);
       if (match) {
@@ -41,7 +60,10 @@ export async function execute(interaction: Interaction): Promise<void> {
       return;
     }
   } catch (error) {
-    log.error(`Erro em interação: ${String(error)}`);
+    const detail =
+      error instanceof Error ? (error.stack ?? error.message) : String(error);
+    log.error(`Erro em interação: ${detail}`);
+    appendBotError(interactionContext(interaction), error);
     if (!interaction.isRepliable()) return;
 
     const payload = {

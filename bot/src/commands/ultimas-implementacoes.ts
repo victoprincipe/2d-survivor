@@ -5,7 +5,11 @@ import {
   SlashCommandBuilder,
 } from 'discord.js';
 import { listRecent } from '../db';
-import { discordTimestamp, statusLabel } from '../ui/embeds';
+import {
+  discordTimestamp,
+  promptPreview,
+  statusLabel,
+} from '../ui/embeds';
 
 export const data = new SlashCommandBuilder()
   .setName('ultimas-implementacoes')
@@ -24,7 +28,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
   const lines = jobs.map(
     (job) =>
-      `**#${job.id}** ${job.title}\n> ${statusLabel(job.status)} • ${discordTimestamp(job.created_at)}`,
+      `**#${job.id}** <@${job.author_id}> — ${job.title}\n> ${statusLabel(job.status)} • ${discordTimestamp(job.created_at)}\n> **Prompt:** ${promptPreview(job)}`,
   );
 
   const embed = new EmbedBuilder()
@@ -34,5 +38,9 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     .setFooter({ text: `${jobs.length} implementação(ões) mais recente(s)` })
     .setTimestamp();
 
-  await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+  await interaction.reply({
+    embeds: [embed],
+    flags: MessageFlags.Ephemeral,
+    allowedMentions: { parse: [] },
+  });
 }

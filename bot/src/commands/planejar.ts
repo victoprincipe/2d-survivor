@@ -1,69 +1,95 @@
 import {
-  Attachment,
   ChatInputCommandInteraction,
+  FileUploadBuilder,
+  LabelBuilder,
   MessageFlags,
+  ModalBuilder,
   SlashCommandBuilder,
+  TextInputBuilder,
+  TextInputStyle,
 } from 'discord.js';
+import { audioConfig, imageConfig } from '../config';
+import { PLANEJAR_MODAL_ID } from '../handlers/modalSubmit';
+import {
+  AUDIO_FILE_TYPES,
+  formatMb,
+} from '../services/attachments';
 import { hasSubmitterRoleForInteraction } from '../services/permissions';
-import { submitPlan } from '../services/plan';
-import { truncate } from '../ui/embeds';
+import { checkAccountAge, checkPlanQuota } from '../services/quotas';
 
 export const data = new SlashCommandBuilder()
   .setName('planejar')
-  .setDescription('Planeja uma feature antes de implementar')
-  .addStringOption((option) =>
-    option
-      .setName('prompt')
-      .setDescription('Descreva a feature que deve ser planejada (20 a 1500 caracteres)')
-      .setRequired(true)
-      .setMinLength(20)
-      .setMaxLength(1500),
-  )
-  .addAttachmentOption((option) =>
-    option
-      .setName('imagem')
-      .setDescription('Imagem de referência (opcional, até 8 MB)')
-      .setRequired(false),
-  )
-  .addAttachmentOption((option) =>
-    option
-      .setName('audio')
-      .setDescription('Áudio de referência ou asset (opcional, até 10 MB)')
-      .setRequired(false),
-  )
-  .addAttachmentOption((option) =>
-    option
-      .setName('audio2')
-      .setDescription('Segundo áudio opcional (até 10 MB)')
-      .setRequired(false),
-  )
-  .addAttachmentOption((option) =>
-    option
-      .setName('audio3')
-      .setDescription('Terceiro áudio opcional (até 10 MB)')
-      .setRequired(false),
-  );
+  .setDescription('Abre o formulário de planejamento');
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
-  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  if (!hasSubmitterRoleForInteraction(interaction)) {
+    await interaction.reply({
+      content: 'Você não tem o cargo necessário para enviar planejamentos.',
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
 
-  const prompt = interaction.options.getString('prompt', true);
-  const image = interaction.options.getAttachment('imagem');
-  const audios = ['audio', 'audio2', 'audio3']
-    .map((name) => interaction.options.getAttachment(name))
-    .filter((attachment): attachment is Attachment => attachment !== null);
+  const age = checkAccountAge(interaction.user.createdAt);
+  if (!age.ok) {
+    await interaction.reply({
+      content: age.reason ?? 'Conta muito nova.',
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
 
-  await submitPlan({
-    authorId: interaction.user.id,
-    authorName: interaction.user.username,
-    authorCreatedAt: interaction.user.createdAt,
-    prompt,
-    images: image ? [image] : [],
-    audios,
-    hasRole: await hasSubmitterRoleForInteraction(interaction),
-    submissionId: interaction.id,
-    reply: async (content) => {
-      await interaction.editReply({ content: truncate(content, 1900) });
-    },
-  });
+  const quota = checkPlanQuota(interaction.user.id);
+  if (!quota.ok) {
+    await interaction.reply({
+      content: quota.reason ?? 'Quota de planejamento indisponível.',
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  const modal = new ModalBuilder()
+    .setCustomId(PLANEJAR_MODAL_ID)
+    .setTitle('Planejar uma feature')
+    .addLabelComponents(
+      new LabelBuilder()
+        .setLabel('Descreva a feature')
+        .setDescription('Até 4000 caracteres. Obrigatório.')
+        .setTextInputComponent(
+          new TextInputBuilder()
+            .setCustomId('prompt')
+            .setStyle(TextInputStyle.Paragraph)
+            .setPlaceholder('O que deve ser planejado? Seja específico.')
+            .setMaxLength(4000)
+            .setRequired(true),
+        ),
+      new LabelBuilder()
+        .setLabel(`Imagens (opcional, até ${imageConfig.maxCount})`)
+        .setDescription(
+          `PNG, JPEG, GIF ou WebP; até ${formatMb(imageConfig.maxBytes)} cada.`,
+        )
+        .setFileUploadComponent(
+          new FileUploadBuilder()
+            .setCustomId('imagens')
+            .setMinValues(0)
+            .setMaxValues(Math.min(10, imageConfig.maxCount))
+            .setFileTypes('image')
+            .setRequired(false),
+        ),
+      new LabelBuilder()
+        .setLabel(`Áudios (opcional, até ${audioConfig.maxCount})`)
+        .setDescription(
+          `MP3, WAV, OGG/OPUS, M4A/AAC, FLAC ou WebM; até ${formatMb(audioConfig.maxBytes)} cada.`,
+        )
+        .setFileUploadComponent(
+          new FileUploadBuilder()
+            .setCustomId('audios')
+            .setMinValues(0)
+            .setMaxValues(Math.min(10, audioConfig.maxCount))
+            .setFileTypes(...AUDIO_FILE_TYPES)
+            .setRequired(false),
+        ),
+    );
+
+  await interaction.showModal(modal);
 }

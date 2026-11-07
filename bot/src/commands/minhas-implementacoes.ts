@@ -5,7 +5,11 @@ import {
   SlashCommandBuilder,
 } from 'discord.js';
 import { listByAuthor } from '../db';
-import { discordTimestamp, statusLabel } from '../ui/embeds';
+import {
+  discordTimestamp,
+  promptPreview,
+  statusLabel,
+} from '../ui/embeds';
 
 export const data = new SlashCommandBuilder()
   .setName('minhas-implementacoes')
@@ -24,7 +28,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
   const lines = jobs.map(
     (job) =>
-      `**#${job.id}** ${job.title}\n> ${statusLabel(job.status)} • ${discordTimestamp(job.created_at)}`,
+      `**#${job.id}** ${job.title}\n> ${statusLabel(job.status)} • ${discordTimestamp(job.created_at)}\n> **Prompt:** ${promptPreview(job)}`,
   );
 
   const embed = new EmbedBuilder()

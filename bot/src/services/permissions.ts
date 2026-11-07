@@ -1,15 +1,48 @@
-import { ChatInputCommandInteraction } from 'discord.js';
+import {
+  APIInteractionGuildMember,
+  ChatInputCommandInteraction,
+  GuildMember,
+  ModalSubmitInteraction,
+} from 'discord.js';
 import { discordConfig } from '../config';
 
-export async function hasSubmitterRoleForInteraction(
-  interaction: ChatInputCommandInteraction,
+type GuildInteraction = ChatInputCommandInteraction | ModalSubmitInteraction;
+type InteractionMember = GuildMember | APIInteractionGuildMember | null;
+
+function memberHasSubmitterRole(member: InteractionMember): boolean {
+  if (!discordConfig.submitterRoleId) return true;
+  if (!member || !('roles' in member)) return false;
+
+  const roles = member.roles;
+  if (Array.isArray(roles)) {
+    return roles.includes(discordConfig.submitterRoleId);
+  }
+
+  return roles.cache.has(discordConfig.submitterRoleId);
+}
+
+/** Checagem rápida usando o member já resolvido na interação. */
+export function hasSubmitterRoleForInteraction(
+  interaction: GuildInteraction,
+): boolean {
+  if (!discordConfig.submitterRoleId) return true;
+  if (!interaction.inGuild()) return false;
+  return memberHasSubmitterRole(interaction.member);
+}
+
+/** Checagem autoritativa: busca o membro se o cache não tiver os cargos. */
+export async function fetchSubmitterRoleForInteraction(
+  interaction: GuildInteraction,
 ): Promise<boolean> {
+  if (hasSubmitterRoleForInteraction(interaction)) return true;
   if (!discordConfig.submitterRoleId) return true;
   if (!interaction.inGuild()) return false;
 
-  const member = await interaction.guild?.members
+  if (!interaction.guild) return false;
+
+  const member = await interaction.guild.members
     .fetch(interaction.user.id)
     .catch(() => null);
 
-  return member?.roles.cache.has(discordConfig.submitterRoleId) ?? false;
+  return memberHasSubmitterRole(member);
 }

@@ -46,6 +46,20 @@ export function planLogPath(planId: number, suffix = ''): string {
   return path.join(paths.logs, `plan-${planId}${suffix}.log`);
 }
 
+export function appendBotError(context: string, error: unknown): void {
+  try {
+    ensureLogDir();
+    const detail =
+      error instanceof Error ? (error.stack ?? error.message) : String(error);
+    fs.appendFileSync(
+      path.join(paths.logs, 'bot-errors.log'),
+      `${new Date().toISOString()} ${context}\n${detail}\n\n`,
+    );
+  } catch {
+    // log de diagnóstico não pode derrubar o bot
+  }
+}
+
 export function appendJobLog(jobId: number, line: string, suffix = ''): void {
   fs.appendFileSync(jobLogPath(jobId, suffix), line.endsWith('\n') ? line : `${line}\n`);
 }

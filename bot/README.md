@@ -105,7 +105,11 @@ Separado: `npm run dev:bot` e `npm run dev:worker`.
 
 ## Como enviar
 
-Use **`/implementar prompt:<texto>`** em qualquer canal do servidor. Não há modal; o prompt vai como opção do comando. Você também pode anexar uma imagem opcional na opção `imagem`.
+Use **`/implementar`** para abrir o formulário de implementação. O formulário aceita várias linhas e até **4000 caracteres**, um select opcional de plano aprovado e upload de até 3 imagens e 3 áudios.
+
+- Para uma implementação nova, deixe o select de plano vazio.
+- Para implementar um plano aprovado, escolha o plano no select. O prompt vira um complemento opcional.
+- Se não houver plano nem anexo, o prompt precisa ter pelo menos 1 caractere.
 
 **Mensagens normais no chat são ignoradas.** O bot só cria jobs por slash command.
 
@@ -113,53 +117,55 @@ A partir daí o fluxo é automático.
 
 ## Imagens e áudios nos prompts
 
-Você pode anexar até **3 imagens** (PNG, JPEG, GIF ou WebP) de até **8 MB** cada e até **3 áudios** (MP3, WAV, OGG/OPUS, M4A/AAC, FLAC ou WebM) de até **10 MB** cada. No `/implementar`, o texto é opcional quando há imagem ou áudio. No `/planejar`, o texto é obrigatório; imagem/áudio são complementos.
+Você pode enviar no formulário até **3 imagens** (PNG, JPEG, GIF ou WebP) de até **8 MB** cada e até **3 áudios** (MP3, WAV, OGG/OPUS, M4A/AAC, FLAC ou WebM) de até **10 MB** cada. No `/implementar`, o texto é opcional quando há imagem/áudio ou um plano selecionado. No `/planejar`, o texto é obrigatório; imagem/áudio são complementos.
 
 - O bot baixa os anexos para `bot/data/assets/message-<id>/` e guarda os metadados no SQLite.
-- O worker copia os anexos para `.job-assets/` dentro do clone; a primeira imagem é anexada com `--file` e o agente lê as demais com a ferramenta `read`.
+- O worker copia as imagens para `.job-assets/` dentro do clone; a primeira imagem é anexada com `--file` e o agente lê as demais com a ferramenta `read`.
+- Os áudios são copiados pelo worker para `public/audio/job-<id>-<arquivo>` antes do agente. O agente referencia a URL pública (ex.: `/audio/job-23-audio-1.mp3`) e não precisa copiar binários.
 - Jobs com imagem usam automaticamente `AGENT_VISION_MODEL`, porque modelos text-only rejeitam imagens.
-- **Referência visual** (mockup, print, estilo): o agente usa como guia e não copia o arquivo.
-- **Asset do jogo** (sprite, ícone, fundo, textura, música, efeito sonoro): o agente copia para `public/` e referencia no código; só isso entra no commit.
-- **Áudio como referência falada:** o modelo não ouve/transcreve áudio. Escreva no prompt o conteúdo ou a instrução; o arquivo fica disponível como asset/referência.
-- `.job-assets/` é excluído do git e apagado depois do job.
+- **Referência visual** (mockup, print, estilo): o agente usa a imagem de `.job-assets/` como guia; ela não entra no commit.
+- **Asset do jogo** (sprite, ícone, fundo, textura, música, efeito sonoro): áudios já são preparados em `public/audio/` e entram no commit; imagens em `.job-assets/` não entram — use-as como referência ou recrie o asset em texto/SVG.
+- **Áudio como referência falada:** o modelo não ouve/transcreve áudio. Escreva no prompt o conteúdo ou a instrução; o arquivo fica disponível em `public/audio/` para uso como asset.
+- `.job-assets/` é excluído do git e apagado depois do job. Áudios em `public/audio/` são commitados: envie apenas conteúdo que você tenha direito de publicar.
 - As pastas em `bot/data/assets/` são removidas após `IMAGE_RETENTION_DAYS` dias; depois disso, `/reprocessar` pede que você reenvie os anexos.
 
 ## Planejamento (`/planejar`)
 
-Use **`/planejar prompt:<texto>`** para gerar um plano antes de implementar. O worker roda um agente planejador somente leitura, que produz dois artefatos:
+Use **`/planejar`** para abrir o formulário e gerar um plano antes de implementar. O formulário aceita várias linhas e até **4000 caracteres**. O worker roda um agente planejador somente leitura, que produz dois artefatos:
 
 - **`PLAN.md`** — objetivo, escopo, arquivos afetados, passos, riscos e critérios de aceite;
 - **`TASKS.md`** — checklist acionável para o implementador.
 
 Os dois arquivos são anexados na mensagem do plano, que traz os botões **Aprovar** e **Rejeitar**:
 
-- **Aprovar**: o plano fica disponível e você implementa com `/implementar plano:<id>`;
+- **Aprovar**: o plano fica disponível no select do `/implementar`;
 - **Rejeitar**: o plano é arquivado; use `/planejar` de novo se quiser outra abordagem.
 
-O planejador não altera o código: a única escrita permitida é em `.plan-artifacts/`. Planejamentos têm limites próprios (padrão: 10/dia, 1 ativo por usuário, fila de 10) e **não consomem** a quota de 15 implementações/dia.
+O planejador não altera o código: a única escrita permitida é em `.plan-artifacts/`. Planejamentos têm limites próprios (padrão: 10/dia, 1 ativo por usuário, fila de 10) e **não consomem** a quota de 30 implementações/dia.
 
 ## Comandos
 
 | Comando | Quem | O que faz |
 |---|---|---|
-| `/implementar prompt:<texto>` | membros com quota | envia uma implementação sem modal; aceita imagem e até 3 áudios opcionais |
-| `/implementar plano:<id>` | autor do plano ou `Manage Server` | implementa um plano aprovado |
-| `/planejar prompt:<texto>` | membros com quota | gera `PLAN.md`/`TASKS.md` para aprovação; aceita imagem/áudios |
-| `/fila` | todos | estado da fila, worker e repo local |
-| `/minhas-implementacoes` | todos | suas implementações |
-| `/ultimas-implementacoes` | todos | últimas do servidor |
+| `/implementar` | membros com quota | abre o formulário com select de plano aprovado, prompt e uploads de imagem/áudio |
+| `/planejar` | membros com quota | abre o formulário com prompt e uploads e gera `PLAN.md`/`TASKS.md` para aprovação |
+| `/fila` | todos | estado da fila, worker e repo local; mostra prompt das jobs em execução/próximas |
+| `/minhas-implementacoes` | todos | suas implementações, com preview do prompt |
+| `/ultimas-implementacoes` | todos | últimas do servidor, com autor e preview do prompt |
+| `/prompt <id>` | todos | mostra o prompt completo de uma implementação |
 | `/reprocessar <id>` | autor ou `Manage Server` | recoloca uma falha na fila |
 
-O título exibido é derivado da primeira linha do prompt; não há campo separado de título.
+O título exibido é derivado da primeira linha do prompt; não há campo separado de título. As listagens mostram um preview do prompt; use `/prompt <id>` para ver o texto completo.
 
 ## Quotas padrão
 
 - Conta com pelo menos 7 dias.
 - 1 job ativo por usuário.
-- 15 jobs por dia por usuário; 20 no total.
+- 30 jobs por dia por usuário; 40 no total.
 - Fila máxima de 20.
-- Prompt de 20 a 1500 caracteres; com imagens ou áudios, o texto é opcional e pode ter até 1500 caracteres.
-- Planejamentos: 10 por dia, 1 ativo por usuário e fila de 10 (não contam nos 15 jobs).
+- Formulário de prompt: até 4000 caracteres. Não há mínimo além de 1 caractere; vazio só é permitido no `/implementar` com plano selecionado ou imagem/áudio.
+- O select de planos do `/implementar` mostra até 25 planos aprovados.
+- Planejamentos: 10 por dia, 1 ativo por usuário e fila de 10 (não contam nos 30 jobs).
 
 ## Status
 
@@ -175,7 +181,7 @@ O título exibido é derivado da primeira linha do prompt; não há campo separa
 
 1. Clona `origin/master` em `../.2d-survivor-worktrees/job-<id>`.
 2. Cria a branch `implementacao/<id>`.
-3. Copia os anexos do job para `.job-assets/` (fora do git) e escolhe o modelo de visão quando houver imagem.
+3. Copia as imagens do job para `.job-assets/` (fora do git), prepara os áudios em `public/audio/` e escolhe o modelo de visão quando houver imagem.
 4. Roda o OpenCode com `HOME`, banco e `PWD` isolados (não herda config global, MCPs nem modelo).
 5. Roda `npm run build` e depois `npm run lint`.
 6. Commita e envia a branch `implementacao/<id>` para o origin.
@@ -226,8 +232,9 @@ bot/
   src/
     index.ts               # bot discord.js
     deploy-commands.ts     # registro dos slash commands
-    commands/              # implementar, fila, minhas, ultimas, reprocessar
+    commands/              # implementar, planejar, fila, minhas, ultimas, prompt, reprocessar
     events/                # interactionCreate
+    handlers/              # modal de implementação/planejamento
     services/              # quotas, moderação, permissões, notificações
     ui/                    # embeds
     worker/                # loop, opencode, planner, gate, apply, assets
@@ -241,7 +248,9 @@ bot/
 - **Bot não responde**: rode `npm run deploy`; confira `applications.commands`.
 - **`auth.json do OpenCode não encontrado`**: rode `opencode auth login` e reinicie o worker.
 - **Comandos não aparecem**: rode `npm run deploy` e confira `GUILD_ID`; o bot precisa do escopo `applications.commands`.
-- **Imagem/áudio rejeitado**: confira formato, tamanho e quantidade. Se o job falhar com “anexo não encontrado”, os arquivos expiraram: reenvie o prompt.
+- **Erro genérico em interação**: veja o stack trace em `bot/data/logs/bot-errors.log`.
+- **Formulário expirou**: o modal do Discord vale por 15 minutos. Rode o comando novamente; os dados vão na submissão do modal, então um restart do bot não os perde.
+- **Imagem/áudio rejeitado**: confira formato, tamanho e quantidade nas descrições dos campos do modal.
 - **Job com imagem falha no modelo**: confira `AGENT_VISION_MODEL` (`opencode models`); modelos text-only não aceitam imagem.
 - **Plano falhou**: veja `bot/data/logs/plan-<id>-planner.log` e o erro na mensagem do plano. Ajuste `AGENT_PLANNER_MODEL` se o modelo não estiver gerando os artefatos.
 - **Build falha em todo job**: rode `npm run build` na raiz. Se for só lint antigo, use `LINT_STRICT=false`.

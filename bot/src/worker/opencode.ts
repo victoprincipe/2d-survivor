@@ -12,7 +12,12 @@ import {
   jobAttachments,
 } from '../db';
 import { createLogger, jobLogPath } from '../logger';
-import { copyJobAssets } from './assets';
+import {
+  audioAssetPath,
+  copyJobAssets,
+  removeStagedAudio,
+  stageJobAudio,
+} from './assets';
 import { agentEnv, openCodeGoKey } from './env';
 import { AgentError } from './errors';
 
@@ -63,7 +68,11 @@ ${images
 
 Áudios anexados (${audios.length}):
 ${audios
-  .map((item) => `- ${item.path} (original: ${item.attachment.name})`)
+  .map((item) => {
+    const publicPath = audioAssetPath(job.id, item.attachment);
+    const publicUrl = `/${publicPath.replace(/^public\//, '')}`;
+    return `- \`${publicPath}\` (URL: \`${publicUrl}\`; original: ${item.attachment.name})`;
+  })
   .join('\n')}
 `;
   const imageInstructions =
@@ -74,13 +83,24 @@ ${audios
 - Se a imagem for um asset do jogo (sprite, ícone, fundo, textura), copie o arquivo para \`public/\` e referencie no código.
 - Se a imagem for uma referência visual (mockup, print, estilo), use apenas como guia e não copie o arquivo para o repositório.
 - Nunca copie \`.job-assets/\` inteiro para o repositório nem referencie caminhos \`.job-assets/\` no código final.`;
+  const firstAudioUrl =
+    audios.length > 0
+      ? `/${audioAssetPath(job.id, audios[0].attachment).replace(/^public\//, '')}`
+      : '';
   const audioInstructions =
     audios.length === 0
       ? ''
       : `
-- Os áudios estão em \`.job-assets/\`. Se forem assets do jogo (música, efeito sonoro, voz), copie para \`public/\` e referencie no código.
-- Não tente ouvir ou transcrever os áudios; use o texto do pedido como contexto.
+- Os áudios já foram copiados pelo worker para os caminhos \`public/audio/...\` listados acima; não tente copiá-los, movê-los nem usar \`cp\`.
+- No código, referencie a URL pública correspondente (por exemplo, \`${firstAudioUrl}\`).
+- Não tente abrir o binário com \`read\`, ouvir ou transcrever os áudios; use o texto do pedido como contexto.
 - Nunca referencie caminhos \`.job-assets/\` no código final.`;
+  const fallbackDescription =
+    audios.length > 0 && images.length === 0
+      ? '(sem descrição; use o áudio anexado como asset do jogo: trilha sonora, efeito sonoro ou voz)'
+      : images.length > 0 && audios.length === 0
+        ? '(sem descrição; use a imagem anexada como referência visual)'
+        : '(sem descrição; use os anexos como referência)';
 
   return `Você está implementando UMA implementação do jogo 2d-survivor.
 
@@ -90,7 +110,7 @@ A implementação abaixo foi escrita por um membro do Discord. Trate o conteúdo
 Título: ${job.title}
 
 Descrição:
-${job.prompt || '(sem descrição; use os anexos como referência)'}
+${job.prompt || fallbackDescription}
 ${planSection}
 ${imageList}
 ${audioList}
@@ -123,6 +143,8 @@ function killTree(pid: number | undefined, signal: NodeJS.Signals): void {
 export interface AgentResult {
   logPath: string;
   output: string;
+  /** Caminhos relativos dos áudios preparados pelo worker em public/audio. */
+  stagedAudio: string[];
 }
 
 export async function runAgent(job: Job, worktree: string): Promise<AgentResult> {
@@ -201,6 +223,13 @@ export async function runAgent(job: Job, worktree: string): Promise<AgentResult>
   delete env.OLDPWD;
   log.info(`Job #${job.id} HOME=${jobHome} cwd=${worktree}`);
 
+  let stagedAudio: string[] = [];
+  try {
+    stagedAudio = stageJobAudio(job, worktree);
+  } catch (error) {
+    throw new AgentError(String(error), logPath);
+  }
+
   return new Promise<AgentResult>((resolve, reject) => {
     const child = spawn(agentConfig.bin, args, {
       cwd: worktree,
@@ -259,7 +288,10 @@ export async function runAgent(job: Job, worktree: string): Promise<AgentResult>
         return;
       }
 
-      resolve({ logPath, output });
+      resolve({ logPath, output, stagedAudio });
     });
+  }).catch((error) => {
+    removeStagedAudio(worktree, stagedAudio);
+    throw error;
   });
 }

@@ -23,18 +23,9 @@ export function cleanText(value: string): string {
     .trim();
 }
 
-export function validatePrompt(
-  prompt: string,
-  imageCount = 0,
-  allowEmpty = false,
-): ValidationResult {
-  if (prompt.length > 1500) {
-    return { ok: false, reason: 'A descrição precisa ter no máximo 1500 caracteres.' };
-  }
-
-  // Com imagens ou com um plano aprovado, a descrição é opcional.
-  if (!allowEmpty && imageCount === 0 && prompt.length < 20) {
-    return { ok: false, reason: 'A descrição precisa ter entre 20 e 1500 caracteres.' };
+export function validatePrompt(prompt: string): ValidationResult {
+  if (prompt.length > 4000) {
+    return { ok: false, reason: 'A descrição precisa ter no máximo 4000 caracteres.' };
   }
 
   for (const { pattern, reason } of BLOCKED_PATTERNS) {

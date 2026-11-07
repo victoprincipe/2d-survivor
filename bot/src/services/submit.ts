@@ -91,11 +91,7 @@ export async function submitImplementation(
     return null;
   }
 
-  const validation = validatePrompt(
-    prompt,
-    images.length,
-    Boolean(input.planId) || audios.length > 0,
-  );
+  const validation = validatePrompt(prompt);
   if (!validation.ok) {
     await input.reply(validation.reason ?? 'Implementação inválida.');
     return null;

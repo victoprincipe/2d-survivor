@@ -8,6 +8,7 @@ import * as planejar from './planejar';
 import * as fila from './fila';
 import * as minhasImplementacoes from './minhas-implementacoes';
 import * as ultimasImplementacoes from './ultimas-implementacoes';
+import * as prompt from './prompt';
 import * as reprocessar from './reprocessar';
 
 export interface Command {
@@ -21,6 +22,7 @@ export const commands: Command[] = [
   fila,
   minhasImplementacoes,
   ultimasImplementacoes,
+  prompt,
   reprocessar,
 ];
 

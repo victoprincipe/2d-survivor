@@ -6,7 +6,8 @@ import { JobAttachment } from '../db';
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
-const AUDIO_EXTENSIONS = new Set([
+/** Extensões aceitas no upload de áudio do modal. */
+export const AUDIO_FILE_TYPES = [
   '.mp3',
   '.wav',
   '.ogg',
@@ -15,7 +16,9 @@ const AUDIO_EXTENSIONS = new Set([
   '.aac',
   '.flac',
   '.webm',
-]);
+] as const;
+
+const AUDIO_EXTENSIONS = new Set<string>(AUDIO_FILE_TYPES);
 
 const AUDIO_CONTENT_TYPES: Record<string, string> = {
   'audio/mpeg': '.mp3',

@@ -71,7 +71,7 @@ export async function submitPlan(input: SubmitPlanInput): Promise<Plan | null> {
     return null;
   }
 
-  const validation = validatePrompt(prompt, input.images.length);
+  const validation = validatePrompt(prompt);
   if (!validation.ok) {
     await input.reply(validation.reason ?? 'Planejamento inválido.');
     return null;

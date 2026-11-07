@@ -537,6 +537,27 @@ export function requirePlan(id: number): Plan {
   return plan;
 }
 
+export function getApprovedPlansForUser(
+  authorId: string,
+  canManage: boolean,
+  limit = 25,
+): Plan[] {
+  const db = getDb();
+  if (canManage) {
+    return db
+      .prepare(
+        "SELECT * FROM plans WHERE status = 'approved' ORDER BY id DESC LIMIT ?",
+      )
+      .all(limit) as Plan[];
+  }
+
+  return db
+    .prepare(
+      "SELECT * FROM plans WHERE status = 'approved' AND author_id = ? ORDER BY id DESC LIMIT ?",
+    )
+    .all(authorId, limit) as Plan[];
+}
+
 export function createPlan(input: NewPlan): Plan {
   const now = new Date().toISOString();
   const result = getDb()

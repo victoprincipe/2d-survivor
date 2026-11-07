@@ -13,7 +13,12 @@ import {
   listQueued,
 } from '../db';
 import { getRepoState } from '../git';
-import { discordTimestamp, jobLine, truncate } from '../ui/embeds';
+import {
+  discordTimestamp,
+  jobLineWithPrompt,
+  promptPreview,
+  truncate,
+} from '../ui/embeds';
 
 export const data = new SlashCommandBuilder()
   .setName('fila')
@@ -65,16 +70,23 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       {
         name: 'Rodando',
         value: running
-          ? `**#${running.id}** ${truncate(running.title, 60)} ${discordTimestamp(running.started_at)}`
+          ? `**#${running.id}** ${truncate(running.title, 60)} ${discordTimestamp(running.started_at)}\n> <@${running.author_id}> • ${promptPreview(running, 70)}`
           : '—',
       },
       {
         name: 'Próximos',
-        value: next.length > 0 ? next.map(jobLine).join('\n') : '—',
+        value:
+          next.length > 0
+            ? next.map((job) => jobLineWithPrompt(job, 70)).join('\n')
+            : '—',
       },
     )
     .setFooter({ text: 'Use /implementar para enviar uma implementação' })
     .setTimestamp();
 
-  await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+  await interaction.reply({
+    embeds: [embed],
+    flags: MessageFlags.Ephemeral,
+    allowedMentions: { parse: [] },
+  });
 }

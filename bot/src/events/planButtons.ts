@@ -47,7 +47,7 @@ export async function handlePlanButton(
 
   const content =
     action === 'approve'
-      ? `Plano #${planId} aprovado. Use \`/implementar plano:${planId}\` para implementar.`
+      ? `Plano #${planId} aprovado. Use \`/implementar\` e selecione o plano #${planId} no formulário.`
       : `Plano #${planId} rejeitado.`;
   await interaction.followUp({ content, flags: MessageFlags.Ephemeral });
 }

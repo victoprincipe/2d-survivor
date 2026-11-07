@@ -13,6 +13,7 @@ import {
   createJobRepo,
   getDiffStats,
   hasChanges,
+  hasChangesExcluding,
   pushJobBranch,
   worktreeRemove,
 } from '../git';
@@ -31,7 +32,7 @@ import {
 } from './errors';
 import { runGate } from './gate';
 import { runAgent } from './opencode';
-import { removeJobAssets } from './assets';
+import { removeJobAssets, removeStagedAudio, stageJobAudio } from './assets';
 import { prepareNodeModules } from './workspace';
 
 const log = createLogger('job');
@@ -154,8 +155,18 @@ async function handleExecute(job: Job): Promise<void> {
     const summary = readSummary(dir);
     updateJob(job.id, { summary, log_path: agent.logPath });
 
-    if (!hasChanges(dir)) {
-      throw new Error('O agente não alterou nenhum arquivo.');
+    if (!hasChangesExcluding(dir, agent.stagedAudio)) {
+      removeStagedAudio(dir, agent.stagedAudio);
+      throw new Error(
+        summary
+          ? 'O agente não alterou nenhum arquivo. Veja o resumo do job para o motivo.'
+          : 'O agente não alterou nenhum arquivo.',
+      );
+    }
+
+    // O agente pode ter removido ou sobrescrito o áudio preparado; garante os bytes originais.
+    if (agent.stagedAudio.length > 0) {
+      stageJobAudio(job, dir);
     }
 
     const gate = await runGate(job.id, dir);

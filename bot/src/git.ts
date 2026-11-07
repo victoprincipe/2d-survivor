@@ -25,13 +25,14 @@ const COMMIT_ENV = {
   GIT_TERMINAL_PROMPT: '0',
 };
 
-export function git(args: string[], cwd = paths.repo): string {
+export function git(args: string[], cwd = paths.repo, trim = true): string {
   try {
-    return execFileSync('git', ['-C', cwd, ...args], {
+    const output = execFileSync('git', ['-C', cwd, ...args], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
       env: COMMIT_ENV,
-    }).trim();
+    });
+    return trim ? output.trim() : output;
   } catch (error) {
     const err = error as { stderr?: Buffer | string; stdout?: Buffer | string; message?: string };
     const stderr = err.stderr ? err.stderr.toString().trim() : '';
@@ -138,6 +139,29 @@ export function worktreeRemove(dir: string): void {
 
 export function hasChanges(worktree: string): boolean {
   return git(['status', '--porcelain'], worktree).length > 0;
+}
+
+/**
+ * Como hasChanges, mas ignora os caminhos informados.
+ * Usado para os áudios que o worker copia para public/ antes do agente não
+ * contarem como trabalho do agente.
+ */
+export function hasChangesExcluding(
+  worktree: string,
+  ignoredPaths: string[],
+): boolean {
+  if (ignoredPaths.length === 0) return hasChanges(worktree);
+
+  const ignored = new Set(
+    ignoredPaths.filter(Boolean).map((file) => file.replace(/\\/g, '/')),
+  );
+  const entries = git(['status', '--porcelain', '-z', '-uall'], worktree, false)
+    .split('\0')
+    .filter(Boolean);
+
+  return entries.some(
+    (entry) => !ignored.has(entry.slice(3).replace(/\\/g, '/')),
+  );
 }
 
 export function commitAll(worktree: string, message: string): string {

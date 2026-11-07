@@ -150,6 +150,11 @@ export function jobEmbed(job: Job): EmbedBuilder {
     fields.push({ name: 'Erro', value: truncate(job.error, 1000) });
   }
 
+  const fallbackDescription = attachments.some(
+    (attachment) => attachmentKind(attachment) === 'audio',
+  )
+    ? '(sem descrição — use o áudio como asset do jogo)'
+    : '(sem descrição — use os anexos como referência)';
   const embed = new EmbedBuilder()
     .setColor(statusColor(job.status))
     .setTitle(truncate(`Implementação #${job.id} — ${job.title}`, 250))
@@ -158,7 +163,7 @@ export function jobEmbed(job: Job): EmbedBuilder {
         ? truncate(job.prompt, 3500)
         : job.plan_id !== null
           ? `(implementação do plano #${job.plan_id})`
-          : '(sem descrição — use as imagens como referência)',
+          : fallbackDescription,
     )
     .addFields(fields)
     .setFooter({ text: `job #${job.id} • ${job.kind}` })
@@ -217,7 +222,7 @@ export function planEmbed(plan: Plan): EmbedBuilder {
     plan.status === 'ready'
       ? '\n\nUse os botões **Aprovar** ou **Rejeitar** abaixo.'
       : plan.status === 'approved'
-        ? `\n\nPlano aprovado. Use \`/implementar plano:${plan.id}\` para implementar.`
+        ? `\n\nPlano aprovado. Use \`/implementar\` e selecione o plano #${plan.id} no formulário.`
         : '';
 
   return new EmbedBuilder()
@@ -246,4 +251,15 @@ export function planComponents(planId: number): ActionRowBuilder<ButtonBuilder>[
 
 export function jobLine(job: Job): string {
   return `**#${job.id}** ${truncate(job.title, 70)} — *${statusLabel(job.status)}*`;
+}
+
+export function promptPreview(job: Job, max = 160): string {
+  const prompt = job.prompt.replace(/\s+/g, ' ').trim();
+  if (prompt) return truncate(prompt, max);
+  if (job.plan_id !== null) return `(plano #${job.plan_id})`;
+  return '(sem prompt; use os anexos)';
+}
+
+export function jobLineWithPrompt(job: Job, maxPrompt = 70): string {
+  return `${jobLine(job)}\n> <@${job.author_id}> • ${promptPreview(job, maxPrompt)}`;
 }
