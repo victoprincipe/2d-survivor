@@ -676,6 +676,99 @@ export class GameEngine {
       ctx.fill();
       ctx.restore();
     }
+
+    // 9. Render Minimap Radar (fixed bottom-left)
+    this.renderMinimap();
+  }
+
+  private renderMinimap(): void {
+    const { ctx, camera } = this;
+    const viewport = Math.min(camera.viewportWidth, camera.viewportHeight);
+    const size = viewport < 640 ? 112 : 152;
+    const margin = 12;
+    const x = margin;
+    // Leave room for the bottom HUD hint without leaving the corner.
+    const y = camera.viewportHeight - size - margin - 18;
+    const half = size / 2;
+
+    const viewSpan = this.worldProps.getMinimapViewSpan();
+    const viewRadius = viewSpan / 2;
+    const scale = size / viewSpan;
+
+    const tracePanel = () => {
+      const radius = 10;
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.lineTo(x + size - radius, y);
+      ctx.quadraticCurveTo(x + size, y, x + size, y + radius);
+      ctx.lineTo(x + size, y + size - radius);
+      ctx.quadraticCurveTo(x + size, y + size, x + size - radius, y + size);
+      ctx.lineTo(x + radius, y + size);
+      ctx.quadraticCurveTo(x, y + size, x, y + size - radius);
+      ctx.lineTo(x, y + radius);
+      ctx.quadraticCurveTo(x, y, x + radius, y);
+      ctx.closePath();
+    };
+
+    ctx.save();
+    tracePanel();
+    ctx.fillStyle = 'rgba(8, 15, 20, 0.68)';
+    ctx.fill();
+
+    ctx.save();
+    ctx.clip();
+    this.worldProps.renderMinimapScenery(
+      ctx,
+      this.player.x,
+      this.player.y,
+      viewRadius,
+      x,
+      y,
+      size
+    );
+
+    const centerX = x + half;
+    const centerY = y + half;
+
+    // Nearby enemies as small red blips.
+    for (let i = 0; i < this.enemies.length; i++) {
+      const enemy = this.enemies[i];
+      const dx = enemy.x - this.player.x;
+      const dy = enemy.y - this.player.y;
+      if (dx * dx + dy * dy > viewRadius * viewRadius) continue;
+
+      const blipRadius = enemy.isBoss ? 2.4 : enemy.isElite ? 2 : 1.4;
+      ctx.fillStyle = '#ef4444';
+      ctx.beginPath();
+      ctx.arc(centerX + dx * scale, centerY + dy * scale, blipRadius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // Hero is always at the center of the radar.
+    const glow = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 11);
+    glow.addColorStop(0, 'rgba(52, 211, 153, 0.9)');
+    glow.addColorStop(0.5, 'rgba(34, 211, 238, 0.35)');
+    glow.addColorStop(1, 'rgba(34, 211, 238, 0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, 11, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#34d399';
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ecfeff';
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, 1.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    tracePanel();
+    ctx.strokeStyle = 'rgba(148, 163, 184, 0.55)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.restore();
   }
 
   public destroy(): void {

@@ -274,6 +274,129 @@ export class WorldSystem {
     return false;
   }
 
+  /**
+   * World span (in world units) shown across the minimap. For the finite
+   * Amazon map this covers about 30% of the total map area; the night plain
+   * has no real bounds, so a practical radar range is used instead.
+   */
+  public getMinimapViewSpan(): number {
+    if (this.mapId === 'amazon_forest') {
+      return FOREST_SIZE * Math.sqrt(0.3);
+    }
+    return 2600;
+  }
+
+  /**
+   * Draws the scenery layer (river, lakes and the map-edge tree wall) inside
+   * the minimap. The minimap square is already clipped by the caller.
+   */
+  public renderMinimapScenery(
+    ctx: CanvasRenderingContext2D,
+    centerX: number,
+    centerY: number,
+    viewRadius: number,
+    originX: number,
+    originY: number,
+    size: number
+  ): void {
+    if (this.mapId !== 'amazon_forest') return;
+
+    const scale = size / (viewRadius * 2);
+    const half = size / 2;
+    const toX = (worldX: number) => originX + half + (worldX - centerX) * scale;
+    const toY = (worldY: number) => originY + half + (worldY - centerY) * scale;
+
+    // Map boundary (the dense tree wall sits just inside it).
+    ctx.strokeStyle = 'rgba(134, 239, 172, 0.35)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(
+      toX(-FOREST_HALF_SIZE),
+      toY(-FOREST_HALF_SIZE),
+      FOREST_SIZE * scale,
+      FOREST_SIZE * scale
+    );
+
+    // Water never paints outside the finite forest bounds.
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(
+      toX(-FOREST_HALF_SIZE),
+      toY(-FOREST_HALF_SIZE),
+      FOREST_SIZE * scale,
+      FOREST_SIZE * scale
+    );
+    ctx.clip();
+
+    // River band, with its sandy bank and water surface.
+    const step = Math.max(60, viewRadius / 24);
+    const start = centerX - viewRadius - step;
+    const end = centerX + viewRadius + step;
+    const traceRiver = () => {
+      ctx.beginPath();
+      for (let x = start; x <= end; x += step) {
+        const y = this.riverCenterY(x);
+        if (x === start) ctx.moveTo(toX(x), toY(y));
+        else ctx.lineTo(toX(x), toY(y));
+      }
+    };
+
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    traceRiver();
+    ctx.strokeStyle = 'rgba(216, 188, 130, 0.65)';
+    ctx.lineWidth = Math.max(2, (RIVER_WIDTH + RIVER_BANK * 2) * scale);
+    ctx.stroke();
+
+    traceRiver();
+    ctx.strokeStyle = 'rgba(43, 139, 161, 0.95)';
+    ctx.lineWidth = Math.max(1.5, RIVER_WIDTH * scale);
+    ctx.stroke();
+
+    // Lakes.
+    for (let i = 0; i < this.lakes.length; i++) {
+      const lake = this.lakes[i];
+      const dx = lake.x - centerX;
+      const dy = lake.y - centerY;
+      if (Math.abs(dx) > viewRadius + lake.rx || Math.abs(dy) > viewRadius + lake.ry) continue;
+
+      ctx.save();
+      ctx.translate(toX(lake.x), toY(lake.y));
+      ctx.rotate(lake.rotation);
+
+      ctx.fillStyle = 'rgba(216, 188, 130, 0.65)';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, (lake.rx + RIVER_BANK) * scale, (lake.ry + RIVER_BANK * 0.85) * scale, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = 'rgba(43, 139, 161, 0.95)';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, lake.rx * scale, lake.ry * scale, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    ctx.restore();
+
+    // Dense wall of trees around the map limit.
+    const borderTrees = this.trees;
+    ctx.fillStyle = 'rgba(22, 101, 52, 0.95)';
+    for (let i = 0; i < borderTrees.length; i++) {
+      const tree = borderTrees[i];
+      if (
+        Math.abs(tree.x) < FOREST_HALF_SIZE - 320 &&
+        Math.abs(tree.y) < FOREST_HALF_SIZE - 320
+      ) {
+        continue;
+      }
+      if (Math.abs(tree.x - centerX) > viewRadius + 300) continue;
+      if (Math.abs(tree.y - centerY) > viewRadius + 300) continue;
+
+      const dotSize = tree.size > 120 ? 2 : 1.5;
+      ctx.fillRect(toX(tree.x) - dotSize / 2, toY(tree.y) - dotSize / 2, dotSize, dotSize);
+    }
+  }
+
   private loadFloorTexture(): void {
     if (typeof window === 'undefined') return;
     const image = new Image();
