@@ -13,6 +13,7 @@ import {
   Swords,
   Syringe,
   Utensils,
+  Hand,
 } from 'lucide-react';
 
 interface CharacterHUDProps {
@@ -34,6 +35,7 @@ const FALLBACK_ICONS: Record<string, React.ReactNode> = {
   Shield: <Shield className="h-7 w-7 text-white/90 drop-shadow" />,
   Syringe: <Syringe className="h-7 w-7 text-white/90 drop-shadow" />,
   Utensils: <Utensils className="h-7 w-7 text-white/90 drop-shadow" />,
+  Hand: <Hand className="h-7 w-7 text-white/90 drop-shadow" />,
 };
 
 export const CharacterHUD: React.FC<CharacterHUDProps> = ({

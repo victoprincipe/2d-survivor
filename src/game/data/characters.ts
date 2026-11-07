@@ -128,4 +128,22 @@ export const CHARACTERS: CharacterConfig[] = [
       pickupRadius: 12,
     },
   },
+  {
+    id: 'lula',
+    name: 'Lula',
+    title: 'Presidente dos Sobreviventes',
+    description: 'Líder carismático que ergue o braço no gesto do L e libera ondas de energia vermelha contra a horda.',
+    startingWeapon: 'lula_power',
+    iconName: 'Hand',
+    color: '#1d4ed8',
+    portraitColor: '#0b1f4b',
+    sprite: '/lula.svg',
+    walkSprite: '/lula_walk_spritesheet.svg',
+    attackSprite: '/lula_attack_spritesheet.svg',
+    walkFrames: 8,
+    attackFrames: 8,
+    statBonuses: {
+      maxHp: 15,
+    },
+  },
 ];

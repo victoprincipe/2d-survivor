@@ -10,7 +10,8 @@ export type WeaponId =
   | 'flying_tray'
   | 'syringe'
   | 'fire_flask'
-  | 'executioner_axe';
+  | 'executioner_axe'
+  | 'lula_power';
 
 export type EvolvedWeaponId =
   | 'holy_wand'
@@ -24,7 +25,8 @@ export type EvolvedWeaponId =
   | 'infinite_rodizio'
   | 'supreme_serum'
   | 'purifying_blaze'
-  | 'death_spiral';
+  | 'death_spiral'
+  | 'poder_do_l_maximo';
 
 export type PassiveId =
   | 'spinach'
@@ -67,6 +69,10 @@ export interface CharacterConfig {
   color: string;
   portraitColor: string;
   sprite?: string;
+  walkSprite?: string;
+  attackSprite?: string;
+  walkFrames?: number;
+  attackFrames?: number;
   statBonuses: {
     maxHp?: number;
     speed?: number;

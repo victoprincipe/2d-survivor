@@ -31,6 +31,7 @@ import {
   Biohazard,
   Dumbbell,
   Bike,
+  Hand,
 } from 'lucide-react';
 
 export function renderWeaponIcon(id: WeaponId, sizeClass: string = 'w-4 h-4'): React.ReactNode {
@@ -59,6 +60,8 @@ export function renderWeaponIcon(id: WeaponId, sizeClass: string = 'w-4 h-4'): R
       return <FlaskConical className={`${sizeClass} text-orange-500`} />;
     case 'executioner_axe':
       return <Axe className={`${sizeClass} text-rose-400`} />;
+    case 'lula_power':
+      return <Hand className={`${sizeClass} text-red-400`} />;
   }
 }
 
@@ -154,6 +157,8 @@ export function renderNamedIcon(
       return <Dumbbell className={c('text-lime-300')} />;
     case 'Bike':
       return <Bike className={c('text-amber-300')} />;
+    case 'Hand':
+      return <Hand className={c('text-red-400')} />;
     default:
       return <Flame className={c('text-amber-400')} />;
   }

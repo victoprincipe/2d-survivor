@@ -1,5 +1,5 @@
 import { WeaponId, PassiveId, UpgradeOption, WeaponInstance, PassiveInstance } from '../types';
-import { WEAPON_REGISTRY, PASSIVE_REGISTRY } from '../data/upgrades';
+import { WEAPON_REGISTRY, PASSIVE_REGISTRY, LULA_SKILL } from '../data/upgrades';
 import { Player } from '../entities/Player';
 import { Enemy } from '../entities/Enemy';
 import { SpatialGrid } from '../engine/SpatialGrid';
@@ -160,6 +160,7 @@ const ALL_WEAPON_IDS: WeaponId[] = [
   'syringe',
   'fire_flask',
   'executioner_axe',
+  'lula_power',
 ];
 
 const ALL_PASSIVE_IDS: PassiveId[] = [
@@ -627,6 +628,16 @@ export class WeaponSystem {
         const baseCd = w.evolved ? 1.05 : w.level >= 5 ? 1.18 : 1.48;
         w.cooldownTimer = baseCd * cdFactor;
         this.triggerExecutionerAxe(w, player, grid, sound);
+        break;
+      }
+      case 'lula_power': {
+        const baseCd = w.evolved
+          ? 4.0
+          : w.level >= 5
+            ? 4.2
+            : LULA_SKILL.cooldown / 1000;
+        w.cooldownTimer = baseCd * cdFactor;
+        this.triggerPoderDoL(w, player, grid, vfx, sound, onEnemyKilled);
         break;
       }
     }
@@ -1360,6 +1371,49 @@ export class WeaponSystem {
     }
 
     sound.playWhip();
+  }
+
+  private triggerPoderDoL(
+    w: WeaponInstance,
+    player: Player,
+    grid: SpatialGrid<Enemy>,
+    vfx: VFXManager,
+    sound: SoundEngine,
+    onEnemyKilled: (enemy: Enemy) => void
+  ): void {
+    const dmgTable = [0, LULA_SKILL.damage, 45, 55, 68, 82];
+    const radiusTable = [0, LULA_SKILL.radius, 165, 180, 200, 225];
+    const baseDamage =
+      (w.evolved ? 110 : dmgTable[w.level] || LULA_SKILL.damage) * player.might;
+    const radius =
+      (w.evolved ? 280 : radiusTable[w.level] || LULA_SKILL.radius) *
+      player.areaMultiplier;
+
+    player.triggerAttackAnimation(LULA_SKILL.animationDuration / 1000);
+    this.spawnRingPulse(player.x, player.y, radius, LULA_SKILL.color, 0.42);
+    this.spawnRingPulse(player.x, player.y, radius * 0.65, '#ff5252', 0.3);
+    vfx.addSparks(player.x, player.y, LULA_SKILL.color, 12);
+    sound.playThunder();
+
+    const victims = grid.queryRadius(player.x, player.y, radius);
+    for (let i = 0; i < victims.length; i++) {
+      const enemy = victims[i];
+      if (enemy.hp <= 0) continue;
+
+      const angle = Math.atan2(enemy.y - player.y, enemy.x - player.x);
+      this.dealHitToEnemy(
+        w,
+        enemy,
+        baseDamage,
+        player,
+        Math.cos(angle),
+        Math.sin(angle),
+        LULA_SKILL.knockback,
+        grid,
+        vfx,
+        onEnemyKilled
+      );
+    }
   }
 
   private performLightningBolt(

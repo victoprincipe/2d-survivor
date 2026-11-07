@@ -240,6 +240,34 @@ export const WEAPON_REGISTRY: Record<WeaponId, WeaponMeta> = {
       'Perfuração massiva e golpes críticos devastadores!',
     ],
   },
+  lula_power: {
+    id: 'lula_power',
+    name: 'Poder do L',
+    description: 'Lula ergue o braço no gesto do L e libera uma onda de energia vermelha que atinge os inimigos ao redor.',
+    maxLevel: 5,
+    iconName: 'Hand',
+    synergyPassive: 'spinach',
+    evolvedId: 'poder_do_l_maximo',
+    evolvedName: 'Poder do L Máximo',
+    evolvedDescription: 'Onda carmesim avassaladora que varre a arena com dano e repulsão massivos.',
+    levelDescriptions: [
+      'Ergue o braço e libera uma onda vermelha (35 de dano, raio 150).',
+      'Dano da onda aumentado para 45 e raio para 165.',
+      'Dano 55, raio 180 e onda mais densa.',
+      'Dano 68 e raio 200.',
+      'Dano 82, raio 225 e recarga reduzida!',
+    ],
+  },
+};
+
+export const LULA_SKILL = {
+  name: 'Poder do L',
+  damage: 35,
+  radius: 150,
+  cooldown: 5000,
+  animationDuration: 800,
+  color: '#ff1744',
+  knockback: 80,
 };
 
 export const PASSIVE_REGISTRY: Record<PassiveId, PassiveMeta> = {

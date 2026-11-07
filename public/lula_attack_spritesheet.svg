@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="160" viewBox="0 0 1024 160" role="img" aria-label="Lula attack spritesheet: 8 frames of the L gesture energy wave">
+  <defs>
+    <g id="lulaTorso">
+      <path d="M36 68 Q64 58 92 68 L98 118 Q64 130 30 118 Z" fill="#17357a"/>
+      <path d="M56 68 L64 86 L72 68 Z" fill="#f8fafc"/>
+      <path d="M61 70 L67 70 L68 78 L64 85 L60 78 Z" fill="#c1121f"/>
+      <path d="M42 70 L55 67 L88 116 L74 124 Z" fill="#f7d117"/>
+      <path d="M47 69 L54 68 L85 114 L78 118 Z" fill="#1f9d55" opacity="0.95"/>
+      <circle cx="61" cy="84" r="6" fill="#f2b705" stroke="#b8860b" stroke-width="1.5"/>
+      <circle cx="61" cy="84" r="3" fill="#2563eb"/>
+      <circle cx="77" cy="105" r="5.5" fill="#f2b705" stroke="#b8860b" stroke-width="1.5"/>
+      <circle cx="77" cy="105" r="2.7" fill="#2563eb"/>
+      <rect x="58" y="56" width="12" height="14" fill="#e8a46f"/>
+      <ellipse cx="64" cy="42" rx="22" ry="24" fill="#f2c29a"/>
+      <ellipse cx="42" cy="44" rx="4" ry="6" fill="#e8a46f"/>
+      <ellipse cx="86" cy="44" rx="4" ry="6" fill="#e8a46f"/>
+      <path d="M42 34 Q46 12 64 11 Q82 12 86 34 Q80 22 70 20 Q62 17 56 21 Q48 23 42 34 Z" fill="#f4f4f4"/>
+      <path d="M42 34 Q40 24 46 18" stroke="#d9d9d9" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <path d="M86 34 Q88 24 82 18" stroke="#d9d9d9" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <path d="M44 44 Q44 68 64 70 Q84 68 84 44 Q78 58 64 59 Q50 58 44 44 Z" fill="#f4f4f4"/>
+      <path d="M51 35 Q56 31 61 34" stroke="#f4f4f4" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <path d="M67 34 Q72 31 77 35" stroke="#f4f4f4" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <ellipse cx="56" cy="41" rx="2" ry="2.5" fill="#1f2937"/>
+      <ellipse cx="72" cy="41" rx="2" ry="2.5" fill="#1f2937"/>
+      <path d="M64 41 Q61 49 65 50 Q67 50 66 46" fill="#e8a46f"/>
+      <path d="M56 55 Q64 61 72 55" stroke="#8b3a2a" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+      <path d="M59 56 Q64 59 69 56" stroke="#ffffff" stroke-width="2" fill="none" stroke-linecap="round"/>
+    </g>
+
+    <g id="legsIdle">
+      <path d="M54 112 L50 148" stroke="#17357a" stroke-width="13" stroke-linecap="round"/>
+      <ellipse cx="48" cy="151" rx="9" ry="4.5" fill="#151515"/>
+      <path d="M74 112 L78 148" stroke="#17357a" stroke-width="13" stroke-linecap="round"/>
+      <ellipse cx="80" cy="151" rx="9" ry="4.5" fill="#151515"/>
+    </g>
+    <g id="armDownLeft">
+      <path d="M40 72 L34 100" stroke="#17357a" stroke-width="12" stroke-linecap="round"/>
+      <circle cx="33" cy="103" r="5" fill="#f2c29a"/>
+    </g>
+    <g id="armDownRight">
+      <path d="M88 72 L94 100" stroke="#17357a" stroke-width="12" stroke-linecap="round"/>
+      <circle cx="95" cy="103" r="5" fill="#f2c29a"/>
+    </g>
+
+    <g id="atkBase">
+      <use href="#legsIdle"/>
+      <use href="#lulaTorso"/>
+      <use href="#armDownLeft"/>
+    </g>
+
+    <g id="atk0"><use href="#atkBase"/><use href="#armDownRight"/></g>
+
+    <g id="atk1">
+      <use href="#atkBase"/>
+      <path d="M88 72 L98 60" stroke="#17357a" stroke-width="12" stroke-linecap="round"/>
+      <circle cx="100" cy="57" r="5" fill="#f2c29a"/>
+      <circle cx="100" cy="57" r="11" fill="none" stroke="#ff1744" stroke-width="2" opacity="0.45"/>
+    </g>
+
+    <g id="atk2">
+      <use href="#atkBase"/>
+      <path d="M88 72 L100 48" stroke="#17357a" stroke-width="12" stroke-linecap="round"/>
+      <circle cx="102" cy="45" r="5" fill="#f2c29a"/>
+      <circle cx="102" cy="45" r="15" fill="none" stroke="#ff1744" stroke-width="2.5" opacity="0.55"/>
+      <path d="M114 34 Q126 42 120 54" stroke="#ff1744" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.6"/>
+    </g>
+
+    <g id="atk3">
+      <use href="#atkBase"/>
+      <path d="M88 72 L99 40" stroke="#17357a" stroke-width="12" stroke-linecap="round"/>
+      <circle cx="100" cy="36" r="5" fill="#f2c29a"/>
+      <circle cx="100" cy="36" r="19" fill="none" stroke="#ff1744" stroke-width="3" opacity="0.65"/>
+      <path d="M114 22 Q126 34 120 52" stroke="#ff1744" stroke-width="3.5" fill="none" stroke-linecap="round" opacity="0.7"/>
+    </g>
+
+    <g id="armGesture">
+      <path d="M88 72 L98 34" stroke="#17357a" stroke-width="12" stroke-linecap="round"/>
+      <circle cx="100" cy="30" r="5" fill="#f2c29a"/>
+      <path d="M100 30 L100 17" stroke="#f2c29a" stroke-width="4" stroke-linecap="round"/>
+      <path d="M100 30 L113 30" stroke="#f2c29a" stroke-width="4" stroke-linecap="round"/>
+    </g>
+
+    <g id="atk4">
+      <use href="#atkBase"/>
+      <use href="#armGesture"/>
+      <circle cx="96" cy="28" r="18" fill="none" stroke="#ff1744" stroke-width="3" opacity="0.7"/>
+      <path d="M114 14 Q126 26 118 46" stroke="#ff1744" stroke-width="4" fill="none" stroke-linecap="round" opacity="0.8"/>
+    </g>
+
+    <g id="atk5">
+      <use href="#atkBase"/>
+      <use href="#armGesture"/>
+      <circle cx="96" cy="28" r="22" fill="none" stroke="#ff1744" stroke-width="3.5" opacity="0.75"/>
+      <path d="M112 8 Q126 24 120 50" stroke="#ff1744" stroke-width="5" fill="none" stroke-linecap="round" opacity="0.8"/>
+      <path d="M118 20 Q126 32 121 44" stroke="#ff5252" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.7"/>
+    </g>
+
+    <g id="atk6">
+      <use href="#atkBase"/>
+      <use href="#armGesture"/>
+      <circle cx="94" cy="28" r="26" fill="none" stroke="#ff1744" stroke-width="4" opacity="0.7"/>
+      <path d="M110 4 Q126 22 122 54" stroke="#ff1744" stroke-width="6" fill="none" stroke-linecap="round" opacity="0.8"/>
+      <path d="M116 14 Q126 30 122 48" stroke="#ff5252" stroke-width="4" fill="none" stroke-linecap="round" opacity="0.75"/>
+      <path d="M120 24 Q126 36 123 46" stroke="#ffd1d8" stroke-width="2.5" fill="none" stroke-linecap="round" opacity="0.8"/>
+    </g>
+
+    <g id="atk7">
+      <use href="#atkBase"/>
+      <use href="#armGesture"/>
+      <circle cx="92" cy="30" r="30" fill="none" stroke="#ff1744" stroke-width="4" opacity="0.55"/>
+      <path d="M108 2 Q126 24 122 58" stroke="#ff1744" stroke-width="6" fill="none" stroke-linecap="round" opacity="0.65"/>
+      <path d="M116 12 Q126 32 122 52" stroke="#ff5252" stroke-width="4" fill="none" stroke-linecap="round" opacity="0.6"/>
+      <path d="M120 22 Q126 36 123 48" stroke="#ffd1d8" stroke-width="2.5" fill="none" stroke-linecap="round" opacity="0.7"/>
+    </g>
+  </defs>
+
+  <use href="#atk0" transform="translate(0 0)"/>
+  <use href="#atk1" transform="translate(128 0)"/>
+  <use href="#atk2" transform="translate(256 0)"/>
+  <use href="#atk3" transform="translate(384 0)"/>
+  <use href="#atk4" transform="translate(512 0)"/>
+  <use href="#atk5" transform="translate(640 0)"/>
+  <use href="#atk6" transform="translate(768 0)"/>
+  <use href="#atk7" transform="translate(896 0)"/>
+</svg>

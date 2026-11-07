@@ -64,7 +64,11 @@ export class Player {
 
   public character: CharacterConfig;
   public powerUps: PermanentPowerUps = {};
+  public attackAnimTimer: number = 0;
+  public attackAnimDuration: number = 0;
   private spriteImage: HTMLImageElement | null = null;
+  private walkSpriteImage: HTMLImageElement | null = null;
+  private attackSpriteImage: HTMLImageElement | null = null;
 
   public static computeXpToNextLevel(level: number): number {
     const lv = Math.max(0, level - 1);
@@ -78,6 +82,16 @@ export class Player {
     if (character.sprite && typeof window !== 'undefined') {
       this.spriteImage = new Image();
       this.spriteImage.src = character.sprite;
+    }
+
+    if (character.walkSprite && typeof window !== 'undefined') {
+      this.walkSpriteImage = new Image();
+      this.walkSpriteImage.src = character.walkSprite;
+    }
+
+    if (character.attackSprite && typeof window !== 'undefined') {
+      this.attackSpriteImage = new Image();
+      this.attackSpriteImage.src = character.attackSprite;
     }
 
     // Apply character base modifiers
@@ -115,6 +129,10 @@ export class Player {
       this.speedBoostTimer -= dt;
     }
 
+    if (this.attackAnimTimer > 0) {
+      this.attackAnimTimer = Math.max(0, this.attackAnimTimer - dt);
+    }
+
     // Health recovery
     if (this.recoveryPerSec > 0 && this.hp < this.maxHp) {
       this.hp = Math.min(this.maxHp, this.hp + this.recoveryPerSec * dt);
@@ -138,6 +156,11 @@ export class Player {
     }
 
     return this.hp > 0;
+  }
+
+  public triggerAttackAnimation(duration: number): void {
+    this.attackAnimDuration = Math.max(0.01, duration);
+    this.attackAnimTimer = this.attackAnimDuration;
   }
 
   takeDamage(amount: number): boolean {
@@ -184,8 +207,17 @@ export class Player {
     ctx.save();
     ctx.translate(screen.x, screen.y);
 
-    // Walking bounce
-    const bob = Math.sin(this.walkAnimTimer) * 3;
+    const walkSheet = this.walkSpriteImage;
+    const attackSheet = this.attackSpriteImage;
+    const hasWalkSheet = !!walkSheet && walkSheet.complete && walkSheet.naturalWidth > 0;
+    const hasAttackSheet =
+      !!attackSheet && attackSheet.complete && attackSheet.naturalWidth > 0;
+    const isDead = this.hp <= 0;
+    const isAttacking = !isDead && this.attackAnimTimer > 0 && hasAttackSheet;
+    const isUsingSheet = hasWalkSheet;
+
+    // Spritesheets already animate the gait, so avoid an extra bounce.
+    const bob = isUsingSheet ? 0 : Math.sin(this.walkAnimTimer) * 3;
 
     // Shadow
     ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
@@ -193,50 +225,108 @@ export class Player {
     ctx.ellipse(0, 16, 16, 7, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Facing direction flip
     const flip = this.facingX < 0 ? -1 : 1;
-    ctx.scale(flip, 1);
+    const spriteHeight = 52;
 
-    const sprite = this.spriteImage;
-    if (sprite && sprite.complete && sprite.naturalWidth > 0) {
-      // Character sprite
-      const spriteHeight = 52;
-      const spriteWidth = spriteHeight * (sprite.naturalWidth / sprite.naturalHeight);
-      ctx.drawImage(sprite, -spriteWidth / 2, 14 - spriteHeight + bob, spriteWidth, spriteHeight);
+    if (isUsingSheet && walkSheet) {
+      // Sheet-based animation: 8 walk frames per row, attack frames on a single row.
+      const walkFrames = Math.max(1, this.character.walkFrames ?? 8);
+      const attackFrames = Math.max(1, this.character.attackFrames ?? 8);
+
+      if (isAttacking && attackSheet) {
+        const frameWidth = attackSheet.naturalWidth / attackFrames;
+        const frameHeight = attackSheet.naturalHeight;
+        const progress =
+          this.attackAnimDuration > 0
+            ? 1 - this.attackAnimTimer / this.attackAnimDuration
+            : 1;
+        const frame = Math.min(
+          attackFrames - 1,
+          Math.max(0, Math.floor(progress * attackFrames))
+        );
+        const spriteWidth = spriteHeight * (frameWidth / frameHeight);
+
+        ctx.save();
+        if (flip < 0) ctx.scale(-1, 1);
+        ctx.drawImage(
+          attackSheet,
+          frame * frameWidth,
+          0,
+          frameWidth,
+          frameHeight,
+          -spriteWidth / 2,
+          14 - spriteHeight,
+          spriteWidth,
+          spriteHeight
+        );
+        ctx.restore();
+      } else {
+        const frameWidth = walkSheet.naturalWidth / walkFrames;
+        const frameHeight = walkSheet.naturalHeight / 2;
+        const row = this.facingX < 0 ? 1 : 0;
+        const frame = isDead
+          ? 0
+          : this.isMoving
+            ? Math.floor(this.walkAnimTimer) % walkFrames
+            : 0;
+        const spriteWidth = spriteHeight * (frameWidth / frameHeight);
+
+        ctx.drawImage(
+          walkSheet,
+          frame * frameWidth,
+          row * frameHeight,
+          frameWidth,
+          frameHeight,
+          -spriteWidth / 2,
+          14 - spriteHeight,
+          spriteWidth,
+          spriteHeight
+        );
+      }
     } else {
-      // Cape / Back detail
-      ctx.fillStyle = '#1a1a24';
-      ctx.beginPath();
-      ctx.moveTo(-10, bob);
-      ctx.lineTo(-14, 14 + bob);
-      ctx.lineTo(-2, 10 + bob);
-      ctx.fill();
+      // Facing direction flip
+      ctx.scale(flip, 1);
 
-      // Body / Robe
-      ctx.fillStyle = this.character.color;
-      ctx.beginPath();
-      ctx.roundRect(-10, -6 + bob, 20, 20, 6);
-      ctx.fill();
+      const sprite = this.spriteImage;
+      if (sprite && sprite.complete && sprite.naturalWidth > 0) {
+        // Character sprite
+        const spriteWidth = spriteHeight * (sprite.naturalWidth / sprite.naturalHeight);
+        ctx.drawImage(sprite, -spriteWidth / 2, 14 - spriteHeight + bob, spriteWidth, spriteHeight);
+      } else {
+        // Cape / Back detail
+        ctx.fillStyle = '#1a1a24';
+        ctx.beginPath();
+        ctx.moveTo(-10, bob);
+        ctx.lineTo(-14, 14 + bob);
+        ctx.lineTo(-2, 10 + bob);
+        ctx.fill();
 
-      // Belt / Trim
-      ctx.fillStyle = '#f4a261';
-      ctx.fillRect(-10, 4 + bob, 20, 3);
+        // Body / Robe
+        ctx.fillStyle = this.character.color;
+        ctx.beginPath();
+        ctx.roundRect(-10, -6 + bob, 20, 20, 6);
+        ctx.fill();
 
-      // Head
-      ctx.fillStyle = '#ffdbac';
-      ctx.beginPath();
-      ctx.arc(0, -12 + bob, 9, 0, Math.PI * 2);
-      ctx.fill();
+        // Belt / Trim
+        ctx.fillStyle = '#f4a261';
+        ctx.fillRect(-10, 4 + bob, 20, 3);
 
-      // Hair / Hood
-      ctx.fillStyle = this.character.portraitColor;
-      ctx.beginPath();
-      ctx.arc(0, -14 + bob, 10, Math.PI * 0.8, Math.PI * 2.2);
-      ctx.fill();
+        // Head
+        ctx.fillStyle = '#ffdbac';
+        ctx.beginPath();
+        ctx.arc(0, -12 + bob, 9, 0, Math.PI * 2);
+        ctx.fill();
 
-      // Eyes
-      ctx.fillStyle = '#111827';
-      ctx.fillRect(2, -14 + bob, 3, 3);
+        // Hair / Hood
+        ctx.fillStyle = this.character.portraitColor;
+        ctx.beginPath();
+        ctx.arc(0, -14 + bob, 10, Math.PI * 0.8, Math.PI * 2.2);
+        ctx.fill();
+
+        // Eyes
+        ctx.fillStyle = '#111827';
+        ctx.fillRect(2, -14 + bob, 3, 3);
+      }
     }
 
     ctx.restore();
@@ -248,7 +338,12 @@ export class Player {
     const barWidth = HP_BAR_WIDTH;
     const barHeight = HP_BAR_HEIGHT;
     const barX = Math.round(screen.x - barWidth / 2);
-    const barY = Math.round(screen.y - (sprite ? 52 : 36));
+    const hasPlayerSprite =
+      isUsingSheet ||
+      (!!this.spriteImage &&
+        this.spriteImage.complete &&
+        this.spriteImage.naturalWidth > 0);
+    const barY = Math.round(screen.y - (hasPlayerSprite ? 52 : 36));
 
     ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
     ctx.fillRect(barX, barY, barWidth, barHeight);
