@@ -1,17 +1,29 @@
-import { DifficultyConfig, EnemyType } from '../types';
+import { AmazonEnemyType, DifficultyConfig, EnemyType, MapId } from '../types';
 import { Enemy } from '../entities/Enemy';
 import { Player } from '../entities/Player';
 import { Camera } from '../engine/Camera';
 import { SoundEngine } from '../engine/SoundEngine';
+import { WorldSystem } from './WorldProps';
+import {
+  AMAZON_BASIC_ENEMIES,
+  AMAZON_ELITE_ENEMIES,
+  AMAZON_MEDIUM_ENEMIES,
+  AMAZON_RESISTANT_ENEMIES,
+  isAmazonWaterEnemy,
+} from '../data/amazonEnemies';
 
 export class WaveDirector {
   public survivalTime: number = 0;
   public difficulty: DifficultyConfig;
   private nextEnemyId: number = 1;
   private spawnTimer: number = 0;
+  private mapId: MapId;
+  private world: WorldSystem | undefined;
 
-  constructor(difficulty: DifficultyConfig) {
+  constructor(difficulty: DifficultyConfig, mapId: MapId = 'night_plain', world?: WorldSystem) {
     this.difficulty = difficulty;
+    this.mapId = mapId;
+    this.world = world;
   }
 
   // Event flags to ensure one-time triggers
@@ -53,6 +65,16 @@ export class WaveDirector {
       420,
       Math.floor((95 + Math.floor(minutes * 58)) * this.difficulty.enemyCount)
     );
+
+    // The Amazon map uses only its exclusive fauna, with no night-plain mobs,
+    // timed night events, minotaurs, spectral generals or corruption boss.
+    if (this.mapId === 'amazon_forest') {
+      if (this.spawnTimer >= spawnInterval && enemies.length < maxEnemies) {
+        this.spawnTimer = 0;
+        this.spawnAmazonEnemy(camera, hpMultiplier, onSpawn);
+      }
+      return;
+    }
 
     // Regular interval spawning
     if (this.spawnTimer >= spawnInterval && enemies.length < maxEnemies) {
@@ -159,6 +181,58 @@ export class WaveDirector {
     }
 
     return { x, y };
+  }
+
+  private spawnAmazonEnemy(
+    camera: Camera,
+    hpMult: number,
+    onSpawn: (enemy: Enemy) => void
+  ): void {
+    const type = this.pickAmazonEnemy();
+    const water = isAmazonWaterEnemy(type);
+    const pos = this.world
+      ? this.world.getAmazonSpawnPosition(camera, water)
+      : this.getSpawnPositionOutsideScreen(camera);
+    onSpawn(this.createEnemy(type, pos.x, pos.y, hpMult));
+  }
+
+  private pickAmazonEnemy(): AmazonEnemyType {
+    const minutes = this.survivalTime / 60;
+    const roll = Math.random();
+    let pool: AmazonEnemyType[];
+
+    if (minutes < 1) {
+      pool = AMAZON_BASIC_ENEMIES;
+    } else if (minutes < 2.25) {
+      pool = roll < 0.72 ? AMAZON_BASIC_ENEMIES : AMAZON_MEDIUM_ENEMIES;
+    } else if (minutes < 3.75) {
+      pool =
+        roll < 0.32
+          ? AMAZON_BASIC_ENEMIES
+          : roll < 0.78
+            ? AMAZON_MEDIUM_ENEMIES
+            : AMAZON_RESISTANT_ENEMIES;
+    } else if (minutes < 5) {
+      pool =
+        roll < 0.22
+          ? AMAZON_BASIC_ENEMIES
+          : roll < 0.57
+            ? AMAZON_MEDIUM_ENEMIES
+            : roll < 0.94
+              ? AMAZON_RESISTANT_ENEMIES
+              : AMAZON_ELITE_ENEMIES;
+    } else {
+      pool =
+        roll < 0.12
+          ? AMAZON_BASIC_ENEMIES
+          : roll < 0.42
+            ? AMAZON_MEDIUM_ENEMIES
+            : roll < 0.88
+              ? AMAZON_RESISTANT_ENEMIES
+              : AMAZON_ELITE_ENEMIES;
+    }
+
+    return pool[Math.floor(Math.random() * pool.length)];
   }
 
   private spawnRegularEnemy(

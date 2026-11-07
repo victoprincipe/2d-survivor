@@ -182,7 +182,36 @@ export interface SavedGameData {
   missions: MissionSaveState;
 }
 
-export type EnemyType = 'bat' | 'skeleton' | 'zombie' | 'ghost' | 'elite_minotaur' | 'boss_vampire';
+export type AmazonEnemyType =
+  | 'bullet_ant'
+  | 'leafcutter_ant'
+  | 'blue_butterfly'
+  | 'cicada'
+  | 'piranha'
+  | 'poison_frog'
+  | 'mantis'
+  | 'stick_insect'
+  | 'toucan'
+  | 'pink_dolphin'
+  | 'capybara'
+  | 'sloth'
+  | 'rhino_beetle'
+  | 'longhorn_beetle'
+  | 'giant_centipede'
+  | 'giant_otter'
+  | 'jaguar'
+  | 'tapir'
+  | 'goliath_spider'
+  | 'black_caiman';
+
+export type EnemyType =
+  | 'bat'
+  | 'skeleton'
+  | 'zombie'
+  | 'ghost'
+  | 'elite_minotaur'
+  | 'boss_vampire'
+  | AmazonEnemyType;
 
 export type DropType =
   | 'gem_blue'

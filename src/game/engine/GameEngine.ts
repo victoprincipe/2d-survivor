@@ -93,7 +93,7 @@ export class GameEngine {
     this.vfx = new VFXManager();
     this.worldProps = new WorldSystem(mapId);
     this.difficulty = getDifficulty(difficultyId);
-    this.waveDirector = new WaveDirector(this.difficulty);
+    this.waveDirector = new WaveDirector(this.difficulty, mapId, this.worldProps);
 
     this.player = new Player(character, savedData.powerUps);
     this.player.setCollisionResolver((fromX, fromY, dx, dy, radius) =>
@@ -195,6 +195,12 @@ export class GameEngine {
       const e = this.enemies[i];
       const sep = this.spatialGrid.applySeparation(e, e.radius * 2, 0.45);
       const alive = e.update(dt, this.player, sep);
+
+      // Aquatic Amazon fauna must stay inside the river, even when chasing,
+      // dashing or being knocked back.
+      if (e.habitat === 'water') {
+        this.worldProps.constrainToRiver(e);
+      }
 
       if (!alive) {
         this.enemies.splice(i, 1);

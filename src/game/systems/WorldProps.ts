@@ -275,6 +275,91 @@ export class WorldSystem {
   }
 
   /**
+   * Keeps aquatic enemies inside the river band, even after knockback or a
+   * charge. They never reach the banks, the lakes or the open forest.
+   */
+  public constrainToRiver(entity: { x: number; y: number; radius: number }): void {
+    if (this.mapId !== 'amazon_forest') return;
+
+    const xLimit = FOREST_HALF_SIZE - 400;
+    entity.x = Math.max(-xLimit, Math.min(xLimit, entity.x));
+
+    const center = this.riverCenterY(entity.x);
+    const limit = Math.max(10, RIVER_HALF_WIDTH - entity.radius - 4);
+    const dy = entity.y - center;
+    if (dy > limit) entity.y = center + limit;
+    else if (dy < -limit) entity.y = center - limit;
+  }
+
+  /**
+   * Chooses a spawn point for the Amazon fauna. Land creatures are placed on
+   * dry ground outside the screen; aquatic creatures are placed inside the
+   * river band and can never spawn in a lake or on land.
+   */
+  public getAmazonSpawnPosition(camera: Camera, water: boolean): { x: number; y: number } {
+    const margin = 70;
+    const halfW = camera.viewportWidth / 2 + margin;
+    const halfH = camera.viewportHeight / 2 + margin;
+    const limit = FOREST_HALF_SIZE - 400;
+
+    if (water) {
+      for (let i = 0; i < 40; i++) {
+        const x = camera.x + (Math.random() - 0.5) * halfW * 2.2;
+        const y = this.riverCenterY(x) + (Math.random() - 0.5) * RIVER_WIDTH * 0.55;
+        if (Math.abs(x) <= limit && Math.abs(y) <= limit) {
+          return { x, y };
+        }
+      }
+      const x = Math.max(-limit, Math.min(limit, camera.x));
+      return { x, y: this.riverCenterY(x) };
+    }
+
+    for (let i = 0; i < 70; i++) {
+      const side = Math.floor(Math.random() * 4);
+      let x = camera.x;
+      let y = camera.y;
+
+      if (side === 0) {
+        x += (Math.random() - 0.5) * 2 * halfW;
+        y -= halfH;
+      } else if (side === 1) {
+        x += halfW;
+        y += (Math.random() - 0.5) * 2 * halfH;
+      } else if (side === 2) {
+        x += (Math.random() - 0.5) * 2 * halfW;
+        y += halfH;
+      } else {
+        x -= halfW;
+        y += (Math.random() - 0.5) * 2 * halfH;
+      }
+
+      if (Math.abs(x) > limit || Math.abs(y) > limit) continue;
+      if (!this.isInWater(x, y)) return { x, y };
+
+      // Nudge the candidate out of the river/lake towards the nearest bank.
+      const riverY = this.riverCenterY(x);
+      const bank = RIVER_HALF_WIDTH + RIVER_BANK + 90;
+      const pushedY = y >= riverY ? riverY + bank : riverY - bank;
+      if (Math.abs(pushedY) <= limit && !this.isInWater(x, pushedY)) {
+        return { x, y: pushedY };
+      }
+    }
+
+    // Sample a wider area around the camera before giving up.
+    for (let i = 0; i < 120; i++) {
+      const x = camera.x + (Math.random() - 0.5) * halfW * 6;
+      const y = camera.y + (Math.random() - 0.5) * halfH * 6;
+      if (Math.abs(x) <= limit && Math.abs(y) <= limit && !this.isInWater(x, y)) {
+        return { x, y };
+      }
+    }
+
+    // Guaranteed dry point in the central gap between the lakes.
+    const side = camera.y >= 0 ? 1 : -1;
+    return { x: 0, y: side * (RIVER_HALF_WIDTH + RIVER_BANK + 200) };
+  }
+
+  /**
    * World span (in world units) shown across the minimap. For the finite
    * Amazon map this covers about 30% of the total map area; the night plain
    * has no real bounds, so a practical radar range is used instead.
