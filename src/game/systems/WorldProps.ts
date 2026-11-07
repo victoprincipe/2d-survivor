@@ -8,7 +8,6 @@ export interface TorchProp {
   x: number;
   y: number;
   radius: number;
-  hp: number;
   animTimer: number;
   buff: DropType;
 }
@@ -62,7 +61,6 @@ export class WorldSystem {
         x,
         y,
         radius: 12,
-        hp: 1,
         animTimer: Math.random() * 5,
         buff,
       });
