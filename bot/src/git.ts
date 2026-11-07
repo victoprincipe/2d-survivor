@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
+import path from 'node:path';
 import { paths, queueConfig } from './config';
 
 export class GitError extends Error {
@@ -23,6 +24,9 @@ const COMMIT_ENV = {
     process.env.GIT_COMMITTER_EMAIL ??
     '6431486+victoprincipe@users.noreply.github.com',
   GIT_TERMINAL_PROMPT: '0',
+  // `git rebase --continue` não deve abrir editor no worker.
+  GIT_EDITOR: process.env.GIT_EDITOR ?? 'true',
+  GIT_SEQUENCE_EDITOR: process.env.GIT_SEQUENCE_EDITOR ?? 'true',
 };
 
 export function git(args: string[], cwd = paths.repo, trim = true): string {
@@ -109,6 +113,111 @@ export function pushJobBranch(dir: string, branch: string): string {
   return git(['push', '--force', 'origin', branch], dir);
 }
 
+/**
+ * Atualiza `origin/<branch>` no clone e devolve o sha remoto.
+ * Usa refspec explícito para não depender da configuração do clone.
+ */
+export function fetchMain(dir: string, branch: string): string {
+  git(
+    ['fetch', '--prune', 'origin', `+refs/heads/${branch}:refs/remotes/origin/${branch}`],
+    dir,
+  );
+  return git(['rev-parse', `origin/${branch}`], dir);
+}
+
+/**
+ * Reaplica o commit do job sobre o novo topo da master.
+ * `-X theirs` numa rebase significa "o commit sendo reaplicado vence" — ou seja,
+ * em caso de conflito as alterações do job são mantidas.
+ * Conflitos que a estratégia não resolve sozinhos (modify/delete, add/add)
+ * param a rebase e são tratados por resolveConflictsTakingTheirs().
+ */
+export function rebaseTakingJobChanges(dir: string, upstream: string): void {
+  git(['rebase', '-X', 'theirs', upstream], dir);
+}
+
+export function rebaseInProgress(dir: string): boolean {
+  for (const name of ['rebase-merge', 'rebase-apply']) {
+    const raw = gitTry(['rev-parse', '--git-path', name], dir).stdout;
+    if (!raw) continue;
+    const resolved = path.isAbsolute(raw) ? raw : path.join(dir, raw);
+    if (fs.existsSync(resolved)) return true;
+  }
+  return false;
+}
+
+export function conflictedPaths(dir: string): string[] {
+  return gitTry(['diff', '--name-only', '--diff-filter=U'], dir).stdout
+    .split('\n')
+    .filter(Boolean);
+}
+
+function hasTheirsStage(dir: string, file: string): boolean {
+  return gitTry(['ls-files', '-u', '--', file], dir).stdout
+    .split('\n')
+    .filter(Boolean)
+    .some((entry) => {
+      const [, , stage] = (entry.split('\t')[0] ?? '').split(' ');
+      return stage === '3';
+    });
+}
+
+/**
+ * Resolve os conflitos pendentes a favor do job (o lado "theirs" da rebase).
+ * Quando o job removeu o arquivo, mantém a remoção.
+ */
+export function resolveConflictsTakingTheirs(dir: string, files: string[]): void {
+  for (const file of files) {
+    if (hasTheirsStage(dir, file)) {
+      git(['checkout', '--theirs', '--', file], dir);
+      git(['add', '--', file], dir);
+    } else {
+      git(['rm', '-f', '--', file], dir);
+    }
+  }
+}
+
+/**
+ * Continua a rebase; se o commit ficou vazio (a master já tinha a mudança),
+ * descarta o commit em vez de falhar.
+ */
+export function continueRebase(dir: string): void {
+  try {
+    git(['rebase', '--continue'], dir);
+  } catch (error) {
+    if (gitTry(['diff', '--cached', '--quiet'], dir).ok) {
+      git(['rebase', '--skip'], dir);
+      return;
+    }
+    throw error;
+  }
+}
+
+export function abortRebase(dir: string): void {
+  if (rebaseInProgress(dir)) gitTry(['rebase', '--abort'], dir);
+}
+
+/**
+ * Push da master com trava: falha se o origin não estiver exatamente em
+ * `expectedSha` (alguém empurrou entre o fetch e o push). Assim o worker nunca
+ * sobrescreve um commit que não viu; ele reintegra e tenta de novo.
+ */
+export function pushMainWithLease(
+  dir: string,
+  branch: string,
+  expectedSha: string,
+): string {
+  return git(
+    [
+      'push',
+      `--force-with-lease=refs/heads/${branch}:${expectedSha}`,
+      'origin',
+      `HEAD:${branch}`,
+    ],
+    dir,
+  );
+}
+
 export function createPlanRepo(id: number): { dir: string; base: string } {
   const dir = `${paths.worktrees}/plan-${id}`;
 
@@ -123,10 +232,6 @@ export function createPlanRepo(id: number): { dir: string; base: string } {
   git(['clone', '--branch', queueConfig.mainBranch, origin, dir], paths.repo);
   const base = git(['rev-parse', 'HEAD'], dir);
   return { dir, base };
-}
-
-export function pushMasterFromClone(dir: string, branch: string): string {
-  return git(['push', 'origin', `HEAD:${branch}`], dir);
 }
 
 export function worktreeRemove(dir: string): void {
@@ -223,8 +328,8 @@ export function branchExists(branch: string): boolean {
   return gitTry(['rev-parse', '--verify', branch]).ok;
 }
 
-export function isAncestor(sha: string, ref = 'HEAD'): boolean {
-  return gitTry(['merge-base', '--is-ancestor', sha, ref]).ok;
+export function isAncestor(sha: string, ref = 'HEAD', cwd = paths.repo): boolean {
+  return gitTry(['merge-base', '--is-ancestor', sha, ref], cwd).ok;
 }
 
 export function revertCommit(sha: string): string {
@@ -236,8 +341,8 @@ export function abortRevert(): void {
   gitTry(['revert', '--abort']);
 }
 
-export function revParse(ref: string): string {
-  return git(['rev-parse', ref]);
+export function revParse(ref: string, cwd = paths.repo): string {
+  return git(['rev-parse', ref], cwd);
 }
 
 export function shortSha(sha: string | null): string {

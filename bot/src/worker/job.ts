@@ -15,6 +15,7 @@ import {
   hasChanges,
   hasChangesExcluding,
   pushJobBranch,
+  shortSha,
   worktreeRemove,
 } from '../git';
 import { createLogger } from '../logger';
@@ -33,27 +34,10 @@ import {
 import { runGate } from './gate';
 import { runAgent } from './opencode';
 import { removeJobAssets, removeStagedAudio, stageJobAudio } from './assets';
+import { reviewReasons } from './review';
 import { prepareNodeModules } from './workspace';
 
 const log = createLogger('job');
-
-const PROTECTED_PATTERNS = [
-  /^bot\//,
-  /^\.github\//,
-  /^\.git\//,
-  /(^|\/)\.env(\.|$)/,
-  /^AGENTS\.md$/,
-  /^opencode\.jsonc?$/,
-  /^\.opencode\//,
-  /^package(-lock)?\.json$/,
-  /^next\.config\./,
-  /^tsconfig\.json$/,
-  /^eslint\.config\./,
-  /^postcss\.config\./,
-  /^tailwind\.config\./,
-  /^\.npmrc$/,
-  /^\.yarnrc/,
-];
 
 function truncate(value: string, max: number): string {
   return value.length <= max ? value : `${value.slice(0, max - 1)}…`;
@@ -111,29 +95,6 @@ function cleanupWorktree(job: Job): void {
     log.warn(`Falha ao remover worktree do job #${job.id}: ${String(error)}`);
   }
   updateJob(job.id, { worktree: null });
-}
-
-function reviewReasons(stats: ReturnType<typeof getDiffStats>): string[] {
-  const reasons: string[] = [];
-
-  if (stats.files > queueConfig.maxDiffFiles) {
-    reasons.push(`Diff tocou ${stats.files} arquivos (limite ${queueConfig.maxDiffFiles})`);
-  }
-  if (stats.lines > queueConfig.maxDiffLines) {
-    reasons.push(`Diff tem ${stats.lines} linhas (limite ${queueConfig.maxDiffLines})`);
-  }
-  if (stats.deletedFiles.length > 0) {
-    reasons.push(`Arquivos removidos: ${stats.deletedFiles.slice(0, 5).join(', ')}`);
-  }
-
-  const protectedHits = stats.changedFiles.filter((file) =>
-    PROTECTED_PATTERNS.some((pattern) => pattern.test(file)),
-  );
-  if (protectedHits.length > 0) {
-    reasons.push(`Caminhos protegidos: ${protectedHits.slice(0, 5).join(', ')}`);
-  }
-
-  return reasons;
 }
 
 function nowIso(): string {
@@ -203,7 +164,7 @@ async function handleExecute(job: Job): Promise<void> {
       throw new NeedsReviewError(reasons.join('; '));
     }
 
-    await applyJob(requireJob(job.id));
+    const applied = await applyJob(requireJob(job.id));
 
     const done = updateJob(job.id, {
       status: 'done',
@@ -212,7 +173,17 @@ async function handleExecute(job: Job): Promise<void> {
       review_reason: null,
       worktree: null,
     });
-    const message = `Job **#${job.id}** aplicado e enviado para \`origin/${queueConfig.mainBranch}\`.`;
+
+    const integration = applied.rebased
+      ? ` Integrado sobre \`${shortSha(applied.baseSha)}\` antes do push.`
+      : '';
+    const resolved =
+      applied.resolvedFiles.length > 0
+        ? ` Conflitos resolvidos a favor do job: ${applied.resolvedFiles.slice(0, 5).join(', ')}.`
+        : '';
+    const message = applied.empty
+      ? `Job **#${job.id}** já estava em \`origin/${queueConfig.mainBranch}\`; nada novo foi aplicado.${resolved}`
+      : `Job **#${job.id}** aplicado e enviado para \`origin/${queueConfig.mainBranch}\`.${integration}${resolved}`;
     await postEmbedToJob(done, message);
     await updateJobMessage(done);
   } catch (error) {

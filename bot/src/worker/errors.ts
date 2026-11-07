@@ -48,3 +48,10 @@ export class PushError extends Error {
     this.name = 'PushError';
   }
 }
+
+export class IntegrationConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'IntegrationConflictError';
+  }
+}
