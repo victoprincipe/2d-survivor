@@ -1277,7 +1277,7 @@ export class GameEngine {
   private renderMinimap(): void {
     const { ctx, camera } = this;
     const viewport = Math.min(camera.viewportWidth, camera.viewportHeight);
-    const size = viewport < 640 ? 112 : 152;
+    const size = viewport < 640 ? 224 : 304;
     const margin = 12;
     const x = margin;
     // Leave room for the bottom HUD hint without leaving the corner.

@@ -69,6 +69,16 @@ const FRUIT_TREE_BENEFITS: Record<FruitTreeKind, string> = {
   araca: 'Explosão: Dano em área nos inimigos',
 };
 
+// Distinct minimap colors so each fruit can be told apart at a glance.
+const FRUIT_TREE_MINIMAP_COLORS: Record<FruitTreeKind, string> = {
+  acai: '#a855f7',
+  cupuacu: '#d4a017',
+  castanha: '#8b5a2b',
+  buriti: '#f97316',
+  pupunha: '#ef4444',
+  araca: '#a3e635',
+};
+
 interface TreeProp {
   x: number;
   y: number;
@@ -158,24 +168,23 @@ export class WorldSystem {
   }
 
   private spawnInitialFruitTrees(): void {
-    // The first six trees are hand-placed near the spawn area, one of each
-    // fruit, so every Amazon run starts with all available effects nearby.
-    const initial: { kind: FruitTreeKind; x: number; y: number }[] = [
-      { kind: 'acai', x: 420, y: -760 },
-      { kind: 'cupuacu', x: -440, y: 820 },
-      { kind: 'castanha', x: 820, y: -720 },
-      { kind: 'buriti', x: -900, y: -1300 },
-      { kind: 'pupunha', x: -1000, y: 1200 },
-      { kind: 'araca', x: 900, y: 1300 },
+    // One tree of each fruit starts at a fully random land position.
+    const kinds: FruitTreeKind[] = [
+      'acai',
+      'cupuacu',
+      'castanha',
+      'buriti',
+      'pupunha',
+      'araca',
     ];
 
-    for (let i = 0; i < initial.length; i++) {
-      const tree = initial[i];
+    for (let i = 0; i < kinds.length; i++) {
+      const spawn = this.findFruitTreeSpawn();
       this.fruitTrees.push({
         id: this.nextFruitTreeId++,
-        kind: tree.kind,
-        x: tree.x,
-        y: tree.y,
+        kind: kinds[i],
+        x: spawn.x,
+        y: spawn.y,
         active: true,
         respawnTimer: 0,
         animTimer: Math.random() * Math.PI * 2,
@@ -183,16 +192,13 @@ export class WorldSystem {
     }
   }
 
-  private findFruitTreeSpawn(player: Player): { x: number; y: number } {
+  private findFruitTreeSpawn(): { x: number; y: number } {
     const limit = FOREST_HALF_SIZE - 420;
 
-    for (let attempt = 0; attempt < 40; attempt++) {
-      const angle = Math.random() * Math.PI * 2;
-      const distance = 520 + Math.random() * 1000;
-      const x = player.x + Math.cos(angle) * distance;
-      const y = player.y + Math.sin(angle) * distance;
+    for (let attempt = 0; attempt < 200; attempt++) {
+      const x = (Math.random() * 2 - 1) * limit;
+      const y = (Math.random() * 2 - 1) * limit;
 
-      if (Math.abs(x) > limit || Math.abs(y) > limit) continue;
       if (this.isInWater(x, y)) continue;
       if (this.collidesWithTree(x, y, 70)) continue;
 
@@ -202,7 +208,7 @@ export class WorldSystem {
         if (!other.active) continue;
         const dx = x - other.x;
         const dy = y - other.y;
-        if (dx * dx + dy * dy < 220 * 220) {
+        if (dx * dx + dy * dy < 260 * 260) {
           overlapsFruitTree = true;
           break;
         }
@@ -212,11 +218,17 @@ export class WorldSystem {
       return { x, y };
     }
 
-    // Fallback: a short offset from the player, still clamped to the map.
-    const fallbackAngle = Math.random() * Math.PI * 2;
+    // Extremely unlikely fallback: keep it random, but at least on dry land.
+    for (let attempt = 0; attempt < 200; attempt++) {
+      const x = (Math.random() * 2 - 1) * limit;
+      const y = (Math.random() * 2 - 1) * limit;
+      if (this.isInWater(x, y) || this.collidesWithTree(x, y, 70)) continue;
+      return { x, y };
+    }
+
     return {
-      x: Math.max(-limit, Math.min(limit, player.x + Math.cos(fallbackAngle) * 700)),
-      y: Math.max(-limit, Math.min(limit, player.y + Math.sin(fallbackAngle) * 700)),
+      x: (Math.random() * 2 - 1) * limit,
+      y: (Math.random() * 2 - 1) * limit,
     };
   }
 
@@ -666,16 +678,31 @@ export class WorldSystem {
       ctx.fillRect(toX(tree.x) - dotSize / 2, toY(tree.y) - dotSize / 2, dotSize, dotSize);
     }
 
-    // Active fruit trees are highlighted as small yellow blips.
-    ctx.fillStyle = '#facc15';
+    // Active fruit trees use a small icon colored by fruit kind.
     for (let i = 0; i < this.fruitTrees.length; i++) {
       const tree = this.fruitTrees[i];
       if (!tree.active) continue;
       if (Math.abs(tree.x - centerX) > viewRadius) continue;
       if (Math.abs(tree.y - centerY) > viewRadius) continue;
 
+      const treeX = toX(tree.x);
+      const treeY = toY(tree.y);
+
+      // Dark backing keeps the icon readable over water and tree wall.
+      ctx.fillStyle = 'rgba(8, 15, 20, 0.75)';
       ctx.beginPath();
-      ctx.arc(toX(tree.x), toY(tree.y), 2.2, 0, Math.PI * 2);
+      ctx.arc(treeX, treeY, 3.6, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = FRUIT_TREE_MINIMAP_COLORS[tree.kind];
+      ctx.beginPath();
+      ctx.arc(treeX, treeY, 2.8, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Tiny highlight to read as a fruit rather than a generic dot.
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+      ctx.beginPath();
+      ctx.arc(treeX - 0.9, treeY - 0.9, 0.9, 0, Math.PI * 2);
       ctx.fill();
     }
   }
@@ -789,7 +816,7 @@ export class WorldSystem {
         if (!tree.active) {
           tree.respawnTimer -= dt;
           if (tree.respawnTimer <= 0) {
-            const spawn = this.findFruitTreeSpawn(player);
+            const spawn = this.findFruitTreeSpawn();
             tree.x = spawn.x;
             tree.y = spawn.y;
             tree.active = true;
