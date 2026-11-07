@@ -27,6 +27,7 @@ export class Player {
   public might: number = 1.0; // Damage multiplier
   public armor: number = 0; // Flat damage reduction
   public cooldownReduction: number = 0; // 0 to 0.5
+  public projectileSpeedMultiplier: number = 1;
   public pickupRadius: number = 65;
   public xpMultiplier: number = 1.0;
   public recoveryPerSec: number = 0;

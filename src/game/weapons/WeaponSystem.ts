@@ -125,6 +125,7 @@ export class WeaponSystem {
     player.maxHp = 100 + (characterBonuses.maxHp || 0) + (permanent.maxHp || 0) * 10;
     player.recoveryPerSec = (permanent.recovery || 0) * 0.5;
     player.cooldownReduction = characterBonuses.cooldownReduction || 0;
+    player.projectileSpeedMultiplier = 1;
     player.pickupRadius = 65 + (characterBonuses.pickupRadius || 0);
     player.speed = player.baseSpeed;
 
@@ -146,6 +147,9 @@ export class WeaponSystem {
 
     const magnet = this.passives.get('magnet');
     if (magnet) player.pickupRadius += magnet.level * 25;
+
+    const bracer = this.passives.get('bracer');
+    if (bracer) player.projectileSpeedMultiplier += bracer.level * 0.15;
   }
 
   update(
@@ -318,7 +322,7 @@ export class WeaponSystem {
     });
 
     const projectileCount = w.evolved ? 2 : 1 + (w.level >= 2 ? 1 : 0) + (w.level >= 4 ? 1 : 0);
-    const speed = w.evolved ? 480 : 360;
+    const speed = (w.evolved ? 480 : 360) * player.projectileSpeedMultiplier;
     const baseDamage = (w.evolved ? 26 : 14 + w.level * 4) * player.might;
 
     for (let i = 0; i < projectileCount; i++) {
@@ -351,7 +355,7 @@ export class WeaponSystem {
 
   private triggerKnife(w: WeaponInstance, player: Player, sound: SoundEngine): void {
     const projectileCount = w.evolved ? 4 : 1 + (w.level >= 2 ? 1 : 0) + (w.level >= 4 ? 1 : 0);
-    const speed = w.evolved ? 550 : 420;
+    const speed = (w.evolved ? 550 : 420) * player.projectileSpeedMultiplier;
     const baseDamage = (w.evolved ? 24 : 12 + w.level * 3) * player.might;
     const baseAngle = Math.atan2(player.facingY, player.facingX);
 
@@ -388,7 +392,7 @@ export class WeaponSystem {
     });
 
     const projectileCount = w.evolved ? 3 : 1 + (w.level >= 4 ? 1 : 0);
-    const speed = w.evolved ? 760 : 560;
+    const speed = (w.evolved ? 760 : 560) * player.projectileSpeedMultiplier;
     const baseDamage = (w.evolved ? 32 : 15 + w.level * 4) * player.might;
     const pierce = w.evolved ? 4 : 1 + (w.level >= 3 ? 1 : 0) + (w.level >= 5 ? 1 : 0);
     const baseAngle = nearby[0]
@@ -430,7 +434,7 @@ export class WeaponSystem {
     });
 
     const projectileCount = w.evolved ? 4 : 1 + (w.level >= 2 ? 1 : 0) + (w.level >= 4 ? 1 : 0);
-    const speed = w.evolved ? 620 : 460;
+    const speed = (w.evolved ? 620 : 460) * player.projectileSpeedMultiplier;
     const baseDamage = (w.evolved ? 32 : 13 + w.level * 4) * player.might;
     const pierce = w.evolved ? 4 : 1 + (w.level >= 3 ? 1 : 0) + (w.level >= 5 ? 1 : 0);
     const baseAngle = nearby[0]
@@ -487,7 +491,7 @@ export class WeaponSystem {
 
     if (roll < 1 / 3) {
       // Pão de queijo: rápido, fraco e sem perfuração.
-      const speed = (w.evolved ? 820 : 700) * speedMultiplier;
+      const speed = (w.evolved ? 820 : 700) * speedMultiplier * player.projectileSpeedMultiplier;
       const baseDamage = (w.evolved ? 16 : 6 + w.level * 2) * player.might * damageMultiplier;
 
       this.projectiles.push({
@@ -513,7 +517,7 @@ export class WeaponSystem {
       // Nos níveis baixos o café atravessa apenas 1 inimigo (pierce 2 no total).
       const pierce = w.evolved ? 6 : 1 + (w.level >= 5 ? 3 : w.level >= 3 ? 2 : 1);
       const startAngle = aimAngle + Math.PI * 0.25;
-      const radialSpeed = (w.evolved ? 210 : 150 + w.level * 8) * speedMultiplier;
+      const radialSpeed = (w.evolved ? 210 : 150 + w.level * 8) * speedMultiplier * player.projectileSpeedMultiplier;
 
       this.projectiles.push({
         id: this.nextProjId++,
@@ -543,7 +547,7 @@ export class WeaponSystem {
     } else {
       // Bolo: três fatias em leque na direção do monstro mais próximo.
       const spread = w.evolved ? 0.26 : 0.18;
-      const speed = (w.evolved ? 500 : 430) * speedMultiplier;
+      const speed = (w.evolved ? 500 : 430) * speedMultiplier * player.projectileSpeedMultiplier;
       const baseDamage = (w.evolved ? 18 : 8 + w.level * 2) * player.might * damageMultiplier;
 
       for (let i = 0; i < 3; i++) {
