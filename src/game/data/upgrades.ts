@@ -153,7 +153,7 @@ export const WEAPON_REGISTRY: Record<WeaponId, WeaponMeta> = {
   derson_combo: {
     id: 'derson_combo',
     name: 'Combo do Derson',
-    description: 'Arremessa aleatoriamente pão de queijo, café em espiral ou fatias de bolo.',
+    description: 'Arremessa aleatoriamente pão de queijo, café em espiral ou fatias de bolo no monstro mais próximo.',
     maxLevel: 5,
     iconName: 'Utensils',
     synergyPassive: 'bracer',

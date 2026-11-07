@@ -477,11 +477,14 @@ export class WeaponSystem {
     const facingAngle = Math.atan2(player.facingY, player.facingX);
     const aimAngle = closest ? Math.atan2(closest.y - player.y, closest.x - player.x) : facingAngle;
     const roll = Math.random();
+    // Aumento de +20% no dano e +10% na velocidade dos petiscos do Derson.
+    const damageMultiplier = 1.2;
+    const speedMultiplier = 1.1;
 
     if (roll < 1 / 3) {
       // Pão de queijo: rápido, fraco e sem perfuração.
-      const speed = w.evolved ? 820 : 700;
-      const baseDamage = (w.evolved ? 16 : 6 + w.level * 2) * player.might;
+      const speed = (w.evolved ? 820 : 700) * speedMultiplier;
+      const baseDamage = (w.evolved ? 16 : 6 + w.level * 2) * player.might * damageMultiplier;
 
       this.projectiles.push({
         id: this.nextProjId++,
@@ -502,11 +505,11 @@ export class WeaponSystem {
       sound.playShoot();
     } else if (roll < 2 / 3) {
       // Café: percorre uma espiral e perfura inimigos.
-      const baseDamage = (w.evolved ? 22 : 10 + w.level * 3) * player.might;
+      const baseDamage = (w.evolved ? 22 : 10 + w.level * 3) * player.might * damageMultiplier;
       // Nos níveis baixos o café atravessa apenas 1 inimigo (pierce 2 no total).
       const pierce = w.evolved ? 6 : 1 + (w.level >= 5 ? 3 : w.level >= 3 ? 2 : 1);
       const startAngle = aimAngle + Math.PI * 0.25;
-      const radialSpeed = w.evolved ? 210 : 150 + w.level * 8;
+      const radialSpeed = (w.evolved ? 210 : 150 + w.level * 8) * speedMultiplier;
 
       this.projectiles.push({
         id: this.nextProjId++,
@@ -534,13 +537,13 @@ export class WeaponSystem {
 
       sound.playShoot();
     } else {
-      // Bolo: três fatias em leque na direção em que o Derson está olhando.
+      // Bolo: três fatias em leque na direção do monstro mais próximo.
       const spread = w.evolved ? 0.26 : 0.18;
-      const speed = w.evolved ? 500 : 430;
-      const baseDamage = (w.evolved ? 18 : 8 + w.level * 2) * player.might;
+      const speed = (w.evolved ? 500 : 430) * speedMultiplier;
+      const baseDamage = (w.evolved ? 18 : 8 + w.level * 2) * player.might * damageMultiplier;
 
       for (let i = 0; i < 3; i++) {
-        const angle = facingAngle + (i - 1) * spread;
+        const angle = aimAngle + (i - 1) * spread;
 
         this.projectiles.push({
           id: this.nextProjId++,
