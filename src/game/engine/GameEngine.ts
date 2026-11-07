@@ -46,7 +46,7 @@ interface BossProjectile {
   damage: number;
   life: number;
   maxLife: number;
-  kind: 'fireball' | 'soundwave' | 'water' | 'sonic';
+  kind: 'fireball' | 'soundwave' | 'water' | 'sonic' | 'spore';
 }
 
 interface BossHazard {
@@ -55,7 +55,7 @@ interface BossHazard {
   radius: number;
   life: number;
   maxLife: number;
-  kind: 'ember' | 'wind' | 'puddle';
+  kind: 'ember' | 'wind' | 'puddle' | 'thorns';
   tickTimer: number;
   damage: number;
   windStrength: number;
@@ -538,6 +538,89 @@ export class GameEngine {
         }
       }
 
+      if (e.pendingSporeRing > 0) {
+        const rings = e.pendingSporeRing;
+        e.pendingSporeRing = 0;
+        this.vfx.addSparks(e.x, e.y, '#84cc16', 16);
+        for (let ring = 0; ring < rings; ring++) {
+          const count = 16;
+          const offset = (ring * Math.PI) / count;
+          for (let k = 0; k < count; k++) {
+            const angle = offset + (k * Math.PI * 2) / count;
+            this.bossProjectiles.push({
+              x: e.x,
+              y: e.y,
+              vx: Math.cos(angle) * 190,
+              vy: Math.sin(angle) * 190,
+              radius: 8,
+              damage: Math.max(1, Math.round(e.damage * 0.45)),
+              life: 3.4,
+              maxLife: 3.4,
+              kind: 'spore',
+            });
+          }
+        }
+      }
+
+      if (e.pendingThornRoots) {
+        e.pendingThornRoots = false;
+        for (let k = 0; k < 8; k++) {
+          const angle = (k * Math.PI * 2) / 8 + Math.random() * 0.25;
+          const offset = 65 + Math.random() * 40;
+          this.bossHazards.push({
+            x: e.x + Math.cos(angle) * offset,
+            y: e.y + Math.sin(angle) * offset,
+            radius: 28,
+            life: 5.5,
+            maxLife: 5.5,
+            kind: 'thorns',
+            tickTimer: 0,
+            damage: Math.max(1, Math.round(e.damage * 0.28)),
+            windStrength: 0,
+          });
+        }
+        this.vfx.addSparks(e.x, e.y, '#65a30d', 12);
+      }
+
+      if (e.pendingStomp) {
+        e.pendingStomp = false;
+        this.camera.shake(0.28, 8);
+        this.vfx.addDeathBurst(e.x, e.y, '#92400e', 18);
+        const stompDx = this.player.x - e.x;
+        const stompDy = this.player.y - e.y;
+        const stompDist = Math.sqrt(stompDx * stompDx + stompDy * stompDy);
+        if (stompDist < 190 + this.player.radius) {
+          this.player.applyStun(1.15);
+          const stompDamage = Math.max(1, Math.round(e.damage * 0.7));
+          const fatal = this.player.takeDamage(stompDamage);
+          this.sound.playPlayerHurt();
+          this.vfx.addDamageNumber(this.player.x, this.player.y, stompDamage, false, false);
+          if (fatal) {
+            this.handlePlayerDeath();
+            return;
+          }
+        }
+      }
+
+      if (e.pendingRoar) {
+        e.pendingRoar = false;
+        this.camera.shake(0.35, 10);
+        this.vfx.addDeathBurst(e.x, e.y, '#f59e0b', 24);
+        const roarDx = this.player.x - e.x;
+        const roarDy = this.player.y - e.y;
+        const roarDist = Math.sqrt(roarDx * roarDx + roarDy * roarDy);
+        if (roarDist < 360 + this.player.radius) {
+          const roarDamage = Math.max(1, Math.round(e.damage * 1.1));
+          const fatal = this.player.takeDamage(roarDamage);
+          this.sound.playPlayerHurt();
+          this.vfx.addDamageNumber(this.player.x, this.player.y, roarDamage, true, false);
+          if (fatal) {
+            this.handlePlayerDeath();
+            return;
+          }
+        }
+      }
+
       // Check body collision with player (jumping grants brief immunity)
       const dx = this.player.x - e.x;
       const dy = this.player.y - e.y;
@@ -640,6 +723,8 @@ export class GameEngine {
         const fatal = this.player.takeDamage(p.damage);
         this.sound.playPlayerHurt();
         this.vfx.addDamageNumber(this.player.x, this.player.y, p.damage, false, false);
+        // Vitória-Régia's spores cling to the player as a mild venom slow.
+        if (p.kind === 'spore') this.player.applySlow(0.25, 1.5);
         p.life = 0;
         if (fatal) return true;
       }
@@ -1314,6 +1399,26 @@ export class GameEngine {
           ctx.ellipse(screen.x, screen.y, rr, rr * 0.55, 0, 0, Math.PI * 2);
           ctx.stroke();
         }
+      } else if (h.kind === 'thorns') {
+        ctx.fillStyle = `rgba(63, 98, 18, ${0.55 * alpha})`;
+        ctx.beginPath();
+        ctx.ellipse(screen.x, screen.y, h.radius, h.radius * 0.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = `rgba(132, 204, 22, ${0.8 * alpha})`;
+        ctx.lineWidth = 2;
+        for (let spike = 0; spike < 7; spike++) {
+          const a = (spike / 7) * Math.PI * 2 + h.life * 0.4;
+          const sx = screen.x + Math.cos(a) * h.radius * 0.65;
+          const sy = screen.y + Math.sin(a) * h.radius * 0.35;
+          ctx.beginPath();
+          ctx.moveTo(sx - 4, sy);
+          ctx.lineTo(sx, sy - 13);
+          ctx.lineTo(sx + 4, sy);
+          ctx.closePath();
+          ctx.fillStyle = `rgba(77, 124, 15, ${0.85 * alpha})`;
+          ctx.fill();
+          ctx.stroke();
+        }
       } else {
         const spin = h.life * 2.4 * (h.windStrength >= 0 ? 1 : -1);
         ctx.strokeStyle = `rgba(186, 230, 253, ${0.6 * alpha})`;
@@ -1387,6 +1492,24 @@ export class GameEngine {
         ctx.fillStyle = `rgba(224, 242, 254, ${alpha})`;
         ctx.beginPath();
         ctx.arc(0, 0, p.radius * 0.6, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (p.kind === 'spore') {
+        const glow = ctx.createRadialGradient(screen.x, screen.y, 1, screen.x, screen.y, p.radius * 2.4);
+        glow.addColorStop(0, `rgba(220, 252, 231, ${alpha})`);
+        glow.addColorStop(0.4, `rgba(132, 204, 22, ${0.9 * alpha})`);
+        glow.addColorStop(1, 'rgba(22, 101, 52, 0)');
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(screen.x, screen.y, p.radius * 2.4, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = `rgba(190, 242, 100, ${alpha})`;
+        ctx.beginPath();
+        ctx.arc(screen.x, screen.y, p.radius * 0.7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = `rgba(22, 101, 52, ${0.8 * alpha})`;
+        ctx.beginPath();
+        ctx.arc(screen.x + Math.sin(p.life * 7) * 2, screen.y, p.radius * 0.25, 0, Math.PI * 2);
         ctx.fill();
       } else {
         const angle = Math.atan2(p.vy, p.vx);

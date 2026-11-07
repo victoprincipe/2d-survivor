@@ -421,6 +421,8 @@ export class WaveDirector {
       'boss_iara',
       'boss_caipora',
       'boss_matinta',
+      'boss_vitoria_regia',
+      'boss_mapinguari',
     ];
     const type = order[this.amazonBossWave % order.length];
     this.amazonBossWave += 1;

@@ -85,6 +85,7 @@ export class Player {
   public speedBoostTimer: number = 0;
   public slowTimer: number = 0;
   public slowFactor: number = 0;
+  public stunTimer: number = 0;
   public attackSpeedBoostTimer: number = 0;
   public shieldTimer: number = 0;
 
@@ -194,6 +195,12 @@ export class Player {
     this.slowTimer = Math.max(this.slowTimer, duration);
   }
 
+  public applyStun(duration: number): void {
+    this.stunTimer = Math.max(this.stunTimer, duration);
+    this.dashTimer = 0;
+    this.jumpTimer = 0;
+  }
+
   update(dt: number, input: InputManager): boolean {
     // Invulnerability timer
     if (this.invulnerableTimer > 0) {
@@ -210,6 +217,10 @@ export class Player {
         this.slowTimer = 0;
         this.slowFactor = 0;
       }
+    }
+
+    if (this.stunTimer > 0) {
+      this.stunTimer = Math.max(0, this.stunTimer - dt);
     }
 
     if (this.attackSpeedBoostTimer > 0) {
@@ -257,8 +268,11 @@ export class Player {
       this.hp = Math.min(this.maxHp, this.hp + this.recoveryPerSec * dt);
     }
 
+    const stunned = this.stunTimer > 0;
+
     // Jump (a single queued press per keydown; no double jumps).
-    if (input.consumeJump() && this.jumpTimer <= 0 && this.jumpCooldownTimer <= 0) {
+    const jumpPressed = input.consumeJump();
+    if (!stunned && jumpPressed && this.jumpTimer <= 0 && this.jumpCooldownTimer <= 0) {
       this.jumpTimer = config.jumpDuration;
       this.jumpCooldownTimer = config.jumpDuration + config.jumpCooldown;
     }
@@ -266,10 +280,11 @@ export class Player {
     // Movement input
     const dx = input.dx;
     const dy = input.dy;
-    const moving = Math.abs(dx) > 0.05 || Math.abs(dy) > 0.05;
+    const moving = !stunned && (Math.abs(dx) > 0.05 || Math.abs(dy) > 0.05);
 
     // Dash impulse (held SHIFT). Direction follows movement, or facing when idle.
     if (
+      !stunned &&
       input.dashHeld &&
       this.dashCooldownTimer <= 0 &&
       this.dashTimer <= 0 &&

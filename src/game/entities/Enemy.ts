@@ -73,6 +73,12 @@ export class Enemy {
   public pendingSummonWild: number = 0;
   public pendingSonicWave: boolean = false;
   public pendingSummonBirds: number = 0;
+  // Vitória-Régia (poison spore rings + thorn roots) and Mapinguari
+  // (ground stomp + sonic roar).
+  public pendingSporeRing: number = 0;
+  public pendingThornRoots: boolean = false;
+  public pendingStomp: boolean = false;
+  public pendingRoar: boolean = false;
 
   constructor(id: number, type: EnemyType, x: number, y: number, hpMultiplier: number = 1.0) {
     this.id = id;
@@ -408,6 +414,28 @@ export class Enemy {
         this.knockbackResistance = 0.07;
         this.skillCooldown = 2.6;
         break;
+      case 'boss_vitoria_regia':
+        this.name = 'Vitória-Régia (Dama das Águas)';
+        this.radius = 46;
+        this.maxHp = Math.round(2200 * hpMultiplier);
+        this.speed = 46;
+        this.damage = 34;
+        this.xpValue = 700;
+        this.isBoss = true;
+        this.knockbackResistance = 0.05;
+        this.skillCooldown = 3.0;
+        break;
+      case 'boss_mapinguari':
+        this.name = 'Mapinguari (Colosso da Mata)';
+        this.radius = 52;
+        this.maxHp = Math.round(3300 * hpMultiplier);
+        this.speed = 52;
+        this.damage = 40;
+        this.xpValue = 900;
+        this.isBoss = true;
+        this.knockbackResistance = 0.03;
+        this.skillCooldown = 3.2;
+        break;
     }
 
     this.hp = this.maxHp;
@@ -558,7 +586,9 @@ export class Enemy {
       this.type === 'boss_boto' ||
       this.type === 'boss_iara' ||
       this.type === 'boss_caipora' ||
-      this.type === 'boss_matinta'
+      this.type === 'boss_matinta' ||
+      this.type === 'boss_vitoria_regia' ||
+      this.type === 'boss_mapinguari'
     ) {
       this.updateAmazonBossSkills(dt, dx, dy, dist, speedMult);
       return;
@@ -696,6 +726,20 @@ export class Enemy {
         this.pendingSummonBirds = 6;
       }
       this.skillCooldown = 2.6;
+    } else if (this.type === 'boss_vitoria_regia') {
+      if (this.bossSkillIndex % 2 === 0) {
+        this.pendingSporeRing += 1;
+      } else {
+        this.pendingThornRoots = true;
+      }
+      this.skillCooldown = 3.2;
+    } else if (this.type === 'boss_mapinguari') {
+      if (this.bossSkillIndex % 2 === 0) {
+        this.pendingStomp = true;
+      } else {
+        this.pendingRoar = true;
+      }
+      this.skillCooldown = 3.4;
     }
 
     this.bossSkillIndex += 1;
@@ -1822,6 +1866,183 @@ export class Enemy {
       ctx.arc(-4, -15 + hover, 1.8, 0, Math.PI * 2);
       ctx.arc(4, -15 + hover, 1.8, 0, Math.PI * 2);
       ctx.fill();
+    } else if (this.type === 'boss_vitoria_regia') {
+      // Vitória-Régia: gigantic floating lily pad with a crowned flower and
+      // thorny vines trailing around the rim.
+      const sway = Math.sin(this.animTimer * 1.3) * 3;
+
+      if (!isFlashing) {
+        const aura = ctx.createRadialGradient(0, 0, 18, 0, 0, 70);
+        aura.addColorStop(0, 'rgba(16, 185, 129, 0.32)');
+        aura.addColorStop(1, 'rgba(16, 185, 129, 0)');
+        ctx.fillStyle = aura;
+        ctx.beginPath();
+        ctx.arc(0, 0, 70, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Giant lily pad.
+      if (!isFlashing) ctx.fillStyle = '#166534';
+      ctx.beginPath();
+      ctx.ellipse(0, 18, 54, 24, 0, 0, Math.PI * 2);
+      ctx.fill();
+      if (!isFlashing) ctx.fillStyle = '#22c55e';
+      ctx.beginPath();
+      ctx.ellipse(0, 14, 46, 20, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Radial veins and the pad's characteristic notch.
+      if (!isFlashing) ctx.strokeStyle = '#15803d';
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 9; i++) {
+        const a = (i / 9) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.moveTo(0, 14);
+        ctx.lineTo(Math.cos(a) * 44, 14 + Math.sin(a) * 18);
+        ctx.stroke();
+      }
+      if (!isFlashing) ctx.fillStyle = '#0b3d24';
+      ctx.beginPath();
+      ctx.moveTo(0, 14);
+      ctx.lineTo(18, 3);
+      ctx.lineTo(22, 15);
+      ctx.closePath();
+      ctx.fill();
+
+      // Flower crown.
+      if (!isFlashing) ctx.fillStyle = '#fbcfe8';
+      for (let i = 0; i < 7; i++) {
+        const a = (i / 7) * Math.PI * 2 + sway * 0.05;
+        const px = Math.cos(a) * 17;
+        const py = -12 + Math.sin(a) * 10;
+        ctx.beginPath();
+        ctx.ellipse(px, py, 10, 6, a, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      if (!isFlashing) ctx.fillStyle = '#f472b6';
+      ctx.beginPath();
+      ctx.arc(0, -12, 12, 0, Math.PI * 2);
+      ctx.fill();
+      if (!isFlashing) ctx.fillStyle = '#fde68a';
+      ctx.beginPath();
+      ctx.arc(0, -12, 5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Thorny vines around the rim.
+      if (!isFlashing) ctx.strokeStyle = '#3f6212';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(0, 14, 48, 0.15, Math.PI - 0.15);
+      ctx.stroke();
+      if (!isFlashing) ctx.fillStyle = '#a16207';
+      for (let i = 0; i < 8; i++) {
+        const a = 0.2 + (i / 7) * (Math.PI - 0.4);
+        const px = Math.cos(a) * 50;
+        const py = 14 + Math.sin(a) * 22;
+        ctx.beginPath();
+        ctx.moveTo(px - 3, py);
+        ctx.lineTo(px, py - 7);
+        ctx.lineTo(px + 3, py);
+        ctx.closePath();
+        ctx.fill();
+      }
+    } else if (this.type === 'boss_mapinguari') {
+      // Mapinguari: colossal shaggy beast with a single eye and a mouth on
+      // its belly.
+      const walk = Math.sin(this.animTimer * 2.4);
+      const breathe = Math.sin(this.animTimer * 1.1) * 2;
+
+      if (!isFlashing) {
+        const aura = ctx.createRadialGradient(0, 0, 20, 0, 0, 78);
+        aura.addColorStop(0, 'rgba(120, 53, 15, 0.35)');
+        aura.addColorStop(1, 'rgba(120, 53, 15, 0)');
+        ctx.fillStyle = aura;
+        ctx.beginPath();
+        ctx.arc(0, 0, 78, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Long shaggy arms.
+      if (!isFlashing) ctx.fillStyle = '#3f2a17';
+      ctx.beginPath();
+      ctx.ellipse(-38, 8 + walk * 2, 15, 26, 0.35, 0, Math.PI * 2);
+      ctx.ellipse(38, 8 - walk * 2, 15, 26, -0.35, 0, Math.PI * 2);
+      ctx.fill();
+      // Claws.
+      if (!isFlashing) ctx.fillStyle = '#e7e5e4';
+      for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        ctx.moveTo(-46 + i * 6, 30 + walk * 2);
+        ctx.lineTo(-48 + i * 6, 40 + walk * 2);
+        ctx.lineTo(-43 + i * 6, 31 + walk * 2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(35 + i * 6, 30 - walk * 2);
+        ctx.lineTo(33 + i * 6, 40 - walk * 2);
+        ctx.lineTo(38 + i * 6, 31 - walk * 2);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      // Massive fur-covered body.
+      if (!isFlashing) ctx.fillStyle = '#4a2f1d';
+      ctx.beginPath();
+      ctx.ellipse(0, 2 + breathe * 0.3, 34, 38, 0, 0, Math.PI * 2);
+      ctx.fill();
+      if (!isFlashing) ctx.fillStyle = '#5b3a1c';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 28, 32, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Shaggy fur tufts.
+      if (!isFlashing) ctx.fillStyle = '#3f2a17';
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2;
+        const px = Math.cos(a) * 30;
+        const py = Math.sin(a) * 34;
+        ctx.beginPath();
+        ctx.moveTo(px - 4, py);
+        ctx.lineTo(px + Math.cos(a) * 8, py + Math.sin(a) * 8);
+        ctx.lineTo(px + 4, py);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      // Single glowing eye.
+      if (!isFlashing) ctx.fillStyle = '#fef3c7';
+      ctx.beginPath();
+      ctx.ellipse(0, -16, 13, 10, 0, 0, Math.PI * 2);
+      ctx.fill();
+      if (!isFlashing) ctx.fillStyle = '#dc2626';
+      ctx.beginPath();
+      ctx.arc(walk * 2, -16, 5.5, 0, Math.PI * 2);
+      ctx.fill();
+      if (!isFlashing) ctx.fillStyle = '#111827';
+      ctx.beginPath();
+      ctx.arc(walk * 2, -16, 2.4, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Mouth on the belly, opening and closing.
+      const gape = 3 + (Math.sin(this.animTimer * 2) + 1) * 3;
+      if (!isFlashing) ctx.fillStyle = '#1c1917';
+      ctx.beginPath();
+      ctx.ellipse(0, 12, 17, gape, 0, 0, Math.PI * 2);
+      ctx.fill();
+      if (!isFlashing) ctx.fillStyle = '#f8fafc';
+      for (let i = -2; i <= 2; i++) {
+        ctx.beginPath();
+        ctx.moveTo(i * 6, 12 - gape);
+        ctx.lineTo(i * 6 + 3, 12 - gape + 5);
+        ctx.lineTo(i * 6 + 6, 12 - gape);
+        ctx.closePath();
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(i * 6, 12 + gape);
+        ctx.lineTo(i * 6 + 3, 12 + gape - 5);
+        ctx.lineTo(i * 6 + 6, 12 + gape);
+        ctx.closePath();
+        ctx.fill();
+      }
     } else if (this.type === 'ghost') {
       ctx.globalAlpha = 0.75;
       if (!isFlashing) ctx.fillStyle = '#93c5fd';
@@ -2524,7 +2745,9 @@ export class Enemy {
         this.type === 'boss_boto' ||
         this.type === 'boss_iara' ||
         this.type === 'boss_caipora' ||
-        this.type === 'boss_matinta');
+        this.type === 'boss_matinta' ||
+        this.type === 'boss_vitoria_regia' ||
+        this.type === 'boss_mapinguari');
     if (this.isElite || showBossBar) {
       const barW = showBossBar ? 76 : 44;
       const barH = showBossBar ? 7 : 5;
