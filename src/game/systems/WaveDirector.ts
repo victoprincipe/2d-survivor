@@ -3,6 +3,7 @@ import { Enemy } from '../entities/Enemy';
 import { Player } from '../entities/Player';
 import { Camera } from '../engine/Camera';
 import { SoundEngine } from '../engine/SoundEngine';
+import { WorldSystem } from './WorldProps';
 
 const AMAZON_BASIC_ENEMIES: EnemyType[] = [
   'bullet_ant',
@@ -34,17 +35,30 @@ const AMAZON_ELITE_ENEMIES: EnemyType[] = [
   'elite_goliath_spider',
 ];
 
+// Aquatic Amazon Forest fauna. These are only ever spawned on top of real
+// water and are kept there by the engine's aquatic movement resolver.
+const AMAZON_AQUATIC_BASIC_ENEMIES: EnemyType[] = ['piranha'];
+const AMAZON_AQUATIC_MEDIUM_ENEMIES: EnemyType[] = ['pink_river_dolphin'];
+const AMAZON_AQUATIC_RESISTANT_ENEMIES: EnemyType[] = ['giant_otter'];
+const AMAZON_AQUATIC_ELITE_ENEMIES: EnemyType[] = ['elite_black_caiman'];
+
 export class WaveDirector {
   public survivalTime: number = 0;
   public difficulty: DifficultyConfig;
   private mapId: MapId;
+  private worldProps: WorldSystem | null;
   private nextEnemyId: number = 1;
   private spawnTimer: number = 0;
   private nextAmazonEliteTime: number = 80 + Math.random() * 40;
 
-  constructor(difficulty: DifficultyConfig, mapId: MapId = 'night_plain') {
+  constructor(
+    difficulty: DifficultyConfig,
+    mapId: MapId = 'night_plain',
+    worldProps: WorldSystem | null = null
+  ) {
     this.difficulty = difficulty;
     this.mapId = mapId;
+    this.worldProps = worldProps;
   }
 
   private get isAmazonForest(): boolean {
@@ -102,15 +116,35 @@ export class WaveDirector {
       return;
     }
 
-    // Rare Amazon Forest elite: one of the map's three oversized predators
-    // appears from time to time on top of the regular waves.
+    // Rare Amazon Forest elite: one of the map's oversized predators appears
+    // from time to time on top of the regular waves. The Jacaré-açu only
+    // replaces the land elite when there is water just outside the camera.
     if (this.isAmazonForest && this.survivalTime >= this.nextAmazonEliteTime) {
       this.nextAmazonEliteTime = this.survivalTime + 90 + Math.random() * 60;
-      const eliteType =
+      let eliteType =
         AMAZON_ELITE_ENEMIES[Math.floor(Math.random() * AMAZON_ELITE_ENEMIES.length)];
-      const elitePos = this.getSpawnPositionOutsideScreen(camera);
+      let elitePos = this.getSpawnPositionOutsideScreen(camera);
+      let aquaticElite = false;
+
+      if (Math.random() < 0.4) {
+        const waterPos = this.getWaterSpawnPosition(camera, 44);
+        if (waterPos) {
+          eliteType =
+            AMAZON_AQUATIC_ELITE_ENEMIES[
+              Math.floor(Math.random() * AMAZON_AQUATIC_ELITE_ENEMIES.length)
+            ];
+          elitePos = waterPos;
+          aquaticElite = true;
+        }
+      }
+
       const amazonElite = this.createEnemy(eliteType, elitePos.x, elitePos.y, hpMultiplier * 1.05);
-      this.triggerAlert(`⚠️ ${amazonElite.name.toUpperCase()} SURGIU NA FLORESTA!`, 4.5);
+      this.triggerAlert(
+        aquaticElite
+          ? `⚠️ ${amazonElite.name.toUpperCase()} SURGIU NO RIO!`
+          : `⚠️ ${amazonElite.name.toUpperCase()} SURGIU NA FLORESTA!`,
+        4.5
+      );
       sound.playBossWarning();
       onSpawn(amazonElite);
     }
@@ -233,6 +267,19 @@ export class WaveDirector {
     return { x, y };
   }
 
+  private getWaterSpawnPosition(camera: Camera, radius: number): { x: number; y: number } | null {
+    if (!this.worldProps) return null;
+
+    // The off-screen spawn ring is sampled until it intersects the river or a
+    // lake. If this part of the map has no water nearby, callers fall back to
+    // the regular land fauna instead of dropping an aquatic enemy on dry land.
+    for (let i = 0; i < 24; i++) {
+      const pos = this.getSpawnPositionOutsideScreen(camera);
+      if (this.worldProps.isNavigableWater(pos.x, pos.y, radius)) return pos;
+    }
+    return null;
+  }
+
   private spawnRegularEnemy(
     player: Player,
     camera: Camera,
@@ -250,12 +297,30 @@ export class WaveDirector {
       // tougher medium threats, then slow high-HP resistant fauna.
       const mediumChance = Math.min(0.55, Math.max(0, (minutes - 0.5) * 0.16));
       const resistantChance = Math.min(0.3, Math.max(0, (minutes - 2) * 0.07));
-      const pool =
-        Math.random() < resistantChance
-          ? AMAZON_RESISTANT_ENEMIES
-          : Math.random() < mediumChance
-            ? AMAZON_MEDIUM_ENEMIES
-            : AMAZON_BASIC_ENEMIES;
+      const isResistant = Math.random() < resistantChance;
+      const isMedium = !isResistant && Math.random() < mediumChance;
+
+      // A share of the forest waves comes from the river fauna. The spawn is
+      // only accepted when the off-screen point is genuinely over water.
+      if (Math.random() < 0.28) {
+        const aquaticPool = isResistant
+          ? AMAZON_AQUATIC_RESISTANT_ENEMIES
+          : isMedium
+            ? AMAZON_AQUATIC_MEDIUM_ENEMIES
+            : AMAZON_AQUATIC_BASIC_ENEMIES;
+        const aquaticType = aquaticPool[Math.floor(Math.random() * aquaticPool.length)];
+        const aquaticPos = this.getWaterSpawnPosition(camera, 24);
+        if (aquaticPos) {
+          onSpawn(this.createEnemy(aquaticType, aquaticPos.x, aquaticPos.y, hpMult));
+          return;
+        }
+      }
+
+      const pool = isResistant
+        ? AMAZON_RESISTANT_ENEMIES
+        : isMedium
+          ? AMAZON_MEDIUM_ENEMIES
+          : AMAZON_BASIC_ENEMIES;
       type = pool[Math.floor(Math.random() * pool.length)];
     } else if (minutes < 1) {
       type = roll < 0.68 ? 'bat' : roll < 0.9 ? 'skeleton' : 'zombie';

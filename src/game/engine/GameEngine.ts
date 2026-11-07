@@ -110,7 +110,7 @@ export class GameEngine {
     this.vfx = new VFXManager();
     this.worldProps = new WorldSystem(mapId);
     this.difficulty = getDifficulty(difficultyId);
-    this.waveDirector = new WaveDirector(this.difficulty, mapId);
+    this.waveDirector = new WaveDirector(this.difficulty, mapId, this.worldProps);
 
     this.player = new Player(character, savedData.powerUps);
     this.player.setCollisionResolver((fromX, fromY, dx, dy, radius) =>
@@ -222,11 +222,27 @@ export class GameEngine {
     for (let i = this.enemies.length - 1; i >= 0; i--) {
       const e = this.enemies[i];
       const sep = this.spatialGrid.applySeparation(e, e.radius * 2, 0.45);
+      const previousX = e.x;
+      const previousY = e.y;
       const alive = e.update(dt, this.player, sep);
 
       if (!alive) {
         this.enemies.splice(i, 1);
         continue;
+      }
+
+      // Aquatic enemies are locked to the water: reject any step that would
+      // carry them onto the riverbank or dry forest floor.
+      if (e.isAquatic) {
+        const resolved = this.worldProps.resolveAquaticMovement(
+          previousX,
+          previousY,
+          e.x,
+          e.y,
+          e.radius
+        );
+        e.x = resolved.x;
+        e.y = resolved.y;
       }
 
       // Boss Nova Burst Resolution
@@ -377,7 +393,8 @@ export class GameEngine {
       const isAmazonElite =
         enemy.type === 'elite_jaguar' ||
         enemy.type === 'elite_tapir' ||
-        enemy.type === 'elite_goliath_spider';
+        enemy.type === 'elite_goliath_spider' ||
+        enemy.type === 'elite_black_caiman';
       this.drops.push(new Drop(Date.now() + Math.random(), 'chest', enemy.x, enemy.y));
       this.drops.push(new Drop(Date.now() + 1 + Math.random(), 'gem_green', enemy.x + 14, enemy.y, enemy.xpValue));
       if (isAmazonElite) {

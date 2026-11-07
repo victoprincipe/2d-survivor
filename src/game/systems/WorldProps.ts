@@ -11,8 +11,8 @@ const FOREST_SIZE = 14000;
 const FOREST_HALF_SIZE = FOREST_SIZE / 2;
 const COLLISION_STEP = 8;
 
-// Decorative Amazon water. The river and lakes are purely visual for now:
-// they do not affect movement, collision or speed.
+// Amazon water. For the player the river and lakes are purely visual, but
+// aquatic enemies use the stricter isNavigableWater check below to stay wet.
 const RIVER_WIDTH = 980;
 const RIVER_BANK = 150;
 const RIVER_HALF_WIDTH = RIVER_WIDTH / 2;
@@ -272,6 +272,77 @@ export class WorldSystem {
     }
 
     return false;
+  }
+
+  /**
+   * True when the point (plus the given body radius) fits inside the visible
+   * water surface of the Amazon river or one of its lakes. Decorative water
+   * includes the sandy banks, so aquatic enemies use this stricter check.
+   */
+  public isNavigableWater(x: number, y: number, radius: number = 0): boolean {
+    if (this.mapId !== 'amazon_forest') return false;
+    if (Math.abs(x) > FOREST_HALF_SIZE || Math.abs(y) > FOREST_HALF_SIZE) return false;
+
+    // River band.
+    const riverHalf = RIVER_HALF_WIDTH - 16 - radius;
+    if (riverHalf > 0 && Math.abs(y - this.riverCenterY(x)) < riverHalf) return true;
+
+    // Lakes (rotated ellipses), inset by the creature's body so it stays wet.
+    const inset = 18 + radius;
+    for (let i = 0; i < this.lakes.length; i++) {
+      const lake = this.lakes[i];
+      const rx = lake.rx - inset;
+      const ry = lake.ry - inset;
+      if (rx <= 0 || ry <= 0) continue;
+
+      const dx = x - lake.x;
+      const dy = y - lake.y;
+      const cos = Math.cos(-lake.rotation);
+      const sin = Math.sin(-lake.rotation);
+      const lx = dx * cos - dy * sin;
+      const ly = dx * sin + dy * cos;
+      if ((lx * lx) / (rx * rx) + (ly * ly) / (ry * ry) <= 1) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Moves an aquatic enemy from one valid water position to another while
+   * refusing any step that would reach dry land. Each axis is resolved
+   * independently so the creature can slide along the riverbank.
+   */
+  public resolveAquaticMovement(
+    fromX: number,
+    fromY: number,
+    toX: number,
+    toY: number,
+    radius: number
+  ): { x: number; y: number } {
+    if (this.mapId !== 'amazon_forest') return { x: toX, y: toY };
+
+    const dx = toX - fromX;
+    const dy = toY - fromY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    if (distance < 0.0001) return { x: fromX, y: fromY };
+
+    const steps = Math.max(1, Math.ceil(distance / COLLISION_STEP));
+    const stepX = dx / steps;
+    const stepY = dy / steps;
+    let x = fromX;
+    let y = fromY;
+
+    for (let i = 0; i < steps; i++) {
+      const nextX = x + stepX;
+      if (this.isNavigableWater(nextX, y, radius)) x = nextX;
+
+      const nextY = y + stepY;
+      if (this.isNavigableWater(x, nextY, radius)) y = nextY;
+    }
+
+    return { x, y };
   }
 
   /**

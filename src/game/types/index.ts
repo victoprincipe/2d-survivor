@@ -208,7 +208,12 @@ export type EnemyType =
   // Rare Amazon Forest elites: oversized, powerful and highly rewarding.
   | 'elite_jaguar'
   | 'elite_tapir'
-  | 'elite_goliath_spider';
+  | 'elite_goliath_spider'
+  // Aquatic Amazon Forest enemies: they only spawn and move inside water.
+  | 'piranha'
+  | 'pink_river_dolphin'
+  | 'giant_otter'
+  | 'elite_black_caiman';
 
 export type DropType =
   | 'gem_blue'

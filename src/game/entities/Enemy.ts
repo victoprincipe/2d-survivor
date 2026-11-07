@@ -29,6 +29,7 @@ export class Enemy {
   public animTimer: number = Math.random() * 10;
   public isBoss: boolean = false;
   public isElite: boolean = false;
+  public isAquatic: boolean = false;
   public name: string = '';
   private spriteImage: HTMLImageElement | null = null;
 
@@ -247,6 +248,49 @@ export class Enemy {
         this.isElite = true;
         this.knockbackResistance = 0.18;
         this.skillCooldown = 4.0 + Math.random() * 1.5;
+        break;
+      // Aquatic Amazon Forest fauna: exclusive to the river and lakes.
+      case 'piranha':
+        this.name = 'Piranha';
+        this.radius = 10;
+        this.maxHp = Math.round(14 * hpMultiplier);
+        this.speed = 195;
+        this.damage = 7;
+        this.xpValue = 5;
+        this.knockbackResistance = 1.25;
+        this.isAquatic = true;
+        break;
+      case 'pink_river_dolphin':
+        this.name = 'Boto-cor-de-rosa';
+        this.radius = 18;
+        this.maxHp = Math.round(55 * hpMultiplier);
+        this.speed = 130;
+        this.damage = 15;
+        this.xpValue = 18;
+        this.knockbackResistance = 0.7;
+        this.isAquatic = true;
+        break;
+      case 'giant_otter':
+        this.name = 'Ariranha';
+        this.radius = 20;
+        this.maxHp = Math.round(300 * hpMultiplier);
+        this.speed = 78;
+        this.damage = 24;
+        this.xpValue = 58;
+        this.knockbackResistance = 0.15;
+        this.isAquatic = true;
+        break;
+      case 'elite_black_caiman':
+        this.name = 'Jacaré-açu Elite';
+        this.radius = 34;
+        this.maxHp = Math.round(900 * hpMultiplier);
+        this.speed = 85;
+        this.damage = 32;
+        this.xpValue = 280;
+        this.isElite = true;
+        this.knockbackResistance = 0.15;
+        this.isAquatic = true;
+        this.skillCooldown = 4.5 + Math.random() * 1.5;
         break;
       case 'ghost':
         this.name = 'Espectro Noturno';
@@ -983,6 +1027,233 @@ export class Enemy {
         ctx.lineTo(5, 15);
         ctx.stroke();
       }
+    } else if (this.type === 'piranha') {
+      // Small silver fish with a red belly and a mouth full of sharp teeth.
+      const tailWag = Math.sin(this.animTimer * 4.2) * 3;
+      if (!isFlashing) ctx.fillStyle = '#94a3b8';
+      ctx.beginPath();
+      ctx.moveTo(-8, 0);
+      ctx.lineTo(-18, -7 + tailWag);
+      ctx.lineTo(-15, 0);
+      ctx.lineTo(-18, 7 + tailWag);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 11, 7, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#dc2626';
+      ctx.beginPath();
+      ctx.ellipse(-1, 3, 8, 3.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#0f172a';
+      ctx.beginPath();
+      ctx.arc(6, -2, 1.7, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#f8fafc';
+      ctx.beginPath();
+      ctx.moveTo(7, 2);
+      ctx.lineTo(11, 3.2);
+      ctx.lineTo(8, 4.2);
+      ctx.lineTo(10, 5.4);
+      ctx.lineTo(6, 5);
+      ctx.closePath();
+      ctx.fill();
+    } else if (this.type === 'pink_river_dolphin') {
+      // Pink river dolphin: rounded body, long rostrum and a small dorsal fin.
+      const bob = Math.sin(this.animTimer * 1.8) * 2;
+      if (!isFlashing) ctx.fillStyle = '#f9a8d4';
+      ctx.beginPath();
+      ctx.ellipse(-2, bob, 20, 9, -0.06, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.ellipse(17, 2 + bob, 8, 4.5, 0.08, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Dorsal fin.
+      ctx.beginPath();
+      ctx.moveTo(-2, -7 + bob);
+      ctx.lineTo(-7, -18 + bob);
+      ctx.lineTo(6, -6 + bob);
+      ctx.closePath();
+      ctx.fill();
+
+      // Tail flukes.
+      ctx.beginPath();
+      ctx.moveTo(-18, 1 + bob);
+      ctx.lineTo(-29, -7 + bob);
+      ctx.lineTo(-26, 1 + bob);
+      ctx.lineTo(-29, 9 + bob);
+      ctx.closePath();
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#fbcfe8';
+      ctx.beginPath();
+      ctx.ellipse(-3, 4 + bob, 12, 3.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#ec4899';
+      ctx.beginPath();
+      ctx.ellipse(4, 7 + bob, 6, 2.8, 0.4, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#0f172a';
+      ctx.beginPath();
+      ctx.arc(16, -1 + bob, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(16.5, -1.5 + bob, 0.7, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (this.type === 'giant_otter') {
+      // Giant otter: long brown body, small ears, pale muzzle and whiskers.
+      const paddle = Math.sin(this.animTimer * 3.2) * 2;
+      if (!isFlashing) ctx.fillStyle = '#6b4423';
+      ctx.beginPath();
+      ctx.moveTo(-15, 0);
+      ctx.quadraticCurveTo(-30, -5 + paddle, -38, 2 + paddle);
+      ctx.quadraticCurveTo(-30, 4 + paddle, -15, 6);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.ellipse(-2, 1, 19, 10, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(16, -2, 8.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#4a2f1d';
+      ctx.beginPath();
+      ctx.arc(12, -9, 3, 0, Math.PI * 2);
+      ctx.arc(20, -9, 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#a47148';
+      ctx.beginPath();
+      ctx.ellipse(22, 1, 5.5, 4.2, 0.1, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#1c1917';
+      ctx.beginPath();
+      ctx.ellipse(26, 0, 2, 1.4, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#fef3c7';
+      ctx.beginPath();
+      ctx.arc(15, -3, 1.7, 0, Math.PI * 2);
+      ctx.arc(20, -2.5, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#111827';
+      ctx.beginPath();
+      ctx.arc(15.5, -3, 0.8, 0, Math.PI * 2);
+      ctx.arc(20.3, -2.5, 0.7, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = isFlashing ? '#ffffff' : '#e7e5e4';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(24, 2);
+      ctx.lineTo(32, -1);
+      ctx.moveTo(25, 3);
+      ctx.lineTo(33, 3);
+      ctx.moveTo(24, 4);
+      ctx.lineTo(31, 7);
+      ctx.stroke();
+
+      if (!isFlashing) ctx.fillStyle = '#4a2f1d';
+      ctx.beginPath();
+      ctx.ellipse(2, 9 + paddle * 0.2, 5, 2.5, 0.2, 0, Math.PI * 2);
+      ctx.ellipse(-10, 9 - paddle * 0.2, 5, 2.5, -0.2, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (this.type === 'elite_black_caiman') {
+      // Jacaré-açu: long dark snout, ridged back, heavy tail and pale teeth.
+      ctx.save();
+      const sway = Math.sin(this.animTimer * 1.9) * 2;
+
+      ctx.strokeStyle = isFlashing ? '#ffffff' : '#1f3d2b';
+      ctx.lineWidth = 12;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-18, 3);
+      ctx.quadraticCurveTo(-34, -8 + sway, -52, 7 + sway);
+      ctx.stroke();
+
+      ctx.strokeStyle = isFlashing ? '#ffffff' : '#254a34';
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(-8, 8);
+      ctx.lineTo(-15, 17);
+      ctx.moveTo(10, 8);
+      ctx.lineTo(17, 16);
+      ctx.stroke();
+      ctx.lineCap = 'butt';
+
+      if (!isFlashing) ctx.fillStyle = '#2f5d3a';
+      ctx.beginPath();
+      ctx.ellipse(-3, 0, 25, 13, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#3f7a4a';
+      ctx.beginPath();
+      ctx.moveTo(16, -9);
+      ctx.lineTo(48, -4);
+      ctx.lineTo(48, 4);
+      ctx.lineTo(18, 9);
+      ctx.closePath();
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#274a2f';
+      ctx.beginPath();
+      ctx.arc(19, -7, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#facc15';
+      ctx.beginPath();
+      ctx.arc(20, -7, 2, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#111827';
+      ctx.beginPath();
+      ctx.arc(20.6, -7, 0.9, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#1c1917';
+      ctx.beginPath();
+      ctx.arc(44, -2, 1.3, 0, Math.PI * 2);
+      ctx.arc(44, 2, 1.3, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#f8fafc';
+      for (let i = 0; i < 5; i++) {
+        const tx = 30 + i * 3.4;
+        ctx.beginPath();
+        ctx.moveTo(tx, 4);
+        ctx.lineTo(tx + 1.5, 6.5);
+        ctx.lineTo(tx + 3, 4);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      if (!isFlashing) ctx.fillStyle = '#1f3d2b';
+      for (let i = 0; i < 5; i++) {
+        const rx = -20 + i * 8;
+        ctx.beginPath();
+        ctx.moveTo(rx, -11);
+        ctx.lineTo(rx + 4, -18);
+        ctx.lineTo(rx + 8, -11);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      ctx.restore();
     } else if (this.type === 'ghost') {
       ctx.globalAlpha = 0.75;
       if (!isFlashing) ctx.fillStyle = '#93c5fd';
