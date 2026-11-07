@@ -6,7 +6,6 @@ import { SpatialGrid } from '../engine/SpatialGrid';
 import { Camera } from '../engine/Camera';
 import { SoundEngine } from '../engine/SoundEngine';
 import { VFXManager } from '../entities/VFX';
-import { WorldSystem } from '../systems/WorldProps';
 
 export interface Projectile {
   id: number;
@@ -150,7 +149,6 @@ export class WeaponSystem {
     player: Player,
     enemies: Enemy[],
     spatialGrid: SpatialGrid<Enemy>,
-    worldProps: WorldSystem,
     vfx: VFXManager,
     sound: SoundEngine,
     onEnemyKilled: (enemy: Enemy) => void
@@ -177,7 +175,7 @@ export class WeaponSystem {
     this.weapons.forEach((weapon) => {
       weapon.cooldownTimer -= dt;
       if (weapon.cooldownTimer <= 0) {
-        this.fireWeapon(weapon, player, enemies, spatialGrid, worldProps, vfx, sound, onEnemyKilled);
+        this.fireWeapon(weapon, player, enemies, spatialGrid, vfx, sound, onEnemyKilled);
       }
     });
 
@@ -186,7 +184,7 @@ export class WeaponSystem {
     this.updateGarlic(dt, player, spatialGrid, vfx, sound, onEnemyKilled);
 
     // Update flying projectiles (Wand bolts & Knives)
-    this.updateProjectiles(dt, spatialGrid, worldProps, vfx, sound, onEnemyKilled);
+    this.updateProjectiles(dt, spatialGrid, vfx, sound, onEnemyKilled);
   }
 
   private fireWeapon(
@@ -194,7 +192,6 @@ export class WeaponSystem {
     player: Player,
     enemies: Enemy[],
     grid: SpatialGrid<Enemy>,
-    worldProps: WorldSystem,
     vfx: VFXManager,
     sound: SoundEngine,
     onEnemyKilled: (enemy: Enemy) => void
@@ -204,7 +201,7 @@ export class WeaponSystem {
     if (w.id === 'whip') {
       const baseCd = w.evolved ? 1.0 : 1.35;
       w.cooldownTimer = baseCd * cdFactor;
-      this.triggerWhip(w, player, grid, worldProps, vfx, sound, onEnemyKilled);
+      this.triggerWhip(w, player, grid, vfx, sound, onEnemyKilled);
     } else if (w.id === 'wand') {
       const baseCd = w.evolved ? 0.35 : 1.1;
       w.cooldownTimer = baseCd * cdFactor;
@@ -236,7 +233,6 @@ export class WeaponSystem {
     w: WeaponInstance,
     player: Player,
     grid: SpatialGrid<Enemy>,
-    worldProps: WorldSystem,
     vfx: VFXManager,
     sound: SoundEngine,
     onEnemyKilled: (enemy: Enemy) => void
@@ -300,14 +296,6 @@ export class WeaponSystem {
         if (dead) {
           onEnemyKilled(e);
         }
-      }
-    }
-
-    // Damage nearby torches
-    for (let i = 0; i < worldProps.torches.length; i++) {
-      const t = worldProps.torches[i];
-      if (Math.abs(t.x - player.x) <= slashWidth && Math.abs(t.y - player.y) <= slashHeight) {
-        worldProps.damageTorch(t);
       }
     }
 
@@ -698,7 +686,6 @@ export class WeaponSystem {
   private updateProjectiles(
     dt: number,
     grid: SpatialGrid<Enemy>,
-    worldProps: WorldSystem,
     vfx: VFXManager,
     sound: SoundEngine,
     onEnemyKilled: (enemy: Enemy) => void
@@ -764,23 +751,6 @@ export class WeaponSystem {
         if (p.pierce <= 0) {
           this.projectiles.splice(i, 1);
           break;
-        }
-      }
-
-      // Check collision with torches
-      for (let tIdx = 0; tIdx < worldProps.torches.length; tIdx++) {
-        const torch = worldProps.torches[tIdx];
-        const tdx = p.x - torch.x;
-        const tdy = p.y - torch.y;
-        if (tdx * tdx + tdy * tdy <= (p.radius + torch.radius) ** 2) {
-          worldProps.damageTorch(torch);
-          vfx.addSparks(torch.x, torch.y, '#f97316', 5);
-          sound.playHit();
-          p.pierce -= 1;
-          if (p.pierce <= 0) {
-            this.projectiles.splice(i, 1);
-            break;
-          }
         }
       }
 

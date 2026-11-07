@@ -1,5 +1,7 @@
 import { Camera } from '../engine/Camera';
 import { Player } from '../entities/Player';
+import { Drop } from '../entities/Drops';
+import { DropType } from '../types';
 
 export interface TorchProp {
   id: number;
@@ -8,6 +10,7 @@ export interface TorchProp {
   radius: number;
   hp: number;
   animTimer: number;
+  buff: DropType;
 }
 
 export class WorldSystem {
@@ -15,6 +18,7 @@ export class WorldSystem {
   private nextTorchId: number = 1;
   private torchSpawnTimer: number = 0;
   private maxTorches: number = 7;
+  private readonly torchSpawnInterval: number = 9; // 1/3 of the previous 3s spawn rate
 
   private tilePatternCanvas: HTMLCanvasElement | null = null;
   private tilePattern: CanvasPattern | null = null;
@@ -61,22 +65,38 @@ export class WorldSystem {
     this.tilePatternCanvas = canvas;
   }
 
-  update(dt: number, player: Player): void {
+  private rollTorchBuff(): DropType {
+    // Healing (chicken) is intentionally excluded from lamps.
+    const roll = Math.random();
+    if (roll < 0.6) return 'coin';
+    if (roll < 0.85) return 'magnet';
+    return 'rosary';
+  }
+
+  update(dt: number, player: Player, onBuffSpawn?: (drop: Drop) => void): void {
     this.torchSpawnTimer += dt;
 
     // Spawn new torches periodically near player
-    if (this.torchSpawnTimer > 3 && this.torches.length < this.maxTorches) {
+    if (this.torchSpawnTimer > this.torchSpawnInterval && this.torches.length < this.maxTorches) {
       this.torchSpawnTimer = 0;
       const angle = Math.random() * Math.PI * 2;
       const dist = 350 + Math.random() * 250;
+      const x = player.x + Math.cos(angle) * dist;
+      const y = player.y + Math.sin(angle) * dist;
+      const buff = this.rollTorchBuff();
+
       this.torches.push({
         id: this.nextTorchId++,
-        x: player.x + Math.cos(angle) * dist,
-        y: player.y + Math.sin(angle) * dist,
+        x,
+        y,
         radius: 12,
         hp: 1,
         animTimer: Math.random() * 5,
+        buff,
       });
+
+      // The lamp already carries its random buff when it spawns.
+      onBuffSpawn?.(new Drop(Date.now() + Math.random(), buff, x, y));
     }
 
     // Clean up torches that are way too far away (> 1500 px)
@@ -90,11 +110,6 @@ export class WorldSystem {
         this.torches.splice(i, 1);
       }
     }
-  }
-
-  damageTorch(torch: TorchProp): boolean {
-    torch.hp -= 1;
-    return torch.hp <= 0;
   }
 
   renderFloor(ctx: CanvasRenderingContext2D, camera: Camera): void {

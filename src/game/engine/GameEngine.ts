@@ -208,7 +208,7 @@ export class GameEngine {
     }
 
     // 5. Update World Props (Torches)
-    this.worldProps.update(dt, this.player);
+    this.worldProps.update(dt, this.player, (drop) => this.drops.push(drop));
 
     // 6. Update Weapons System
     this.weaponSystem.update(
@@ -216,7 +216,6 @@ export class GameEngine {
       this.player,
       this.enemies,
       this.spatialGrid,
-      this.worldProps,
       this.vfx,
       this.sound,
       (enemy) => this.onEnemyKilled(enemy)
