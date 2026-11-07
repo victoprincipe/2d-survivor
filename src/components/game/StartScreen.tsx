@@ -461,7 +461,9 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
         {/* Instructions footer */}
         <div className="mt-4 flex items-center gap-2 text-[11px] text-[#6b7280]">
           <Info className="h-4 w-4 text-[#9ca3af]" />
-          <span>Controles: WASD ou Setas no teclado • Arraste o mouse ou toque para mover</span>
+          <span>
+            Controles: WASD ou Setas • Espaço para pular • Arraste o mouse ou toque para mover
+          </span>
         </div>
       </div>
     </div>

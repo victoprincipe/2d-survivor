@@ -22,6 +22,9 @@ export class Enemy {
   public damage: number;
   public xpValue: number;
   public knockbackResistance: number = 1.0;
+  public waterSpeedMultiplier: number = 0.65;
+  public landSpeedMultiplier: number = 1.0;
+  public groundHeight: number = 0;
 
   public knockbackX: number = 0;
   public knockbackY: number = 0;
@@ -102,6 +105,126 @@ export class Enemy {
         this.xpValue = 16;
         this.knockbackResistance = 0.35;
         break;
+      case 'sucuri':
+        this.name = 'Sucuri';
+        this.radius = 20;
+        this.maxHp = Math.round(58 * hpMultiplier);
+        this.speed = 76;
+        this.damage = 14;
+        this.xpValue = 14;
+        this.knockbackResistance = 0.72;
+        this.waterSpeedMultiplier = 1.25;
+        break;
+      case 'capivara':
+        this.name = 'Capivara';
+        this.radius = 16;
+        this.maxHp = Math.round(42 * hpMultiplier);
+        this.speed = 90;
+        this.damage = 10;
+        this.xpValue = 10;
+        this.knockbackResistance = 0.85;
+        this.waterSpeedMultiplier = 0.9;
+        break;
+      case 'jacare':
+        this.name = 'Jacaré-açu';
+        this.radius = 24;
+        this.maxHp = Math.round(125 * hpMultiplier);
+        this.speed = 78;
+        this.damage = 22;
+        this.xpValue = 30;
+        this.knockbackResistance = 0.5;
+        this.waterSpeedMultiplier = 1.65;
+        this.landSpeedMultiplier = 0.75;
+        break;
+      case 'ra_dardo':
+        this.name = 'Rã-dardo';
+        this.radius = 12;
+        this.maxHp = Math.round(28 * hpMultiplier);
+        this.speed = 98;
+        this.damage = 12;
+        this.xpValue = 8;
+        this.knockbackResistance = 0.9;
+        this.waterSpeedMultiplier = 1.35;
+        this.landSpeedMultiplier = 1.0;
+        break;
+      case 'piranha':
+        this.name = 'Piranha';
+        this.radius = 10;
+        this.maxHp = Math.round(22 * hpMultiplier);
+        this.speed = 112;
+        this.damage = 9;
+        this.xpValue = 6;
+        this.knockbackResistance = 1.1;
+        this.waterSpeedMultiplier = 1.7;
+        this.landSpeedMultiplier = 0.45;
+        break;
+      case 'boto':
+        this.name = 'Boto-cor-de-rosa';
+        this.radius = 20;
+        this.maxHp = Math.round(84 * hpMultiplier);
+        this.speed = 102;
+        this.damage = 16;
+        this.xpValue = 22;
+        this.knockbackResistance = 0.62;
+        this.waterSpeedMultiplier = 1.55;
+        this.landSpeedMultiplier = 0.5;
+        break;
+      case 'onca':
+        this.name = 'Onça-pintada';
+        this.radius = 22;
+        this.maxHp = Math.round(104 * hpMultiplier);
+        this.speed = 108;
+        this.damage = 24;
+        this.xpValue = 28;
+        this.knockbackResistance = 0.4;
+        break;
+      case 'anta':
+        this.name = 'Anta';
+        this.radius = 26;
+        this.maxHp = Math.round(165 * hpMultiplier);
+        this.speed = 64;
+        this.damage = 26;
+        this.xpValue = 34;
+        this.knockbackResistance = 0.32;
+        this.waterSpeedMultiplier = 0.85;
+        break;
+      case 'macaco':
+        this.name = 'Macaco-bugio';
+        this.radius = 14;
+        this.maxHp = Math.round(40 * hpMultiplier);
+        this.speed = 120;
+        this.damage = 11;
+        this.xpValue = 11;
+        this.knockbackResistance = 0.95;
+        break;
+      case 'tucano':
+        this.name = 'Tucano';
+        this.radius = 11;
+        this.maxHp = Math.round(24 * hpMultiplier);
+        this.speed = 132;
+        this.damage = 8;
+        this.xpValue = 7;
+        this.knockbackResistance = 1.2;
+        this.waterSpeedMultiplier = 1.0;
+        break;
+      case 'formiga_bala':
+        this.name = 'Formiga-bala';
+        this.radius = 8;
+        this.maxHp = Math.round(15 * hpMultiplier);
+        this.speed = 152;
+        this.damage = 7;
+        this.xpValue = 4;
+        this.knockbackResistance = 1.25;
+        break;
+      case 'aranha_golias':
+        this.name = 'Aranha-golias';
+        this.radius = 18;
+        this.maxHp = Math.round(64 * hpMultiplier);
+        this.speed = 94;
+        this.damage = 16;
+        this.xpValue = 16;
+        this.knockbackResistance = 0.7;
+        break;
       case 'elite_minotaur':
         this.name = 'Minotauro Elite';
         this.radius = 28;
@@ -181,7 +304,12 @@ export class Enemy {
     return rawAmount * mult;
   }
 
-  update(dt: number, player: Player, separation: { vx: number; vy: number }): boolean {
+  update(
+    dt: number,
+    player: Player,
+    separation: { vx: number; vy: number },
+    terrainSpeedMultiplier: number = 1
+  ): boolean {
     this.animTimer += dt * 8;
 
     // Decay timers
@@ -226,7 +354,7 @@ export class Enemy {
     }
 
     if (this.skillState === 'dashing') {
-      const dashSpeed = (this.isBoss ? 275 : 210) * speedMult;
+      const dashSpeed = (this.isBoss ? 275 : 210) * speedMult * terrainSpeedMultiplier;
       this.x += this.dashDirX * dashSpeed * dt;
       this.y += this.dashDirY * dashSpeed * dt;
       return this.hp > 0;
@@ -239,15 +367,15 @@ export class Enemy {
     ) {
       // Slow ominous step while telegraphing
       if (dist > 0) {
-        this.x += (dx / dist) * this.speed * 0.25 * speedMult * dt;
-        this.y += (dy / dist) * this.speed * 0.25 * speedMult * dt;
+        this.x += (dx / dist) * this.speed * 0.25 * speedMult * terrainSpeedMultiplier * dt;
+        this.y += (dy / dist) * this.speed * 0.25 * speedMult * terrainSpeedMultiplier * dt;
       }
       return this.hp > 0;
     }
 
     // Standard movement towards player
     if (dist > 0) {
-      const currentSpeed = this.speed * speedMult;
+      const currentSpeed = this.speed * speedMult * terrainSpeedMultiplier;
       let vx = (dx / dist) * currentSpeed;
       let vy = (dy / dist) * currentSpeed;
 
@@ -259,7 +387,7 @@ export class Enemy {
       if (this.type === 'ghost') {
         const perpX = -dy / dist;
         const perpY = dx / dist;
-        const wave = Math.sin(this.animTimer * 1.5) * 44 * speedMult;
+        const wave = Math.sin(this.animTimer * 1.5) * 44 * speedMult * terrainSpeedMultiplier;
         vx += perpX * wave;
         vy += perpY * wave;
       }
@@ -329,6 +457,277 @@ export class Enemy {
     }
   }
 
+  private renderAmazonCreature(ctx: CanvasRenderingContext2D, isFlashing: boolean): void {
+    const bodyColor = (color: string) => (isFlashing ? '#ffffff' : color);
+    const wobble = Math.sin(this.animTimer) * 2;
+
+    switch (this.type) {
+      case 'sucuri':
+        ctx.fillStyle = bodyColor('#4d7c0f');
+        ctx.beginPath();
+        ctx.ellipse(0, 0, this.radius * 1.25, this.radius * 0.55, 0.12, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(this.radius * 1.02, -2, this.radius * 0.42, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = bodyColor('#365314');
+        for (let i = -2; i <= 2; i++) {
+          ctx.beginPath();
+          ctx.arc(i * this.radius * 0.35, 0, this.radius * 0.12, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.fillStyle = '#fde047';
+        ctx.fillRect(this.radius * 1.05, -5, 3, 3);
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(this.radius * 1.25, 0);
+        ctx.lineTo(this.radius * 1.25 + 9 + wobble, 2);
+        ctx.stroke();
+        break;
+      case 'capivara':
+        ctx.fillStyle = bodyColor('#8b5a2b');
+        ctx.beginPath();
+        ctx.ellipse(0, 0, this.radius * 0.95, this.radius * 0.68, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(this.radius * 0.78, -3, this.radius * 0.46, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = bodyColor('#5b3a1b');
+        ctx.beginPath();
+        ctx.arc(this.radius * 0.6, -this.radius * 0.42, 3, 0, Math.PI * 2);
+        ctx.arc(this.radius * 0.95, -this.radius * 0.42, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#111827';
+        ctx.fillRect(this.radius * 0.92, -5, 2.5, 2.5);
+        break;
+      case 'jacare':
+        ctx.fillStyle = bodyColor('#3f6212');
+        ctx.beginPath();
+        ctx.ellipse(0, 0, this.radius * 1.05, this.radius * 0.58, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(-this.radius, 0);
+        ctx.lineTo(-this.radius * 1.6, -this.radius * 0.42);
+        ctx.lineTo(-this.radius * 1.15, this.radius * 0.18);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = bodyColor('#365314');
+        ctx.beginPath();
+        ctx.roundRect(this.radius * 0.55, -6, this.radius * 0.95, 12, 4);
+        ctx.fill();
+        ctx.fillStyle = bodyColor('#65a30d');
+        for (let i = -1; i <= 1; i++) {
+          ctx.beginPath();
+          ctx.moveTo(i * this.radius * 0.45, -this.radius * 0.45);
+          ctx.lineTo(i * this.radius * 0.45 + 5, -this.radius * 0.72);
+          ctx.lineTo(i * this.radius * 0.45 + 9, -this.radius * 0.42);
+          ctx.fill();
+        }
+        ctx.fillStyle = '#fde047';
+        ctx.fillRect(this.radius * 0.78, -8, 3, 3);
+        ctx.fillStyle = '#f8fafc';
+        for (let i = 0; i < 3; i++) {
+          ctx.fillRect(this.radius * 1.1 + i * 3, 1, 2, 3);
+        }
+        break;
+      case 'ra_dardo':
+        ctx.fillStyle = bodyColor('#84cc16');
+        ctx.beginPath();
+        ctx.ellipse(0, 0, this.radius * 0.9, this.radius * 0.7, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = bodyColor('#166534');
+        for (let i = 0; i < 4; i++) {
+          ctx.beginPath();
+          ctx.arc((i % 2 ? 1 : -1) * this.radius * 0.32, (i < 2 ? -1 : 1) * 3, 2.4, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.fillStyle = '#facc15';
+        ctx.beginPath();
+        ctx.arc(-5, -this.radius * 0.62, 3.4, 0, Math.PI * 2);
+        ctx.arc(5, -this.radius * 0.62, 3.4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#111827';
+        ctx.fillRect(-6, -this.radius * 0.7, 2, 2);
+        ctx.fillRect(4, -this.radius * 0.7, 2, 2);
+        break;
+      case 'piranha':
+        ctx.fillStyle = bodyColor('#94a3b8');
+        ctx.beginPath();
+        ctx.ellipse(0, 0, this.radius * 0.95, this.radius * 0.62, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(-this.radius * 0.8, 0);
+        ctx.lineTo(-this.radius * 1.45, -this.radius * 0.55);
+        ctx.lineTo(-this.radius * 1.35, this.radius * 0.5);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = bodyColor('#dc2626');
+        ctx.beginPath();
+        ctx.ellipse(0, this.radius * 0.22, this.radius * 0.58, this.radius * 0.24, 0, 0, Math.PI);
+        ctx.fill();
+        ctx.fillStyle = '#f8fafc';
+        ctx.beginPath();
+        ctx.moveTo(this.radius * 0.55, 0);
+        ctx.lineTo(this.radius * 0.95, -3);
+        ctx.lineTo(this.radius * 0.95, 3);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#fef08a';
+        ctx.fillRect(this.radius * 0.58, -5, 3, 3);
+        break;
+      case 'boto':
+        ctx.fillStyle = bodyColor('#f9a8d4');
+        ctx.beginPath();
+        ctx.ellipse(0, 0, this.radius * 1.1, this.radius * 0.6, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(-4, -this.radius * 0.5);
+        ctx.lineTo(2, -this.radius * 1.15);
+        ctx.lineTo(9, -this.radius * 0.45);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = bodyColor('#db2777');
+        ctx.beginPath();
+        ctx.ellipse(this.radius * 0.9, 0, this.radius * 0.38, this.radius * 0.3, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#111827';
+        ctx.fillRect(this.radius * 1.0, -4, 2.5, 2.5);
+        break;
+      case 'onca':
+        ctx.fillStyle = bodyColor('#d97706');
+        ctx.beginPath();
+        ctx.ellipse(0, 0, this.radius * 1.05, this.radius * 0.62, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(this.radius * 0.92, -2, this.radius * 0.42, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = bodyColor('#b45309');
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(-this.radius, 0);
+        ctx.quadraticCurveTo(-this.radius * 1.7, -this.radius * 0.4, -this.radius * 1.45, -this.radius * 0.9);
+        ctx.stroke();
+        ctx.fillStyle = '#1c1917';
+        for (let i = 0; i < 4; i++) {
+          ctx.beginPath();
+          ctx.arc((i - 1.5) * this.radius * 0.32, (i % 2 ? 1 : -1) * 4, 2.6, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.fillStyle = '#facc15';
+        ctx.fillRect(this.radius * 1.02, -5, 3, 3);
+        break;
+      case 'anta':
+        ctx.fillStyle = bodyColor('#4b5563');
+        ctx.beginPath();
+        ctx.ellipse(0, 0, this.radius * 1.05, this.radius * 0.68, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(this.radius * 0.85, 2, this.radius * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = bodyColor('#d1d5db');
+        ctx.beginPath();
+        ctx.ellipse(this.radius * 1.2, 4, this.radius * 0.35, this.radius * 0.22, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#111827';
+        ctx.fillRect(this.radius * 0.85, -6, 3, 3);
+        break;
+      case 'macaco':
+        ctx.fillStyle = bodyColor('#78350f');
+        ctx.beginPath();
+        ctx.ellipse(0, 2, this.radius * 0.7, this.radius * 0.85, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(0, -this.radius * 0.7, this.radius * 0.55, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = bodyColor('#f5d0a9');
+        ctx.beginPath();
+        ctx.ellipse(0, -this.radius * 0.62, this.radius * 0.34, this.radius * 0.3, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#111827';
+        ctx.fillRect(-5, -this.radius * 0.75, 2, 3);
+        ctx.fillRect(3, -this.radius * 0.75, 2, 3);
+        ctx.strokeStyle = bodyColor('#78350f');
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(-this.radius * 0.7, 4);
+        ctx.quadraticCurveTo(-this.radius * 1.4, 10, -this.radius * 1.1, -6);
+        ctx.stroke();
+        break;
+      case 'tucano':
+        ctx.fillStyle = bodyColor('#111827');
+        ctx.beginPath();
+        ctx.ellipse(0, 0, this.radius * 0.75, this.radius * 0.95, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = bodyColor('#1e3a8a');
+        ctx.beginPath();
+        ctx.ellipse(-4, 2, this.radius * 0.4, this.radius * 0.55, -0.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#f97316';
+        ctx.beginPath();
+        ctx.moveTo(this.radius * 0.5, -2);
+        ctx.lineTo(this.radius * 0.8, 5);
+        ctx.lineTo(this.radius * 1.7, 2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#fde047';
+        ctx.fillRect(this.radius * 0.45, -7, 3, 3);
+        break;
+      case 'formiga_bala':
+        ctx.fillStyle = bodyColor('#1c1917');
+        ctx.beginPath();
+        ctx.arc(-this.radius * 0.7, 0, this.radius * 0.5, 0, Math.PI * 2);
+        ctx.arc(0, 0, this.radius * 0.55, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = bodyColor('#b91c1c');
+        ctx.beginPath();
+        ctx.ellipse(this.radius * 0.75, 0, this.radius * 0.7, this.radius * 0.55, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#1c1917';
+        ctx.lineWidth = 1.5;
+        for (let i = -1; i <= 1; i++) {
+          ctx.beginPath();
+          ctx.moveTo(i * 3, -3);
+          ctx.lineTo(i * 3 - 6, -9);
+          ctx.moveTo(i * 3, 3);
+          ctx.lineTo(i * 3 - 6, 9);
+          ctx.stroke();
+        }
+        ctx.fillStyle = '#fef08a';
+        ctx.fillRect(-this.radius * 1.1, -3, 2.5, 2.5);
+        break;
+      case 'aranha_golias':
+        ctx.strokeStyle = bodyColor('#3f2b1d');
+        ctx.lineWidth = 3;
+        for (let i = 0; i < 4; i++) {
+          const off = i * 3 - 4;
+          ctx.beginPath();
+          ctx.moveTo(-4, 0);
+          ctx.lineTo(-this.radius * 1.2, off - 8);
+          ctx.moveTo(4, 0);
+          ctx.lineTo(this.radius * 1.2, off - 8);
+          ctx.moveTo(-4, 3);
+          ctx.lineTo(-this.radius * 1.1, off + 10);
+          ctx.moveTo(4, 3);
+          ctx.lineTo(this.radius * 1.1, off + 10);
+          ctx.stroke();
+        }
+        ctx.fillStyle = bodyColor('#3f2b1d');
+        ctx.beginPath();
+        ctx.ellipse(-2, 2, this.radius * 0.72, this.radius * 0.62, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(this.radius * 0.55, -1, this.radius * 0.38, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath();
+        ctx.arc(this.radius * 0.58, -4, 2.4, 0, Math.PI * 2);
+        ctx.arc(this.radius * 0.75, 0, 2.4, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+    }
+  }
+
   takeDamage(amount: number, knockX: number = 0, knockY: number = 0, knockForce: number = 200): boolean {
     this.hp -= amount;
     this.hitFlashTimer = 0.12;
@@ -343,6 +742,7 @@ export class Enemy {
     if (!camera.isInView(this.x, this.y, 160)) return;
 
     const screen = camera.worldToScreen(this.x, this.y);
+    screen.y -= this.groundHeight * 8;
     const flip = this.x > camera.x ? -1 : 1;
 
     // Render Boss / Elite Telegraphs beneath character
@@ -469,6 +869,21 @@ export class Enemy {
       ctx.arc(3, -5, 2.5, 0, Math.PI * 2);
       ctx.fill();
       ctx.globalAlpha = 1.0;
+    } else if (
+      this.type === 'sucuri' ||
+      this.type === 'capivara' ||
+      this.type === 'jacare' ||
+      this.type === 'ra_dardo' ||
+      this.type === 'piranha' ||
+      this.type === 'boto' ||
+      this.type === 'onca' ||
+      this.type === 'anta' ||
+      this.type === 'macaco' ||
+      this.type === 'tucano' ||
+      this.type === 'formiga_bala' ||
+      this.type === 'aranha_golias'
+    ) {
+      this.renderAmazonCreature(ctx, isFlashing);
     } else if (this.type === 'elite_minotaur') {
       if (!isFlashing) ctx.fillStyle = this.skillState === 'dashing' ? '#dc2626' : '#991b1b';
       ctx.beginPath();

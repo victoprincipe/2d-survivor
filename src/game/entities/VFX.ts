@@ -43,6 +43,19 @@ export class VFXManager {
     });
   }
 
+  addFloatingText(x: number, y: number, text: string, color: string = '#facc15'): void {
+    this.damageNumbers.push({
+      x,
+      y: y - 14,
+      text,
+      color,
+      isCrit: false,
+      vy: -45,
+      life: 0.85,
+      maxLife: 0.85,
+    });
+  }
+
   addDeathBurst(x: number, y: number, color: string = '#ef4444', count: number = 10): void {
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;

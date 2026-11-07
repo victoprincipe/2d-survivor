@@ -13,6 +13,7 @@ export class InputManager {
   public dy: number = 0;
   public facingX: number = 1;
   public facingY: number = 0;
+  private jumpQueued: boolean = false;
 
   // Virtual Joystick for touch / mouse
   public joystick: VirtualJoystickState = {
@@ -50,6 +51,10 @@ export class InputManager {
     if (e.code === 'Escape' || e.code === 'KeyP') {
       this.onPauseToggle?.();
     }
+    if (e.code === 'Space') {
+      e.preventDefault();
+      this.jumpQueued = true;
+    }
     if (e.code === 'Digit1') this.onOptionSelect?.(0);
     if (e.code === 'Digit2') this.onOptionSelect?.(1);
     if (e.code === 'Digit3') this.onOptionSelect?.(2);
@@ -65,6 +70,13 @@ export class InputManager {
     this.joystick.active = false;
     this.dx = 0;
     this.dy = 0;
+    this.jumpQueued = false;
+  }
+
+  public consumeJump(): boolean {
+    if (!this.jumpQueued) return false;
+    this.jumpQueued = false;
+    return true;
   }
 
   public handlePointerDown(x: number, y: number): void {

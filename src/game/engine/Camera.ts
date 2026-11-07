@@ -43,6 +43,13 @@ export class Camera {
     this.shakeIntensity = intensity;
   }
 
+  clampToWorld(worldWidth: number, worldHeight: number): void {
+    const halfWidth = Math.min(this.viewportWidth / 2, worldWidth / 2);
+    const halfHeight = Math.min(this.viewportHeight / 2, worldHeight / 2);
+    this.x = Math.max(halfWidth, Math.min(worldWidth - halfWidth, this.x));
+    this.y = Math.max(halfHeight, Math.min(worldHeight - halfHeight, this.y));
+  }
+
   worldToScreen(worldX: number, worldY: number): { x: number; y: number } {
     return {
       x: worldX - this.x + this.viewportWidth / 2 + this.shakeOffsetX,

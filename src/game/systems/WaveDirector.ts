@@ -3,12 +3,14 @@ import { Enemy } from '../entities/Enemy';
 import { Player } from '../entities/Player';
 import { Camera } from '../engine/Camera';
 import { SoundEngine } from '../engine/SoundEngine';
+import { BiomeType, WorldSystem } from './WorldProps';
 
 export class WaveDirector {
   public survivalTime: number = 0;
   public difficulty: DifficultyConfig;
   private nextEnemyId: number = 1;
   private spawnTimer: number = 0;
+  private world: WorldSystem | null = null;
 
   constructor(difficulty: DifficultyConfig) {
     this.difficulty = difficulty;
@@ -27,8 +29,10 @@ export class WaveDirector {
     camera: Camera,
     enemies: Enemy[],
     sound: SoundEngine,
-    onSpawn: (enemy: Enemy) => void
+    onSpawn: (enemy: Enemy) => void,
+    world?: WorldSystem
   ): void {
+    this.world = world ?? null;
     this.survivalTime += dt;
     this.spawnTimer += dt;
 
@@ -158,6 +162,10 @@ export class WaveDirector {
       y += (Math.random() - 0.5) * 2 * halfH;
     }
 
+    if (this.world) {
+      return this.world.clampSpawnPoint(x, y);
+    }
+
     return { x, y };
   }
 
@@ -169,21 +177,42 @@ export class WaveDirector {
   ): void {
     const pos = this.getSpawnPositionOutsideScreen(camera);
     const minutes = this.survivalTime / 60;
-
-    let type: Enemy['type'] = 'bat';
-    const roll = Math.random();
-
-    if (minutes < 1) {
-      type = roll < 0.68 ? 'bat' : roll < 0.9 ? 'skeleton' : 'zombie';
-    } else if (minutes < 2) {
-      type = roll < 0.35 ? 'bat' : roll < 0.78 ? 'skeleton' : 'zombie';
-    } else if (minutes < 3.5) {
-      type = roll < 0.28 ? 'skeleton' : roll < 0.65 ? 'ghost' : 'zombie';
-    } else {
-      type = roll < 0.22 ? 'bat' : roll < 0.52 ? 'ghost' : roll < 0.78 ? 'skeleton' : 'zombie';
-    }
+    const biome: BiomeType = this.world ? this.world.getBiomeAt(pos.x, pos.y) : 'mata';
+    const type = this.pickBiomeEnemy(biome, minutes);
 
     onSpawn(this.createEnemy(type, pos.x, pos.y, hpMult));
+  }
+
+  private pickBiomeEnemy(biome: BiomeType, minutes: number): EnemyType {
+    const roll = Math.random();
+    const threat = Math.min(0.18, minutes * 0.025);
+
+    if (biome === 'agua') {
+      return roll < 0.44 ? 'piranha' : roll < 0.76 ? 'boto' : 'jacare';
+    }
+
+    if (biome === 'margem') {
+      if (roll < 0.28) return 'sucuri';
+      if (roll < 0.52) return 'capivara';
+      if (roll < 0.72 + threat * 0.4) return 'jacare';
+      if (roll < 0.9) return 'ra_dardo';
+      return 'formiga_bala';
+    }
+
+    if (biome === 'plato') {
+      if (roll < 0.28 + threat * 0.2) return 'onca';
+      if (roll < 0.52) return 'anta';
+      if (roll < 0.72) return 'macaco';
+      if (roll < 0.88) return 'tucano';
+      return 'aranha_golias';
+    }
+
+    if (roll < 0.24 + threat * 0.2) return 'onca';
+    if (roll < 0.46) return 'anta';
+    if (roll < 0.68) return 'macaco';
+    if (roll < 0.84) return 'tucano';
+    if (roll < 0.94) return 'formiga_bala';
+    return 'aranha_golias';
   }
 
   public createEnemy(type: EnemyType, x: number, y: number, hpMult: number): Enemy {

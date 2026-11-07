@@ -98,6 +98,13 @@ export class GameEngine {
     this.weaponSystem.recalculatePlayerStats(this.player);
     this.player.hp = this.player.maxHp;
 
+    const spawnPoint = this.worldProps.getSpawnPoint();
+    this.player.x = spawnPoint.x;
+    this.player.y = spawnPoint.y;
+    this.player.groundHeight = this.worldProps.getHeightAtWorld(spawnPoint.x, spawnPoint.y);
+    this.camera.x = spawnPoint.x;
+    this.camera.y = spawnPoint.y;
+
     // Initial resize
     this.handleResize();
 
@@ -168,14 +175,23 @@ export class GameEngine {
     }
 
     // 1. Update Player
+    const previousPlayerX = this.player.x;
+    const previousPlayerY = this.player.y;
+    this.player.terrainSpeedMultiplier = this.worldProps.getMovementSpeedMultiplier(
+      this.player.x,
+      this.player.y,
+      this.player.isJumping
+    );
     const playerAlive = this.player.update(dt, this.input);
     if (!playerAlive) {
       this.handlePlayerDeath();
       return;
     }
+    this.worldProps.resolvePlayerMovement(this.player, previousPlayerX, previousPlayerY);
 
     // 2. Update Camera
     this.camera.follow(this.player.x, this.player.y, dt);
+    this.camera.clampToWorld(this.worldProps.worldWidth, this.worldProps.worldHeight);
 
     // 3. Clear and Rebuild Spatial Grid with current enemies
     this.spatialGrid.clear();
@@ -188,7 +204,10 @@ export class GameEngine {
     for (let i = this.enemies.length - 1; i >= 0; i--) {
       const e = this.enemies[i];
       const sep = this.spatialGrid.applySeparation(e, e.radius * 2, 0.45);
-      const alive = e.update(dt, this.player, sep);
+      const inWater = this.worldProps.isWaterAt(e.x, e.y);
+      const terrainSpeed = inWater ? e.waterSpeedMultiplier : e.landSpeedMultiplier;
+      const alive = e.update(dt, this.player, sep, terrainSpeed);
+      e.groundHeight = this.worldProps.getHeightAtWorld(e.x, e.y);
 
       if (!alive) {
         this.enemies.splice(i, 1);
@@ -256,8 +275,11 @@ export class GameEngine {
       this.spatialGrid.insert(spawnedMinions[m]);
     }
 
-    // 5. Update World Props (Torches)
-    this.worldProps.update(dt, this.player, (drop) => this.drops.push(drop));
+    // 5. Update World Props (Amazon resources)
+    this.worldProps.update(dt, this.player, (x, y, color, text) => {
+      this.vfx.addFloatingText(x, y, text, color);
+      this.vfx.addDeathBurst(x, y, color, 6);
+    });
 
     // 6. Update Weapons System
     this.weaponSystem.update(
@@ -296,7 +318,8 @@ export class GameEngine {
       this.camera,
       this.enemies,
       this.sound,
-      (enemy) => this.enemies.push(enemy)
+      (enemy) => this.enemies.push(enemy),
+      this.worldProps
     );
 
     // 9. Update VFX
@@ -366,14 +389,11 @@ export class GameEngine {
 
     const angle = Math.random() * Math.PI * 2;
     const dist = 200 + Math.random() * 280;
-    this.drops.push(
-      new Drop(
-        Date.now() + Math.random(),
-        type,
-        this.player.x + Math.cos(angle) * dist,
-        this.player.y + Math.sin(angle) * dist
-      )
+    const point = this.worldProps.clampSpawnPoint(
+      this.player.x + Math.cos(angle) * dist,
+      this.player.y + Math.sin(angle) * dist
     );
+    this.drops.push(new Drop(Date.now() + Math.random(), type, point.x, point.y));
   }
 
   private handleDropCollected(drop: Drop): void {
@@ -625,8 +645,8 @@ export class GameEngine {
     // 1. Clear & Render Floor Tile Pattern
     this.worldProps.renderFloor(ctx, camera);
 
-    // 2. Render Torches & Props
-    this.worldProps.renderTorches(ctx, camera);
+    // 2. Render Amazon vegetation, resources and low obstacles
+    this.worldProps.renderProps(ctx, camera);
 
     // 3. Render Drops (Gems, Pickups, Chests)
     for (let i = 0; i < this.drops.length; i++) {

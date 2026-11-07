@@ -50,6 +50,19 @@ export class Player {
   public recoveryPerSec: number = 0;
   public speedBoostTimer: number = 0;
 
+  // Terrain, jump and temporary flower buffs
+  public terrainSpeedMultiplier: number = 1;
+  public groundHeight: number = 0;
+  public jumpTimer: number = 0;
+  public jumpCooldown: number = 0;
+  public jumpLift: number = 0;
+  public isJumping: boolean = false;
+  public buffTimer: number = 0;
+  public activeBuffLabel: string = '';
+  private buffSpeedMultiplier: number = 1;
+  private buffMightBonus: number = 0;
+  private buffArmorBonus: number = 0;
+
   // Progression
   public level: number = 1;
   public xp: number = 0;
@@ -115,6 +128,34 @@ export class Player {
       this.speedBoostTimer -= dt;
     }
 
+    if (this.buffTimer > 0) {
+      this.buffTimer -= dt;
+      if (this.buffTimer <= 0) this.clearFlowerBuff();
+    }
+
+    if (this.jumpCooldown > 0) {
+      this.jumpCooldown -= dt;
+    }
+    if (input.consumeJump() && this.jumpCooldown <= 0) {
+      this.jumpTimer = 0.55;
+      this.jumpCooldown = 0.9;
+    }
+    if (this.jumpTimer > 0) {
+      this.jumpTimer -= dt;
+      if (this.jumpTimer <= 0) {
+        this.jumpTimer = 0;
+        this.isJumping = false;
+        this.jumpLift = 0;
+      } else {
+        this.isJumping = true;
+        const jumpProgress = 1 - this.jumpTimer / 0.55;
+        this.jumpLift = Math.sin(jumpProgress * Math.PI) * 24;
+      }
+    } else {
+      this.isJumping = false;
+      this.jumpLift = 0;
+    }
+
     // Health recovery
     if (this.recoveryPerSec > 0 && this.hp < this.maxHp) {
       this.hp = Math.min(this.maxHp, this.hp + this.recoveryPerSec * dt);
@@ -125,7 +166,12 @@ export class Player {
     const dy = input.dy;
     this.isMoving = Math.abs(dx) > 0.05 || Math.abs(dy) > 0.05;
 
-    const effectiveSpeed = this.speedBoostTimer > 0 ? this.speed * 1.15 : this.speed;
+    const effectiveSpeed =
+      this.speed *
+      (this.speedBoostTimer > 0 ? 1.15 : 1) *
+      this.terrainSpeedMultiplier *
+      this.buffSpeedMultiplier *
+      (this.isJumping ? 1.05 : 1);
 
     if (this.isMoving) {
       this.x += dx * effectiveSpeed * dt;
@@ -173,8 +219,40 @@ export class Player {
     return this.checkLevelUp();
   }
 
+  public applyFlowerBuff(kind: 'speed' | 'might' | 'armor'): void {
+    this.clearFlowerBuff();
+    if (kind === 'speed') {
+      this.buffSpeedMultiplier = 1.3;
+      this.activeBuffLabel = 'VELOCIDADE';
+    } else if (kind === 'might') {
+      this.buffMightBonus = this.might * 0.25;
+      this.might += this.buffMightBonus;
+      this.activeBuffLabel = 'FORÇA';
+    } else {
+      this.buffArmorBonus = 5;
+      this.armor += this.buffArmorBonus;
+      this.activeBuffLabel = 'ARMADURA';
+    }
+    this.buffTimer = 10;
+  }
+
+  private clearFlowerBuff(): void {
+    if (this.buffMightBonus > 0) {
+      this.might = Math.max(1, this.might - this.buffMightBonus);
+    }
+    if (this.buffArmorBonus > 0) {
+      this.armor = Math.max(0, this.armor - this.buffArmorBonus);
+    }
+    this.buffSpeedMultiplier = 1;
+    this.buffMightBonus = 0;
+    this.buffArmorBonus = 0;
+    this.buffTimer = 0;
+    this.activeBuffLabel = '';
+  }
+
   render(ctx: CanvasRenderingContext2D, camera: Camera): void {
     const screen = camera.worldToScreen(this.x, this.y);
+    screen.y -= this.groundHeight * 8 + this.jumpLift;
 
     // Flash white/transparent when invulnerable
     if (this.invulnerableTimer > 0 && Math.floor(Date.now() / 60) % 2 === 0) {
