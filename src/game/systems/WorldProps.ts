@@ -20,49 +20,21 @@ export class WorldSystem {
   private maxTorches: number = 7;
   private readonly torchSpawnInterval: number = 9; // 1/3 of the previous 3s spawn rate
 
-  private tilePatternCanvas: HTMLCanvasElement | null = null;
-  private tilePattern: CanvasPattern | null = null;
-  private readonly tileSize: number = 128;
+  private floorImage: HTMLImageElement | null = null;
+  private floorPattern: CanvasPattern | null = null;
 
   constructor() {
-    this.createFloorPattern();
+    this.loadFloorTexture();
   }
 
-  private createFloorPattern(): void {
+  private loadFloorTexture(): void {
     if (typeof window === 'undefined') return;
-    const canvas = document.createElement('canvas');
-    canvas.width = this.tileSize;
-    canvas.height = this.tileSize;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Dark gothic stone background
-    ctx.fillStyle = '#111827';
-    ctx.fillRect(0, 0, this.tileSize, this.tileSize);
-
-    // Stone tile grid lines
-    ctx.strokeStyle = '#1e293b';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(0, 0, this.tileSize, this.tileSize);
-
-    // Inner subtle paving details
-    ctx.strokeStyle = '#0f172a';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(4, 4, this.tileSize - 8, this.tileSize - 8);
-
-    // Cracks / texture dots
-    ctx.fillStyle = '#1e293b';
-    ctx.fillRect(20, 30, 8, 2);
-    ctx.fillRect(75, 80, 12, 2);
-    ctx.fillRect(90, 25, 2, 8);
-
-    // Moss patch
-    ctx.fillStyle = '#064e3b';
-    ctx.beginPath();
-    ctx.arc(100, 100, 7, 0, Math.PI * 2);
-    ctx.fill();
-
-    this.tilePatternCanvas = canvas;
+    const image = new Image();
+    image.onload = () => {
+      this.floorImage = image;
+      this.floorPattern = null;
+    };
+    image.src = '/grass-texture.jpg';
   }
 
   private rollTorchBuff(): DropType {
@@ -113,24 +85,34 @@ export class WorldSystem {
   }
 
   renderFloor(ctx: CanvasRenderingContext2D, camera: Camera): void {
-    if (!this.tilePattern && this.tilePatternCanvas) {
-      this.tilePattern = ctx.createPattern(this.tilePatternCanvas, 'repeat');
+    const image = this.floorImage;
+    if (image) {
+      if (!this.floorPattern) {
+        this.floorPattern = ctx.createPattern(image, 'repeat');
+      }
+
+      if (this.floorPattern) {
+        const tileWidth = image.naturalWidth;
+        const tileHeight = image.naturalHeight;
+        const offsetX = (-camera.x + camera.viewportWidth / 2 + camera.shakeOffsetX) % tileWidth;
+        const offsetY = (-camera.y + camera.viewportHeight / 2 + camera.shakeOffsetY) % tileHeight;
+
+        ctx.save();
+        ctx.translate(offsetX, offsetY);
+        ctx.fillStyle = this.floorPattern;
+        ctx.fillRect(
+          -tileWidth,
+          -tileHeight,
+          camera.viewportWidth + tileWidth * 2,
+          camera.viewportHeight + tileHeight * 2
+        );
+        ctx.restore();
+        return;
+      }
     }
 
-    if (this.tilePattern) {
-      ctx.save();
-      // Translate pattern matrix by camera coordinates
-      const offsetX = (-camera.x + camera.viewportWidth / 2 + camera.shakeOffsetX) % this.tileSize;
-      const offsetY = (-camera.y + camera.viewportHeight / 2 + camera.shakeOffsetY) % this.tileSize;
-
-      ctx.translate(offsetX, offsetY);
-      ctx.fillStyle = this.tilePattern;
-      ctx.fillRect(-this.tileSize, -this.tileSize, camera.viewportWidth + this.tileSize * 2, camera.viewportHeight + this.tileSize * 2);
-      ctx.restore();
-    } else {
-      ctx.fillStyle = '#0f172a';
-      ctx.fillRect(0, 0, camera.viewportWidth, camera.viewportHeight);
-    }
+    ctx.fillStyle = '#1f2b1f';
+    ctx.fillRect(0, 0, camera.viewportWidth, camera.viewportHeight);
   }
 
   renderTorches(ctx: CanvasRenderingContext2D, camera: Camera): void {
