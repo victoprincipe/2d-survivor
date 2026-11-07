@@ -66,6 +66,7 @@ export class GameEngine {
   private gemStreak: number = 0;
   private gemStreakTimer: number = 0;
   private itemSpawnTimer: number = 0;
+  private processedEnemyDeaths = new WeakSet<Enemy>();
   private missionSnapshot = { kills: 0, survivalSeconds: 0, goldCollected: 0, bossesDefeated: 0 };
 
   private callbacks: GameEngineCallbacks;
@@ -264,6 +265,12 @@ export class GameEngine {
   }
 
   private onEnemyKilled(enemy: Enemy): void {
+    // Multiple weapons/projectiles can resolve a kill for the same enemy in a
+    // single frame (the enemy is only removed from the array next update).
+    // Ensure kills, XP, gold and drops are granted exactly once per enemy.
+    if (this.processedEnemyDeaths.has(enemy)) return;
+    this.processedEnemyDeaths.add(enemy);
+
     this.kills += 1;
     this.vfx.addDeathBurst(enemy.x, enemy.y, enemy.type === 'bat' ? '#a855f7' : '#ef4444', enemy.isElite ? 25 : 8);
 
