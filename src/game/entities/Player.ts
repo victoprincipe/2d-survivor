@@ -30,6 +30,7 @@ export class Player {
   public projectileSpeedMultiplier: number = 1;
   public pickupRadius: number = 65;
   public xpMultiplier: number = 1.0;
+  public goldMultiplier: number = 1.0;
   public recoveryPerSec: number = 0;
 
   // Progression
@@ -73,6 +74,7 @@ export class Player {
     if (initialPowerUps.maxHp) this.maxHp += initialPowerUps.maxHp * 10;
     if (initialPowerUps.recovery) this.recoveryPerSec += initialPowerUps.recovery * 0.5;
     if (initialPowerUps.speed) this.baseSpeed *= (1 + initialPowerUps.speed * 0.05);
+    if (initialPowerUps.greed) this.goldMultiplier += initialPowerUps.greed * 0.15;
 
     this.hp = this.maxHp;
     this.speed = this.baseSpeed;

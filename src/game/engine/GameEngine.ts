@@ -338,7 +338,9 @@ export class GameEngine {
         this.callbacks.onLevelUp(options);
       }
     } else if (drop.type === 'coin') {
-      const gained = Math.round(drop.value * this.difficulty.goldMultiplier);
+      const gained = Math.round(
+        drop.value * this.difficulty.goldMultiplier * this.player.goldMultiplier
+      );
       this.goldCollected += gained;
       this.sound.playGemPickup(4);
       this.vfx.addDamageNumber(this.player.x, this.player.y, gained, true, true);
@@ -368,7 +370,11 @@ export class GameEngine {
     } else if (drop.type === 'chest') {
       this.sound.playChestOpen();
       this.pause();
-      const goldBonus = Math.round((50 + Math.floor(Math.random() * 50)) * this.difficulty.goldMultiplier);
+      const goldBonus = Math.round(
+        (50 + Math.floor(Math.random() * 50)) *
+          this.difficulty.goldMultiplier *
+          this.player.goldMultiplier
+      );
       this.goldCollected += goldBonus;
       const upgradeOptions = this.weaponSystem.generateUpgradeOptions();
       const chosenUpgrade = upgradeOptions.length > 0 ? upgradeOptions[0] : undefined;
