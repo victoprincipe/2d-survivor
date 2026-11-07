@@ -1,3 +1,5 @@
+const BGM_TRACK_URL = '/audio/job-23-audio-1.mp3';
+
 export class SoundEngine {
   private ctx: AudioContext | null = null;
   private sfxGain: GainNode | null = null;
@@ -9,8 +11,7 @@ export class SoundEngine {
   public bgmVolume: number = 0.3;
 
   private lastPlayedTimestamps: Record<string, number> = {};
-  private bgmInterval: ReturnType<typeof setInterval> | null = null;
-  private bgmNoteIndex: number = 0;
+  private bgmAudio: HTMLAudioElement | null = null;
   private isBgmPlaying: boolean = false;
 
   constructor() {
@@ -371,49 +372,31 @@ export class SoundEngine {
   startBgm(): void {
     if (this.isBgmPlaying) return;
     this.isBgmPlaying = true;
-    if (!this.initCtx()) return;
+    if (!this.initCtx() || !this.ctx || !this.bgmGain) return;
 
-    // Dark retro synthwave bassline pattern: Am - F - C - G
-    const bassline = [
-      110, 110, 164.81, 110,
-      87.31, 87.31, 130.81, 87.31,
-      65.41, 65.41, 98.0, 65.41,
-      98.0, 98.0, 146.83, 98.0,
-    ];
+    // Route the soundtrack through bgmGain so mute and volume controls apply.
+    if (!this.bgmAudio) {
+      this.bgmAudio = new Audio(BGM_TRACK_URL);
+      this.bgmAudio.loop = true;
+      this.bgmAudio.preload = 'auto';
+      const source = this.ctx.createMediaElementSource(this.bgmAudio);
+      source.connect(this.bgmGain);
+    }
 
-    this.bgmInterval = setInterval(() => {
-      if (this.muted || !this.ctx || !this.bgmGain) return;
-      const freq = bassline[this.bgmNoteIndex % bassline.length];
-      this.bgmNoteIndex++;
-
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      const now = this.ctx.currentTime;
-
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(freq, now);
-
-      gain.gain.setValueAtTime(0.12, now);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.22);
-
-      osc.connect(gain);
-      gain.connect(this.bgmGain);
-
-      osc.start(now);
-      osc.stop(now + 0.22);
-    }, 250);
+    this.bgmAudio.play().catch(() => {
+      // Autoplay may be denied before the first user gesture; retry on next start.
+      this.isBgmPlaying = false;
+    });
   }
 
   stopBgm(): void {
     this.isBgmPlaying = false;
-    if (this.bgmInterval) {
-      clearInterval(this.bgmInterval);
-      this.bgmInterval = null;
-    }
+    this.bgmAudio?.pause();
   }
 
   destroy(): void {
     this.stopBgm();
+    this.bgmAudio = null;
     if (this.ctx) {
       this.ctx.close().catch(() => {});
       this.ctx = null;
