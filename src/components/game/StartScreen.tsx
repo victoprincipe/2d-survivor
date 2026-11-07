@@ -71,6 +71,7 @@ const CHARACTER_SELECTION_MUSIC: Record<string, string> = {
 // Per-character music volume multiplier, applied on top of the selection volume slider.
 const CHARACTER_SELECTION_MUSIC_VOLUME: Record<string, number> = {
   derson: 0.5,
+  lula: 0.5,
 };
 
 const getSelectionMusicVolume = (characterId: string, masterVolume: number) =>
