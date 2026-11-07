@@ -588,7 +588,7 @@ export class GameEngine {
       this.sound.playGemPickup(8);
       this.vfx.addSparks(fruit.x, fruit.y, '#84cc16', 12);
       this.vfx.addDamageNumber(this.player.x, this.player.y, healed, false, true);
-    } else {
+    } else if (fruit.kind === 'castanha') {
       // Castanha-do-Pará: drop an extra gold package.
       this.sound.playGemPickup(4);
       this.vfx.addSparks(fruit.x, fruit.y, '#fbbf24', 12);
@@ -604,6 +604,43 @@ export class GameEngine {
             50
           )
         );
+      }
+    } else if (fruit.kind === 'buriti') {
+      // Buriti: faster movement and attack speed for 10 seconds.
+      this.sound.playLevelUp();
+      this.vfx.triggerFlash('#fbbf24', 0.25);
+      this.vfx.addSparks(fruit.x, fruit.y, '#fb923c', 14);
+      this.player.speedBoostTimer = Math.max(this.player.speedBoostTimer, 10);
+      this.player.attackSpeedBoostTimer = 10;
+    } else if (fruit.kind === 'pupunha') {
+      // Pupunha: protective shield that halves incoming damage for 10 seconds.
+      this.sound.playGemPickup(8);
+      this.vfx.triggerFlash('#38bdf8', 0.2);
+      this.vfx.addSparks(fruit.x, fruit.y, '#38bdf8', 14);
+      this.player.shieldTimer = Math.max(this.player.shieldTimer, 10);
+    } else {
+      // Araçá: a shockwave that damages every nearby enemy.
+      const radius = 240;
+      const damage = Math.max(1, Math.round(70 * this.player.might));
+      this.sound.playThunder();
+      this.camera.shake(0.18, 5);
+      this.vfx.triggerFlash('#f97316', 0.2);
+      this.vfx.addSparks(fruit.x, fruit.y, '#f97316', 20);
+      this.weaponSystem.spawnRingPulse(fruit.x, fruit.y, radius, '#f97316', 0.4);
+
+      for (let i = this.enemies.length - 1; i >= 0; i--) {
+        const enemy = this.enemies[i];
+        const dx = enemy.x - fruit.x;
+        const dy = enemy.y - fruit.y;
+        if (dx * dx + dy * dy > radius * radius) continue;
+
+        const dist = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+        const dead = enemy.takeDamage(damage, dx / dist, dy / dist, 240);
+        this.vfx.addDamageNumber(enemy.x, enemy.y, damage, false);
+        if (dead) {
+          this.onEnemyKilled(enemy);
+          this.enemies.splice(i, 1);
+        }
       }
     }
   }

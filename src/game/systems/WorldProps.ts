@@ -31,7 +31,13 @@ export interface TorchProp {
   buff: DropType;
 }
 
-export type FruitTreeKind = 'acai' | 'cupuacu' | 'castanha';
+export type FruitTreeKind =
+  | 'acai'
+  | 'cupuacu'
+  | 'castanha'
+  | 'buriti'
+  | 'pupunha'
+  | 'araca';
 
 export interface FruitTreeProp {
   id: number;
@@ -138,12 +144,15 @@ export class WorldSystem {
   }
 
   private spawnInitialFruitTrees(): void {
-    // The first three trees are hand-placed near the spawn area, one of each
-    // fruit, so every Amazon run starts with all three effects available.
+    // The first six trees are hand-placed near the spawn area, one of each
+    // fruit, so every Amazon run starts with all available effects nearby.
     const initial: { kind: FruitTreeKind; x: number; y: number }[] = [
       { kind: 'acai', x: 420, y: -760 },
       { kind: 'cupuacu', x: -440, y: 820 },
       { kind: 'castanha', x: 820, y: -720 },
+      { kind: 'buriti', x: -900, y: -1300 },
+      { kind: 'pupunha', x: -1000, y: 1200 },
+      { kind: 'araca', x: 900, y: 1300 },
     ];
 
     for (let i = 0; i < initial.length; i++) {
@@ -1218,7 +1227,7 @@ export class WorldSystem {
         ctx.beginPath();
         ctx.ellipse(-23, -43, 4, 6, 0.2, 0, Math.PI * 2);
         ctx.fill();
-      } else {
+      } else if (tree.kind === 'castanha') {
         // Castanheira-do-Brasil: tall trunk, high canopy and spiky seed pods.
         ctx.fillStyle = '#5b3a1e';
         ctx.fillRect(-7, -92, 14, 96);
@@ -1253,6 +1262,153 @@ export class WorldSystem {
             else ctx.lineTo(px, py);
           }
           ctx.closePath();
+          ctx.fill();
+        }
+      } else if (tree.kind === 'buriti') {
+        // Buritizeiro: tall palm with a fan crown and orange fruit clusters.
+        const topX = sway * 0.5;
+        const topY = -96;
+
+        ctx.strokeStyle = '#6b4423';
+        ctx.lineWidth = 8;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.quadraticCurveTo(4, -52, topX, topY);
+        ctx.stroke();
+        ctx.lineCap = 'butt';
+
+        for (let f = 0; f < 10; f++) {
+          const angle = -Math.PI + (f / 9) * Math.PI;
+          const length = 34 + (f % 3) * 6;
+          ctx.strokeStyle = f % 2 === 0 ? '#15803d' : '#166534';
+          ctx.lineWidth = 3.5;
+          ctx.beginPath();
+          ctx.moveTo(topX, topY);
+          ctx.quadraticCurveTo(
+            topX + Math.cos(angle) * length * 0.55,
+            topY + Math.sin(angle) * length * 0.55 - 5,
+            topX + Math.cos(angle) * length,
+            topY + Math.sin(angle) * length * 0.7
+          );
+          ctx.stroke();
+        }
+
+        // Hanging bunches of reddish buriti fruit.
+        ctx.fillStyle = '#c2410c';
+        for (let b = 0; b < 10; b++) {
+          const angle = (b / 10) * Math.PI * 2;
+          const radius = 8 + (b % 3) * 3;
+          ctx.beginPath();
+          ctx.arc(
+            topX + Math.cos(angle) * radius,
+            topY + 14 + Math.sin(angle) * radius * 0.6,
+            3,
+            0,
+            Math.PI * 2
+          );
+          ctx.fill();
+        }
+        ctx.fillStyle = '#f97316';
+        ctx.beginPath();
+        ctx.arc(topX - 4, topY + 11, 1.8, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (tree.kind === 'pupunha') {
+        // Pupunheira: slim ringed palm with long fronds and red fruit bunches.
+        const topX = -sway * 0.4;
+        const topY = -86;
+
+        ctx.strokeStyle = '#7a4d29';
+        ctx.lineWidth = 6;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.quadraticCurveTo(-3, -46, topX, topY);
+        ctx.stroke();
+        ctx.lineCap = 'butt';
+
+        // Trunk rings.
+        ctx.strokeStyle = '#a16207';
+        ctx.lineWidth = 1.4;
+        for (let r = 0; r < 5; r++) {
+          const t = 0.18 + r * 0.16;
+          const rx = topX * t;
+          const ry = topY * t;
+          ctx.beginPath();
+          ctx.moveTo(rx - 5, ry);
+          ctx.lineTo(rx + 5, ry);
+          ctx.stroke();
+        }
+
+        for (let f = 0; f < 9; f++) {
+          const angle = -Math.PI + (f / 8) * Math.PI;
+          const length = 30 + (f % 2) * 8;
+          ctx.strokeStyle = f % 2 === 0 ? '#166534' : '#15803d';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(topX, topY);
+          ctx.quadraticCurveTo(
+            topX + Math.cos(angle) * length * 0.5,
+            topY + Math.sin(angle) * length * 0.55 - 6,
+            topX + Math.cos(angle) * length,
+            topY + Math.sin(angle) * length * 0.75
+          );
+          ctx.stroke();
+        }
+
+        // Orange-red pupunha fruit cluster at the crown.
+        ctx.fillStyle = '#dc2626';
+        for (let b = 0; b < 9; b++) {
+          const angle = (b / 9) * Math.PI * 2;
+          const radius = 6 + (b % 3) * 2;
+          ctx.beginPath();
+          ctx.arc(
+            topX + Math.cos(angle) * radius,
+            topY + 9 + Math.sin(angle) * radius * 0.6,
+            2.6,
+            0,
+            Math.PI * 2
+          );
+          ctx.fill();
+        }
+        ctx.fillStyle = '#fb923c';
+        ctx.beginPath();
+        ctx.arc(topX + 4, topY + 7, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (tree.kind === 'araca') {
+        // Araçazeiro: bushy small tree with round yellow-green araçá fruit.
+        ctx.fillStyle = '#5b3a1e';
+        ctx.fillRect(-5, -34, 10, 38);
+
+        ctx.fillStyle = '#166534';
+        ctx.beginPath();
+        ctx.arc(-17 + sway, -46, 21, 0, Math.PI * 2);
+        ctx.arc(17 + sway, -48, 23, 0, Math.PI * 2);
+        ctx.arc(0 + sway, -66, 26, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#15803d';
+        ctx.beginPath();
+        ctx.arc(-2 + sway, -54, 17, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Round araçá fruit hanging under the canopy.
+        const aracaFruit: { x: number; y: number }[] = [
+          { x: -22 + sway, y: -50 },
+          { x: -8 + sway, y: -40 },
+          { x: 10 + sway, y: -44 },
+          { x: 24 + sway, y: -54 },
+          { x: 2 + sway, y: -60 },
+        ];
+        for (let f = 0; f < aracaFruit.length; f++) {
+          const fruit = aracaFruit[f];
+          ctx.fillStyle = f % 2 === 0 ? '#facc15' : '#a3e635';
+          ctx.beginPath();
+          ctx.arc(fruit.x, fruit.y, 5.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+          ctx.beginPath();
+          ctx.arc(fruit.x - 1.8, fruit.y - 1.8, 1.6, 0, Math.PI * 2);
           ctx.fill();
         }
       }

@@ -83,6 +83,8 @@ export class Player {
   public goldMultiplier: number = 1.0;
   public recoveryPerSec: number = 0;
   public speedBoostTimer: number = 0;
+  public attackSpeedBoostTimer: number = 0;
+  public shieldTimer: number = 0;
 
   // Movement abilities (dash & jump)
   public movementConfig: MovementConfig = { ...DEFAULT_MOVEMENT_CONFIG };
@@ -193,6 +195,14 @@ export class Player {
 
     if (this.speedBoostTimer > 0) {
       this.speedBoostTimer -= dt;
+    }
+
+    if (this.attackSpeedBoostTimer > 0) {
+      this.attackSpeedBoostTimer = Math.max(0, this.attackSpeedBoostTimer - dt);
+    }
+
+    if (this.shieldTimer > 0) {
+      this.shieldTimer = Math.max(0, this.shieldTimer - dt);
     }
 
     if (this.attackAnimTimer > 0) {
@@ -315,7 +325,9 @@ export class Player {
     if (this.godMode) return false;
     if (this.invulnerableTimer > 0) return false;
 
-    const reducedAmount = Math.max(1, Math.round(amount - this.armor));
+    // Pupunha shield: halve incoming damage while the buff lasts.
+    const shieldedAmount = this.shieldTimer > 0 ? amount * 0.5 : amount;
+    const reducedAmount = Math.max(1, Math.round(shieldedAmount - this.armor));
     this.hp -= reducedAmount;
     this.invulnerableTimer = 0.5; // Half-second i-frames
 
@@ -487,6 +499,17 @@ export class Player {
 
     ctx.restore();
     ctx.globalAlpha = 1.0;
+
+    // Pupunha shield ring.
+    if (this.shieldTimer > 0) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.8)';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(screen.x, screen.y - 6, 30, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
 
     // HP Bar above player
     ctx.save();

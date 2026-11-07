@@ -617,7 +617,9 @@ export class WeaponSystem {
     sound: SoundEngine,
     onEnemyKilled: (enemy: Enemy) => void
   ): void {
-    const cdFactor = Math.max(0.45, 1 - player.cooldownReduction);
+    // Buriti buff: shorter cooldowns (faster attacks) for its duration.
+    const attackSpeedFactor = player.attackSpeedBoostTimer > 0 ? 0.65 : 1;
+    const cdFactor = Math.max(0.45, 1 - player.cooldownReduction) * attackSpeedFactor;
 
     switch (w.id) {
       case 'whip': {
