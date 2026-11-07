@@ -2,6 +2,15 @@ import { CharacterConfig } from '../types';
 import { Camera } from '../engine/Camera';
 import { InputManager } from '../engine/Input';
 
+export type PermanentPowerUps = {
+  might?: number;
+  armor?: number;
+  maxHp?: number;
+  recovery?: number;
+  speed?: number;
+  greed?: number;
+};
+
 export class Player {
   public id: string = 'player';
   public x: number = 0;
@@ -35,10 +44,12 @@ export class Player {
   public isMoving: boolean = false;
 
   public character: CharacterConfig;
+  public powerUps: PermanentPowerUps = {};
   private spriteImage: HTMLImageElement | null = null;
 
-  constructor(character: CharacterConfig, initialPowerUps: { might?: number; armor?: number; maxHp?: number; recovery?: number; speed?: number; greed?: number } = {}) {
+  constructor(character: CharacterConfig, initialPowerUps: PermanentPowerUps = {}) {
     this.character = character;
+    this.powerUps = initialPowerUps;
 
     if (character.sprite && typeof window !== 'undefined') {
       this.spriteImage = new Image();

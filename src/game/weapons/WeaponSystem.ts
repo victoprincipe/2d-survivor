@@ -116,11 +116,16 @@ export class WeaponSystem {
   }
 
   recalculatePlayerStats(player: Player): void {
-    // Reset player modifiers to character base
-    player.might = 1.0 + (player.character.statBonuses.might || 0);
-    player.armor = player.character.statBonuses.armor || 0;
-    player.cooldownReduction = player.character.statBonuses.cooldownReduction || 0;
-    player.pickupRadius = 65 + (player.character.statBonuses.pickupRadius || 0);
+    const characterBonuses = player.character.statBonuses;
+    const permanent = player.powerUps;
+
+    // Reset player modifiers to character base + permanent shop bonuses
+    player.might = 1.0 + (characterBonuses.might || 0) + (permanent.might || 0) * 0.05;
+    player.armor = (characterBonuses.armor || 0) + (permanent.armor || 0) * 1;
+    player.maxHp = 100 + (characterBonuses.maxHp || 0) + (permanent.maxHp || 0) * 10;
+    player.recoveryPerSec = (permanent.recovery || 0) * 0.5;
+    player.cooldownReduction = characterBonuses.cooldownReduction || 0;
+    player.pickupRadius = 65 + (characterBonuses.pickupRadius || 0);
     player.speed = player.baseSpeed;
 
     // Apply passives
@@ -132,9 +137,8 @@ export class WeaponSystem {
 
     const heart = this.passives.get('heart');
     if (heart) {
-      const bonusHp = heart.level * 20;
-      player.maxHp = 100 + (player.character.statBonuses.maxHp || 0) + bonusHp;
-      player.recoveryPerSec = heart.level * 0.5;
+      player.maxHp += heart.level * 20;
+      player.recoveryPerSec += heart.level * 0.5;
     }
 
     const tome = this.passives.get('tome');
