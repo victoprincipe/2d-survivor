@@ -1,13 +1,22 @@
 import {
   APIInteractionGuildMember,
+  ButtonInteraction,
   ChatInputCommandInteraction,
   GuildMember,
   ModalSubmitInteraction,
+  PermissionFlagsBits,
 } from 'discord.js';
 import { discordConfig } from '../config';
 
 type GuildInteraction = ChatInputCommandInteraction | ModalSubmitInteraction;
 type InteractionMember = GuildMember | APIInteractionGuildMember | null;
+
+/** `Manage Server` na interação atual (sem fetch). */
+export function canManageGuildForInteraction(
+  interaction: GuildInteraction | ButtonInteraction,
+): boolean {
+  return interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) ?? false;
+}
 
 function memberHasSubmitterRole(member: InteractionMember): boolean {
   if (!discordConfig.submitterRoleId) return true;

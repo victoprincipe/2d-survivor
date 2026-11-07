@@ -3,6 +3,7 @@ import { commandMap } from '../commands';
 import { handleModalSubmit } from '../handlers/modalSubmit';
 import { appendBotError, createLogger } from '../logger';
 import { handlePlanButton } from './planButtons';
+import { handleQueueButton } from './queueButtons';
 
 const log = createLogger('interaction');
 
@@ -56,6 +57,12 @@ export async function execute(interaction: Interaction): Promise<void> {
           match[1] as 'approve' | 'reject',
           Number(match[2]),
         );
+        return;
+      }
+
+      const queueMatch = /^queue:(pause|resume)$/.exec(interaction.customId);
+      if (queueMatch) {
+        await handleQueueButton(interaction, queueMatch[1] as 'pause' | 'resume');
       }
       return;
     }

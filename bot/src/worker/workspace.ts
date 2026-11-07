@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { paths } from '../config';
+import { paths, queueConfig } from '../config';
 import { git, worktreeRemove } from '../git';
 import { gateEnv } from './env';
 
@@ -16,6 +16,16 @@ function removePath(target: string): void {
   } catch {
     // não existe
   }
+}
+
+/** `npm ci` no clone, com o ambiente do gate (sem chaves de provedor). */
+export function installDependencies(worktree: string): void {
+  execFileSync('npm', ['ci', '--prefer-offline', '--no-audit', '--no-fund'], {
+    cwd: worktree,
+    stdio: 'ignore',
+    env: gateEnv(),
+    timeout: queueConfig.buildTimeoutMs,
+  });
 }
 
 /**
@@ -35,11 +45,7 @@ export function prepareNodeModules(worktree: string): void {
   removePath(target);
 
   if (process.platform === 'win32') {
-    execFileSync('npm', ['ci', '--prefer-offline', '--no-audit', '--no-fund'], {
-      cwd: worktree,
-      stdio: 'ignore',
-      env: gateEnv(),
-    });
+    installDependencies(worktree);
     return;
   }
 
@@ -47,11 +53,7 @@ export function prepareNodeModules(worktree: string): void {
     execFileSync('cp', ['-al', source, target], { stdio: 'ignore' });
   } catch {
     // Fallback para filesystems sem hardlink (ex.: volumes diferentes).
-    execFileSync('npm', ['ci', '--prefer-offline', '--no-audit', '--no-fund'], {
-      cwd: worktree,
-      stdio: 'ignore',
-      env: gateEnv(),
-    });
+    installDependencies(worktree);
   }
 }
 

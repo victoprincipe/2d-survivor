@@ -149,7 +149,7 @@ O planejador não altera o código: a única escrita permitida é em `.plan-arti
 |---|---|---|
 | `/implementar` | membros com quota | abre o formulário com select de plano aprovado, prompt e uploads de imagem/áudio |
 | `/planejar` | membros com quota | abre o formulário com prompt e uploads e gera `PLAN.md`/`TASKS.md` para aprovação |
-| `/fila` | todos | estado da fila, worker e repo local; mostra prompt das jobs em execução/próximas |
+| `/fila` | todos | estado da fila (ativa/pausada), worker e repo local; pausar/retomar para quem gerencia o servidor |
 | `/minhas-implementacoes` | todos | suas implementações, com preview do prompt |
 | `/ultimas-implementacoes` | todos | últimas do servidor, com autor e preview do prompt |
 | `/prompt <id>` | todos | mostra o prompt completo de uma implementação |
@@ -185,10 +185,11 @@ O título exibido é derivado da primeira linha do prompt; não há campo separa
 4. Roda o OpenCode com `HOME`, banco e `PWD` isolados (não herda config global, MCPs nem modelo).
 5. Roda `npm run build` e depois `npm run lint`.
 6. Commita e envia a branch `implementacao/<id>` para o origin.
-7. Se o diff estiver dentro dos limites, envia `HEAD:master` para o origin.
-8. Remove o clone. A branch permanece no origin para inspeção.
+7. Se o diff estiver dentro dos limites, busca `origin/master` de novo: se a master avançou durante o job, faz rebase mantendo as alterações do job (conflitos são resolvidos a favor do job), roda o gate outra vez e, se a master tiver mudado dependências, roda `npm ci`.
+8. Envia `HEAD:master` com `--force-with-lease`. Se alguém empurrar entre o fetch e o push, reintegra e tenta de novo (até 3 vezes); nunca sobrescreve um commit que não viu.
+9. Remove o clone. A branch permanece no origin para inspeção.
 
-Diff acima de 20 arquivos/800 linhas, arquivos removidos ou caminhos protegidos fazem o job falhar sem push na master — a branch continua no origin. Se o push da master falhar (por exemplo, o origin avançou), o job falha e a branch também fica no origin.
+Diff acima de 20 arquivos/800 linhas, arquivos removidos ou caminhos protegidos fazem o job falhar sem push na master — a branch continua no origin. Se o push da master falhar depois das tentativas, ou se o rebuild pós-rebase quebrar, o job falha e a branch também fica no origin. Se a própria master já falhava no gate antes do job, a mensagem aponta o log da master em vez de culpar o job.
 
 ### Planejamento
 
@@ -216,9 +217,12 @@ O worker roda o OpenCode com um `HOME` próprio por job:
 ## Operação
 
 - O worker precisa de `origin` acessível; se o push falhar, veja `/fila` e os logs.
+- Só pode existir **um worker** por bancada. Ele grava `bot/data/worker.lock` com o pid; um segundo worker recusa iniciar e um lock de processo morto é assumido automaticamente.
+- `/fila` mostra se a fila está **Ativa** ou **Pausada**; quem tem `Gerenciar Servidor` pode pausar/retomar pelos botões. Pausada, o worker termina o job atual e não pega novos (jobs e planos).
 - O checkout local pode ficar sujo; isso não bloqueia.
 - Se quiser incluir WIP, commite e faça push antes de enviar o prompt.
-- O worker faz push para `origin`/`master` depois de cada job.
+- O worker faz push para `origin`/`master` depois de cada job, integrando com o que já estiver publicado.
+- Depois de um job que mudou `package-lock.json` na master, rode `npm install` na raiz para o `node_modules` compartilhado ficar em dia.
 - Os commits do worker usam `GIT_AUTHOR_NAME`/`GIT_AUTHOR_EMAIL`. Mantenha o e-mail verificado no GitHub; o padrão é o noreply `6431486+victoprincipe@users.noreply.github.com`.
 - Para inspecionar: `npm run db:status`; logs em `bot/data/logs/`.
 - Reinicie o worker depois de mudar `.env` ou `bot/agent/opencode.json`.
@@ -237,7 +241,7 @@ bot/
     handlers/              # modal de implementação/planejamento
     services/              # quotas, moderação, permissões, notificações
     ui/                    # embeds
-    worker/                # loop, opencode, planner, gate, apply, assets
+    worker/                # loop, opencode, planner, gate, apply, assets, lock, review
     scripts/               # db-init, db:status, check:commands
   data/                    # SQLite, logs, homes do agente, assets, plans (gitignored)
 ```

@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import { queueConfig } from '../config';
 import { Job, updateJob } from '../db';
 import {
@@ -6,6 +7,8 @@ import {
   continueRebase,
   fetchMain,
   getDiffStats,
+  git,
+  gitTry,
   isAncestor,
   pushJobBranch,
   pushMainWithLease,
@@ -25,6 +28,7 @@ import {
 } from './errors';
 import { runGate } from './gate';
 import { reviewReasons } from './review';
+import { installDependencies, prepareNodeModules } from './workspace';
 
 const log = createLogger('apply');
 
@@ -46,6 +50,53 @@ export interface ApplyResult {
 }
 
 type Integration = ApplyResult;
+
+interface BaseGateResult {
+  ok: boolean;
+  logPath: string;
+}
+
+/** A master nova mudou o lockfile? Então o node_modules do clone está velho. */
+function lockfileChanged(job: Job, worktree: string, remoteSha: string): boolean {
+  if (!job.base_sha) return false;
+  return (
+    gitTry(
+      [
+        'diff',
+        '--name-only',
+        `${job.base_sha}..${remoteSha}`,
+        '--',
+        'package.json',
+        'package-lock.json',
+      ],
+      worktree,
+    ).stdout.length > 0
+  );
+}
+
+/**
+ * Roda o gate num checkout limpo de `origin/master` para saber se a falha do
+ * gate pós-rebase é do job ou se a master já estava quebrada quando ele chegou.
+ */
+async function runBaseGate(
+  job: Job,
+  worktree: string,
+  remoteSha: string,
+  attempt: number,
+): Promise<BaseGateResult> {
+  const dir = `${worktree}-base`;
+  fs.rmSync(dir, { recursive: true, force: true });
+  git(['worktree', 'add', '--detach', dir, remoteSha], worktree);
+
+  try {
+    prepareNodeModules(dir);
+    const gate = await runGate(job.id, dir, `base-${attempt}`);
+    return { ok: gate.ok, logPath: gate.logPath };
+  } finally {
+    gitTry(['worktree', 'remove', '--force', dir], worktree);
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
 
 /**
  * Resolve os conflitos pendentes da rebase a favor do job.
@@ -129,11 +180,39 @@ async function integrate(
     return { empty: true, rebased: true, resolvedFiles, baseSha: remoteSha };
   }
 
+  if (lockfileChanged(job, worktree, remoteSha)) {
+    log.warn(
+      `Job #${job.id}: a master mudou package.json/package-lock.json; rodando npm ci no clone.`,
+    );
+    try {
+      installDependencies(worktree);
+    } catch (error) {
+      throw new Error(`Falha ao instalar dependências depois do rebase: ${String(error)}`);
+    }
+    log.warn(
+      'Rode "npm install" na raiz para os próximos jobs partirem do node_modules atualizado.',
+    );
+  }
+
   // O origin deve refletir o estado integrado mesmo se o gate falhar.
   pushJobBranch(worktree, job.branch as string);
 
   const gate = await runGate(job.id, worktree, `rebase-${attempt}`);
   if (!gate.ok) {
+    let base: BaseGateResult | null = null;
+    try {
+      base = await runBaseGate(job, worktree, remoteSha, attempt);
+    } catch (error) {
+      log.warn(`Job #${job.id}: não consegui classificar a falha do gate (${String(error)}).`);
+    }
+
+    if (base && !base.ok) {
+      throw new GateError(
+        `A master atual (${shortSha(remoteSha)}) já falha no build/lint; o job #${job.id} não foi aplicado. Log da master: ${base.logPath}`,
+        base.logPath,
+      );
+    }
+
     throw new GateError(
       `Build/lint falhou ao integrar o job com ${shortSha(remoteSha)} (a master avançou durante a execução). Log: ${gate.logPath}`,
       gate.logPath,

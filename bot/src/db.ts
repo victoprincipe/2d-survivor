@@ -176,7 +176,17 @@ function initSchema(db: Database.Database): void {
     );
   `);
 
-  db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('queue_paused', '1');
+  db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('queue_paused', '0');
+
+  // A flag `queue_paused` existia mas não era lida até a v1; bancos antigos
+  // guardam '1' (pausada) sem que ninguém tenha pausado. Normaliza uma vez só.
+  const pauseMigrated = db
+    .prepare("SELECT value FROM settings WHERE key = 'queue_paused_v2'")
+    .get() as { value: string } | undefined;
+  if (!pauseMigrated) {
+    db.prepare("UPDATE settings SET value = '0' WHERE key = 'queue_paused'").run();
+    db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('queue_paused_v2', '1')").run();
+  }
 
   // Migração para bancos criados antes do suporte a imagens/planos.
   const columns = db.prepare('PRAGMA table_info(jobs)').all() as Array<{ name: string }>;
@@ -374,6 +384,11 @@ export function heartbeatJob(id: number): void {
     .run(new Date().toISOString(), id);
 }
 
+/**
+ * No boot, todo job `running` é órfão: o lock do worker garante que nenhum
+ * outro processo está executando a fila (um worker novo só sobe quando o
+ * anterior morreu, e um lock de pid morto é assumido).
+ */
 export function recoverRunningJobs(): Job[] {
   const db = getDb();
   const running = db.prepare("SELECT * FROM jobs WHERE status = 'running'").all() as Job[];

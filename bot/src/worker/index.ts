@@ -6,6 +6,7 @@ import {
   claimNextJob,
   claimNextPlan,
   getDb,
+  isQueuePaused,
   recoverRunningJobs,
   recoverRunningPlans,
   updateJob,
@@ -15,6 +16,7 @@ import { worktreeRemove } from '../git';
 import { createLogger } from '../logger';
 import { cleanupOldAssets } from './assets';
 import { processJob } from './job';
+import { acquireWorkerLock } from './lock';
 import { processPlan } from './plan';
 
 const log = createLogger('worker');
@@ -22,6 +24,14 @@ const log = createLogger('worker');
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 requireWorkerConfig();
+
+try {
+  acquireWorkerLock();
+} catch (error) {
+  log.error(String(error));
+  process.exit(1);
+}
+
 getDb();
 fs.mkdirSync(paths.logs, { recursive: true });
 fs.mkdirSync(paths.worktrees, { recursive: true });
@@ -101,6 +111,11 @@ async function main(): Promise<void> {
   log.info('Worker iniciado. Aguardando jobs...');
 
   while (!stopping) {
+    if (isQueuePaused()) {
+      await sleep(queueConfig.pollMs);
+      continue;
+    }
+
     const job = claimNextJob();
     if (job) {
       log.info(`Processando job #${job.id} (${job.kind}, tentativa ${job.attempts})...`);
