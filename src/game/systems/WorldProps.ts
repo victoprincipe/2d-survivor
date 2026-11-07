@@ -6,8 +6,8 @@ import { DropType, MapId } from '../types';
 // The night plain is effectively open, so this is only a large safety limit
 // that prevents the player from wandering out of the coordinate space.
 const WORLD_HALF_SIZE = 100000;
-// The Amazon Forest is a finite 3500x3500 map centered on the origin.
-const FOREST_SIZE = 3500;
+// The Amazon Forest is a finite 10500x10500 map centered on the origin.
+const FOREST_SIZE = 10500;
 const FOREST_HALF_SIZE = FOREST_SIZE / 2;
 const COLLISION_STEP = 8;
 
@@ -70,8 +70,8 @@ export class WorldSystem {
 
     // Scattered trees inside the playable area.
     for (let i = 0; i < 80; i++) {
-      const x = (random() - 0.5) * 3000;
-      const y = (random() - 0.5) * 3000;
+      const x = (random() - 0.5) * FOREST_SIZE * 0.86;
+      const y = (random() - 0.5) * FOREST_SIZE * 0.86;
       // Keep the spawn area clear.
       if (Math.abs(x) < 180 && Math.abs(y) < 180) continue;
       this.trees.push({
@@ -223,7 +223,7 @@ export class WorldSystem {
       ctx.fillStyle = '#08120b';
       ctx.fillRect(0, 0, camera.viewportWidth, camera.viewportHeight);
 
-      // Dark green grass base restricted to the 3500x3500 playable square.
+      // Dark green grass base restricted to the 10500x10500 playable square.
       const origin = camera.worldToScreen(-FOREST_HALF_SIZE, -FOREST_HALF_SIZE);
       ctx.fillStyle = '#14351d';
       ctx.fillRect(origin.x, origin.y, FOREST_SIZE, FOREST_SIZE);
