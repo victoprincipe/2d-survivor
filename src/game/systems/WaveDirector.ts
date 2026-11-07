@@ -1,4 +1,4 @@
-import { DifficultyConfig, EnemyType } from '../types';
+import { DifficultyConfig, EnemyType, MapId } from '../types';
 import { Enemy } from '../entities/Enemy';
 import { Player } from '../entities/Player';
 import { Camera } from '../engine/Camera';
@@ -7,11 +7,13 @@ import { SoundEngine } from '../engine/SoundEngine';
 export class WaveDirector {
   public survivalTime: number = 0;
   public difficulty: DifficultyConfig;
+  private mapId: MapId;
   private nextEnemyId: number = 1;
   private spawnTimer: number = 0;
 
-  constructor(difficulty: DifficultyConfig) {
+  constructor(difficulty: DifficultyConfig, mapId: MapId = 'night_plain') {
     this.difficulty = difficulty;
+    this.mapId = mapId;
   }
 
   // Event flags to ensure one-time triggers
@@ -66,9 +68,17 @@ export class WaveDirector {
     // Event 1: 01:00 - Bat Swarm + Vanguard Elite (#1 Chest)
     if (sec >= 60 && !this.triggeredEvents.has('wave_60')) {
       this.triggeredEvents.add('wave_60');
-      this.triggerAlert('🦇 ENXAME DE MORCEGOS E GUARDA ELITE SURGIRAM!', 4.5);
+      if (this.mapId === 'amazon_forest') {
+        this.triggerAlert('🐜 ENXAME DE FORMIGAS E GUARDA ELITE SURGIRAM!', 4.5);
+      } else {
+        this.triggerAlert('🦇 ENXAME DE MORCEGOS E GUARDA ELITE SURGIRAM!', 4.5);
+      }
       sound.playBossWarning();
-      this.spawnBatSwarm(player, camera, onSpawn);
+      if (this.mapId === 'amazon_forest') {
+        this.spawnAmazonSwarm(camera, onSpawn);
+      } else {
+        this.spawnBatSwarm(player, camera, onSpawn);
+      }
       this.spawnElite(player, camera, hpMultiplier * 0.75, 'Capitão da Guarda Elite', onSpawn);
     }
 
@@ -83,9 +93,15 @@ export class WaveDirector {
     // Event 3: 03:00 - Zombie Ring + Butcher Elite (#3 Chest)
     if (sec >= 180 && !this.triggeredEvents.has('wave_180')) {
       this.triggeredEvents.add('wave_180');
-      this.triggerAlert('💀 CERCO DE ZUMBIS COM CARNICEIRO ELITE!', 4.5);
-      sound.playBossWarning();
-      this.spawnRingEnemies(player, hpMultiplier, 'zombie', onSpawn);
+      if (this.mapId === 'amazon_forest') {
+        this.triggerAlert('🐜 CERCO DE FORMIGAS-CORTADEIRAS COM CARNICEIRO ELITE!', 4.5);
+        sound.playBossWarning();
+        this.spawnRingEnemies(player, hpMultiplier, 'leafcutter_ant', onSpawn);
+      } else {
+        this.triggerAlert('💀 CERCO DE ZUMBIS COM CARNICEIRO ELITE!', 4.5);
+        sound.playBossWarning();
+        this.spawnRingEnemies(player, hpMultiplier, 'zombie', onSpawn);
+      }
       this.spawnElite(player, camera, hpMultiplier * 1.05, 'Carniceiro Elite', onSpawn);
     }
 
@@ -123,7 +139,15 @@ export class WaveDirector {
           this.bossActive = boss;
         } else {
           this.triggerAlert(`🔥 ONDA INFINITA DO MINUTO ${minuteMark}: CAÇADORES ELITE!`, 4.5);
-          this.spawnRingEnemies(player, hpMultiplier * 0.95, minuteMark % 2 === 0 ? 'ghost' : 'skeleton', onSpawn);
+          const ringType: EnemyType =
+            this.mapId === 'amazon_forest'
+              ? minuteMark % 2 === 0
+                ? 'bullet_ant'
+                : 'blue_butterfly'
+              : minuteMark % 2 === 0
+                ? 'ghost'
+                : 'skeleton';
+          this.spawnRingEnemies(player, hpMultiplier * 0.95, ringType, onSpawn);
           this.spawnElite(player, camera, hpMultiplier * 1.1, 'Executor Abissal Elite', onSpawn);
         }
       }
@@ -173,7 +197,32 @@ export class WaveDirector {
     let type: Enemy['type'] = 'bat';
     const roll = Math.random();
 
-    if (minutes < 1) {
+    if (this.mapId === 'amazon_forest') {
+      // Amazon Forest has its own fast, fragile basic fauna.
+      if (minutes < 1) {
+        type = roll < 0.62 ? 'bullet_ant' : 'blue_butterfly';
+      } else if (minutes < 2) {
+        type = roll < 0.4 ? 'bullet_ant' : roll < 0.72 ? 'blue_butterfly' : 'leafcutter_ant';
+      } else if (minutes < 3.5) {
+        type =
+          roll < 0.3
+            ? 'bullet_ant'
+            : roll < 0.55
+              ? 'blue_butterfly'
+              : roll < 0.8
+                ? 'leafcutter_ant'
+                : 'cicada';
+      } else {
+        type =
+          roll < 0.25
+            ? 'bullet_ant'
+            : roll < 0.5
+              ? 'blue_butterfly'
+              : roll < 0.75
+                ? 'leafcutter_ant'
+                : 'cicada';
+      }
+    } else if (minutes < 1) {
       type = roll < 0.68 ? 'bat' : roll < 0.9 ? 'skeleton' : 'zombie';
     } else if (minutes < 2) {
       type = roll < 0.35 ? 'bat' : roll < 0.78 ? 'skeleton' : 'zombie';
@@ -198,6 +247,15 @@ export class WaveDirector {
     for (let i = 0; i < count; i++) {
       const pos = this.getSpawnPositionOutsideScreen(camera);
       onSpawn(this.createEnemy('bat', pos.x, pos.y, 0.85));
+    }
+  }
+
+  private spawnAmazonSwarm(camera: Camera, onSpawn: (enemy: Enemy) => void): void {
+    const count = Math.round(32 * this.difficulty.enemyCount);
+    for (let i = 0; i < count; i++) {
+      const pos = this.getSpawnPositionOutsideScreen(camera);
+      const type: EnemyType = i % 3 === 0 ? 'blue_butterfly' : 'bullet_ant';
+      onSpawn(this.createEnemy(type, pos.x, pos.y, 0.85));
     }
   }
 

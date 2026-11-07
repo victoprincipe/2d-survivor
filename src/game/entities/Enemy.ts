@@ -102,6 +102,42 @@ export class Enemy {
         this.xpValue = 16;
         this.knockbackResistance = 0.35;
         break;
+      case 'bullet_ant':
+        this.name = 'Formiga-bala';
+        this.radius = 9;
+        this.maxHp = Math.round(12 * hpMultiplier);
+        this.speed = 152;
+        this.damage = 7;
+        this.xpValue = 5;
+        this.knockbackResistance = 1.25;
+        break;
+      case 'leafcutter_ant':
+        this.name = 'Formiga-cortadeira';
+        this.radius = 12;
+        this.maxHp = Math.round(24 * hpMultiplier);
+        this.speed = 112;
+        this.damage = 10;
+        this.xpValue = 8;
+        this.knockbackResistance = 0.95;
+        break;
+      case 'blue_butterfly':
+        this.name = 'Borboleta-azul';
+        this.radius = 10;
+        this.maxHp = Math.round(9 * hpMultiplier);
+        this.speed = 160;
+        this.damage = 5;
+        this.xpValue = 4;
+        this.knockbackResistance = 1.3;
+        break;
+      case 'cicada':
+        this.name = 'Cigarra';
+        this.radius = 12;
+        this.maxHp = Math.round(22 * hpMultiplier);
+        this.speed = 120;
+        this.damage = 11;
+        this.xpValue = 9;
+        this.knockbackResistance = 0.8;
+        break;
       case 'elite_minotaur':
         this.name = 'Minotauro Elite';
         this.radius = 28;
@@ -255,11 +291,12 @@ export class Enemy {
       vx += separation.vx * currentSpeed * 0.8;
       vy += separation.vy * currentSpeed * 0.8;
 
-      // Special ghost waving movement
-      if (this.type === 'ghost') {
+      // Special ghost/butterfly waving movement
+      if (this.type === 'ghost' || this.type === 'blue_butterfly') {
         const perpX = -dy / dist;
         const perpY = dx / dist;
-        const wave = Math.sin(this.animTimer * 1.5) * 44 * speedMult;
+        const amplitude = this.type === 'blue_butterfly' ? 30 : 44;
+        const wave = Math.sin(this.animTimer * 1.5) * amplitude * speedMult;
         vx += perpX * wave;
         vy += perpY * wave;
       }
@@ -469,6 +506,153 @@ export class Enemy {
       ctx.arc(3, -5, 2.5, 0, Math.PI * 2);
       ctx.fill();
       ctx.globalAlpha = 1.0;
+    } else if (this.type === 'bullet_ant') {
+      const legSwing = Math.sin(this.animTimer * 3) * 2.5;
+      ctx.strokeStyle = isFlashing ? '#ffffff' : '#1c1917';
+      ctx.lineWidth = 1.6;
+      for (const side of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(side * 2, -2);
+        ctx.lineTo(side * 8, -5 + legSwing);
+        ctx.moveTo(side * 2, 1);
+        ctx.lineTo(side * 9, 2);
+        ctx.moveTo(side * 2, 3);
+        ctx.lineTo(side * 8, 7 - legSwing);
+        ctx.stroke();
+      }
+      if (!isFlashing) ctx.fillStyle = '#7f1d1d';
+      ctx.beginPath();
+      ctx.ellipse(0, 4, 5, 7, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(0, -3, 3.5, 4.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(0, -9, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+      if (!isFlashing) ctx.fillStyle = '#f97316';
+      ctx.fillRect(-1.5, -2, 3, 9);
+      ctx.strokeStyle = isFlashing ? '#ffffff' : '#fde68a';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(-3, -12);
+      ctx.lineTo(-5, -15);
+      ctx.moveTo(3, -12);
+      ctx.lineTo(5, -15);
+      ctx.stroke();
+      ctx.fillStyle = isFlashing ? '#ffffff' : '#fca5a5';
+      ctx.fillRect(-2.5, -10, 1.5, 1.5);
+      ctx.fillRect(1, -10, 1.5, 1.5);
+    } else if (this.type === 'leafcutter_ant') {
+      const legSwing = Math.sin(this.animTimer * 2.4) * 2;
+      ctx.save();
+      ctx.translate(0, -15);
+      ctx.rotate(-0.35 + Math.sin(this.animTimer * 1.2) * 0.08);
+      if (!isFlashing) ctx.fillStyle = '#65a30d';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 7, 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      if (!isFlashing) {
+        ctx.strokeStyle = '#3f6212';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(-6, 0);
+        ctx.lineTo(6, 0);
+        ctx.stroke();
+      }
+      ctx.restore();
+      ctx.strokeStyle = isFlashing ? '#ffffff' : '#451a03';
+      ctx.lineWidth = 1.6;
+      for (const side of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(side * 2, -1);
+        ctx.lineTo(side * 9, -4 + legSwing);
+        ctx.moveTo(side * 2, 2);
+        ctx.lineTo(side * 10, 3);
+        ctx.moveTo(side * 2, 4);
+        ctx.lineTo(side * 9, 8 - legSwing);
+        ctx.stroke();
+      }
+      if (!isFlashing) ctx.fillStyle = '#78350f';
+      ctx.beginPath();
+      ctx.ellipse(0, 4, 6, 7, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(0, -2, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(0, -9, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = isFlashing ? '#ffffff' : '#fde68a';
+      ctx.fillRect(-3, -10, 2, 2);
+      ctx.fillRect(1, -10, 2, 2);
+    } else if (this.type === 'blue_butterfly') {
+      const flap = Math.sin(this.animTimer * 5);
+      const wingScale = 0.45 + Math.abs(flap) * 0.55;
+      for (const side of [-1, 1]) {
+        ctx.save();
+        ctx.scale(side * wingScale, 1);
+        if (!isFlashing) ctx.fillStyle = '#2563eb';
+        ctx.beginPath();
+        ctx.ellipse(8, -5, 9, 6, -0.35, 0, Math.PI * 2);
+        ctx.fill();
+        if (!isFlashing) ctx.fillStyle = '#60a5fa';
+        ctx.beginPath();
+        ctx.ellipse(6, 3, 6, 4.5, 0.35, 0, Math.PI * 2);
+        ctx.fill();
+        if (!isFlashing) {
+          ctx.fillStyle = '#1e3a8a';
+          ctx.beginPath();
+          ctx.arc(10, -6, 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+      if (!isFlashing) ctx.fillStyle = '#1e293b';
+      ctx.beginPath();
+      ctx.ellipse(0, 1, 2, 7, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = isFlashing ? '#ffffff' : '#0f172a';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(-1, -5);
+      ctx.lineTo(-4, -10);
+      ctx.moveTo(1, -5);
+      ctx.lineTo(4, -10);
+      ctx.stroke();
+    } else if (this.type === 'cicada') {
+      const wingVibe = Math.sin(this.animTimer * 6) * 0.12;
+      ctx.save();
+      ctx.globalAlpha = 0.65;
+      if (!isFlashing) ctx.fillStyle = '#a7f3d0';
+      ctx.beginPath();
+      ctx.ellipse(-7, -2, 10, 4.5, -0.35 + wingVibe, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(7, -2, 10, 4.5, 0.35 - wingVibe, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      if (!isFlashing) ctx.fillStyle = '#0f766e';
+      ctx.beginPath();
+      ctx.ellipse(0, 2, 6, 9, 0, 0, Math.PI * 2);
+      ctx.fill();
+      if (!isFlashing) ctx.fillStyle = '#134e4a';
+      ctx.beginPath();
+      ctx.arc(0, -8, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = isFlashing ? '#ffffff' : '#ef4444';
+      ctx.beginPath();
+      ctx.arc(-3, -9, 1.8, 0, Math.PI * 2);
+      ctx.arc(3, -9, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+      if (!isFlashing) {
+        ctx.strokeStyle = '#5eead4';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, -4);
+        ctx.lineTo(0, 9);
+        ctx.stroke();
+      }
     } else if (this.type === 'elite_minotaur') {
       if (!isFlashing) ctx.fillStyle = this.skillState === 'dashing' ? '#dc2626' : '#991b1b';
       ctx.beginPath();

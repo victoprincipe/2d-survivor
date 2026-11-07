@@ -49,6 +49,7 @@ export class GameEngine {
   public worldProps: WorldSystem;
   public vfx: VFXManager;
   public difficulty: DifficultyConfig;
+  private mapId: MapId;
 
   public enemies: Enemy[] = [];
   public drops: Drop[] = [];
@@ -91,9 +92,10 @@ export class GameEngine {
     this.sound = new SoundEngine();
     this.spatialGrid = new SpatialGrid<Enemy>(110);
     this.vfx = new VFXManager();
+    this.mapId = mapId;
     this.worldProps = new WorldSystem(mapId);
     this.difficulty = getDifficulty(difficultyId);
-    this.waveDirector = new WaveDirector(this.difficulty);
+    this.waveDirector = new WaveDirector(this.difficulty, mapId);
 
     this.player = new Player(character, savedData.powerUps);
     this.player.setCollisionResolver((fromX, fromY, dx, dy, radius) =>
@@ -230,11 +232,12 @@ export class GameEngine {
           this.vfx.addDeathBurst(e.x, e.y, '#a855f7', 16);
           const minutes = this.waveDirector.survivalTime / 60;
           const hpMult = (1.0 + minutes * 0.4) * this.difficulty.enemyHp;
+          const minionType = this.mapId === 'amazon_forest' ? 'bullet_ant' : 'bat';
           for (let s = 0; s < toSpawn; s++) {
             const ang = (s * Math.PI * 2) / toSpawn;
             const mx = e.x + Math.cos(ang) * 65;
             const my = e.y + Math.sin(ang) * 65;
-            spawnedMinions.push(this.waveDirector.createEnemy('bat', mx, my, hpMult));
+            spawnedMinions.push(this.waveDirector.createEnemy(minionType, mx, my, hpMult));
           }
         }
       }
@@ -321,10 +324,22 @@ export class GameEngine {
     this.processedEnemyDeaths.add(enemy);
 
     this.kills += 1;
+    const deathColor =
+      enemy.type === 'bat'
+        ? '#a855f7'
+        : enemy.type === 'blue_butterfly'
+          ? '#3b82f6'
+          : enemy.type === 'leafcutter_ant'
+            ? '#65a30d'
+            : enemy.type === 'cicada'
+              ? '#14b8a6'
+              : enemy.type === 'bullet_ant'
+                ? '#b91c1c'
+                : '#ef4444';
     this.vfx.addDeathBurst(
       enemy.x,
       enemy.y,
-      enemy.type === 'bat' ? '#a855f7' : '#ef4444',
+      deathColor,
       enemy.isElite ? 25 : 8
     );
 

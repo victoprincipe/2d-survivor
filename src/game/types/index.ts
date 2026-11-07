@@ -182,7 +182,17 @@ export interface SavedGameData {
   missions: MissionSaveState;
 }
 
-export type EnemyType = 'bat' | 'skeleton' | 'zombie' | 'ghost' | 'elite_minotaur' | 'boss_vampire';
+export type EnemyType =
+  | 'bat'
+  | 'skeleton'
+  | 'zombie'
+  | 'ghost'
+  | 'bullet_ant'
+  | 'leafcutter_ant'
+  | 'blue_butterfly'
+  | 'cicada'
+  | 'elite_minotaur'
+  | 'boss_vampire';
 
 export type DropType =
   | 'gem_blue'
