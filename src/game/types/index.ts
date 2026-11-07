@@ -198,7 +198,13 @@ export type EnemyType =
   | 'poison_dart_frog'
   | 'praying_mantis'
   | 'stick_bug'
-  | 'toucan';
+  | 'toucan'
+  // Resistant threats exclusive to the Amazon Forest map: high HP and slow.
+  | 'capybara'
+  | 'sloth'
+  | 'rhino_beetle'
+  | 'sawyer_beetle'
+  | 'giant_centipede';
 
 export type DropType =
   | 'gem_blue'

@@ -18,6 +18,14 @@ const AMAZON_MEDIUM_ENEMIES: EnemyType[] = [
   'toucan',
 ];
 
+const AMAZON_RESISTANT_ENEMIES: EnemyType[] = [
+  'capybara',
+  'sloth',
+  'rhino_beetle',
+  'sawyer_beetle',
+  'giant_centipede',
+];
+
 export class WaveDirector {
   public survivalTime: number = 0;
   public difficulty: DifficultyConfig;
@@ -217,9 +225,15 @@ export class WaveDirector {
 
     if (this.isAmazonForest) {
       // The forest starts with its fast basic fauna and gradually mixes in
-      // tougher medium threats as the run goes on.
+      // tougher medium threats, then slow high-HP resistant fauna.
       const mediumChance = Math.min(0.55, Math.max(0, (minutes - 0.5) * 0.16));
-      const pool = Math.random() < mediumChance ? AMAZON_MEDIUM_ENEMIES : AMAZON_BASIC_ENEMIES;
+      const resistantChance = Math.min(0.3, Math.max(0, (minutes - 2) * 0.07));
+      const pool =
+        Math.random() < resistantChance
+          ? AMAZON_RESISTANT_ENEMIES
+          : Math.random() < mediumChance
+            ? AMAZON_MEDIUM_ENEMIES
+            : AMAZON_BASIC_ENEMIES;
       type = pool[Math.floor(Math.random() * pool.length)];
     } else if (minutes < 1) {
       type = roll < 0.68 ? 'bat' : roll < 0.9 ? 'skeleton' : 'zombie';

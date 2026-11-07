@@ -168,6 +168,52 @@ export class Enemy {
         this.xpValue = 14;
         this.knockbackResistance = 1.05;
         break;
+      // Amazon Forest resistant fauna: slow, heavy and hard to put down.
+      case 'capybara':
+        this.name = 'Capivara';
+        this.radius = 22;
+        this.maxHp = Math.round(260 * hpMultiplier);
+        this.speed = 46;
+        this.damage = 20;
+        this.xpValue = 42;
+        this.knockbackResistance = 0.3;
+        break;
+      case 'sloth':
+        this.name = 'Bicho-preguiça';
+        this.radius = 20;
+        this.maxHp = Math.round(220 * hpMultiplier);
+        this.speed = 30;
+        this.damage = 18;
+        this.xpValue = 40;
+        this.knockbackResistance = 0.22;
+        break;
+      case 'rhino_beetle':
+        this.name = 'Besouro-rinoceronte';
+        this.radius = 19;
+        this.maxHp = Math.round(320 * hpMultiplier);
+        this.speed = 52;
+        this.damage = 24;
+        this.xpValue = 55;
+        this.knockbackResistance = 0.12;
+        break;
+      case 'sawyer_beetle':
+        this.name = 'Besouro-serra-pau';
+        this.radius = 18;
+        this.maxHp = Math.round(240 * hpMultiplier);
+        this.speed = 60;
+        this.damage = 21;
+        this.xpValue = 48;
+        this.knockbackResistance = 0.2;
+        break;
+      case 'giant_centipede':
+        this.name = 'Lacraia-gigante';
+        this.radius = 24;
+        this.maxHp = Math.round(280 * hpMultiplier);
+        this.speed = 66;
+        this.damage = 26;
+        this.xpValue = 60;
+        this.knockbackResistance = 0.16;
+        break;
       case 'ghost':
         this.name = 'Espectro Noturno';
         this.radius = 16;
@@ -921,6 +967,296 @@ export class Enemy {
       ctx.arc(3, -5, 2.5, 0, Math.PI * 2);
       ctx.fill();
       ctx.globalAlpha = 1.0;
+    } else if (this.type === 'capybara') {
+      // Heavy brown rodent: barrel body, stubby legs and a blunt muzzle.
+      const step = Math.sin(this.animTimer * 2.2);
+      ctx.strokeStyle = isFlashing ? '#ffffff' : '#4a2f1d';
+      ctx.lineWidth = 4;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-11, 8);
+      ctx.lineTo(-12, 15 + step * 2);
+      ctx.moveTo(-3, 9);
+      ctx.lineTo(-2, 16 - step * 2);
+      ctx.moveTo(7, 9);
+      ctx.lineTo(8, 16 - step * 2);
+      ctx.moveTo(14, 8);
+      ctx.lineTo(16, 15 + step * 2);
+      ctx.stroke();
+      ctx.lineCap = 'butt';
+
+      if (!isFlashing) ctx.fillStyle = '#8b5e3c';
+      ctx.beginPath();
+      ctx.ellipse(-3, 1, 19, 12, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#a47148';
+      ctx.beginPath();
+      ctx.ellipse(16, -2, 9, 8, 0.12, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Small rounded ears.
+      if (!isFlashing) ctx.fillStyle = '#6b4423';
+      ctx.beginPath();
+      ctx.arc(12, -9, 3, 0, Math.PI * 2);
+      ctx.arc(20, -8, 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#3f2a17';
+      ctx.beginPath();
+      ctx.ellipse(24, 0, 3.5, 2.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#fef3c7';
+      ctx.beginPath();
+      ctx.arc(18, -4, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (this.type === 'sloth') {
+      // Shaggy grey body, sleepy face and long hooked claws.
+      const sway = Math.sin(this.animTimer * 0.55) * 2;
+      ctx.strokeStyle = isFlashing ? '#ffffff' : '#57534e';
+      ctx.lineWidth = 3.5;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-5, -2);
+      ctx.lineTo(-14, 8 + sway);
+      ctx.moveTo(6, -4);
+      ctx.lineTo(17, 4 - sway);
+      ctx.moveTo(-7, 8);
+      ctx.lineTo(-10, 16);
+      ctx.moveTo(7, 8);
+      ctx.lineTo(9, 16);
+      ctx.stroke();
+      ctx.lineCap = 'butt';
+
+      if (!isFlashing) ctx.fillStyle = '#78716c';
+      ctx.beginPath();
+      ctx.ellipse(0, 2, 15, 16, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#a8a29e';
+      ctx.beginPath();
+      ctx.arc(7, -12, 9, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Dark eye patches and closed sleepy eyes.
+      if (!isFlashing) ctx.fillStyle = '#44403c';
+      ctx.beginPath();
+      ctx.ellipse(4, -13, 3, 2.5, -0.3, 0, Math.PI * 2);
+      ctx.ellipse(11, -12, 3, 2.5, 0.3, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = isFlashing ? '#ffffff' : '#1c1917';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(2.5, -13);
+      ctx.lineTo(5.5, -13);
+      ctx.moveTo(9.5, -12);
+      ctx.lineTo(12.5, -12);
+      ctx.stroke();
+
+      if (!isFlashing) ctx.fillStyle = '#292524';
+      ctx.beginPath();
+      ctx.ellipse(8, -8, 2, 1.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Hooked claws on the long arms.
+      ctx.strokeStyle = isFlashing ? '#ffffff' : '#e7e5e4';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(-15, 8 + sway);
+      ctx.lineTo(-18, 11 + sway);
+      ctx.moveTo(-13, 9 + sway);
+      ctx.lineTo(-15, 13 + sway);
+      ctx.moveTo(17, 4 - sway);
+      ctx.lineTo(21, 6 - sway);
+      ctx.moveTo(16, 6 - sway);
+      ctx.lineTo(19, 9 - sway);
+      ctx.stroke();
+    } else if (this.type === 'rhino_beetle') {
+      // Armoured black beetle with a large forked horn.
+      const legPhase = Math.sin(this.animTimer * 4.5) * 2;
+      ctx.strokeStyle = isFlashing ? '#ffffff' : '#1c1917';
+      ctx.lineWidth = 2.6;
+      ctx.beginPath();
+      ctx.moveTo(-8, 8);
+      ctx.lineTo(-14, 14 + legPhase);
+      ctx.moveTo(-2, 9);
+      ctx.lineTo(-6, 16 - legPhase);
+      ctx.moveTo(5, 9);
+      ctx.lineTo(10, 16 + legPhase);
+      ctx.moveTo(11, 7);
+      ctx.lineTo(16, 13 - legPhase);
+      ctx.stroke();
+
+      if (!isFlashing) ctx.fillStyle = '#292524';
+      ctx.beginPath();
+      ctx.ellipse(-2, 1, 19, 14, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) {
+        ctx.strokeStyle = '#57534e';
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.moveTo(-19, -2);
+        ctx.lineTo(14, -1);
+        ctx.stroke();
+      }
+
+      if (!isFlashing) ctx.fillStyle = '#1c1917';
+      ctx.beginPath();
+      ctx.ellipse(14, -2, 8, 7, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Forward horn with a small fork at the tip.
+      if (!isFlashing) ctx.fillStyle = '#44403c';
+      ctx.beginPath();
+      ctx.moveTo(15, -7);
+      ctx.quadraticCurveTo(24, -13, 30, -8);
+      ctx.lineTo(24, -4);
+      ctx.quadraticCurveTo(20, -6, 15, -2);
+      ctx.closePath();
+      ctx.fill();
+      if (!isFlashing) ctx.fillStyle = '#78716c';
+      ctx.beginPath();
+      ctx.moveTo(27, -9);
+      ctx.lineTo(33, -12);
+      ctx.lineTo(30, -7);
+      ctx.closePath();
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#f59e0b';
+      ctx.beginPath();
+      ctx.arc(16, -4, 1.6, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (this.type === 'sawyer_beetle') {
+      // Slender brown longhorn beetle with serrated antennae.
+      const legPhase = Math.sin(this.animTimer * 5) * 1.8;
+      ctx.strokeStyle = isFlashing ? '#ffffff' : '#451a03';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.moveTo(-10, 6);
+      ctx.lineTo(-17, 12 + legPhase);
+      ctx.moveTo(-4, 7);
+      ctx.lineTo(-8, 14 - legPhase);
+      ctx.moveTo(3, 7);
+      ctx.lineTo(7, 14 + legPhase);
+      ctx.moveTo(10, 5);
+      ctx.lineTo(15, 11 - legPhase);
+      ctx.stroke();
+
+      // Long serrated antennae.
+      ctx.strokeStyle = isFlashing ? '#ffffff' : '#78350f';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(17, -4);
+      ctx.lineTo(25, -11);
+      ctx.lineTo(31, -9);
+      ctx.moveTo(17, -1);
+      ctx.lineTo(26, 1);
+      ctx.lineTo(31, 4);
+      ctx.stroke();
+      ctx.lineWidth = 1;
+      for (let i = 0; i < 3; i++) {
+        const ax = 22 + i * 4;
+        const ay = -10 + i * 0.7;
+        ctx.beginPath();
+        ctx.moveTo(ax, ay);
+        ctx.lineTo(ax + 1.5, ay - 3);
+        ctx.moveTo(ax + 1, 1 + i * 0.9);
+        ctx.lineTo(ax + 2.5, 4 + i * 0.9);
+        ctx.stroke();
+      }
+
+      if (!isFlashing) ctx.fillStyle = '#92400e';
+      ctx.beginPath();
+      ctx.ellipse(-3, 0, 21, 9, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) {
+        ctx.strokeStyle = '#451a03';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(-23, 0);
+        ctx.lineTo(16, -1);
+        ctx.stroke();
+      }
+
+      if (!isFlashing) ctx.fillStyle = '#7c2d12';
+      ctx.beginPath();
+      ctx.arc(-8, -3, 2.2, 0, Math.PI * 2);
+      ctx.arc(1, 3, 1.8, 0, Math.PI * 2);
+      ctx.arc(7, -4, 1.6, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#451a03';
+      ctx.beginPath();
+      ctx.arc(17, -2, 5.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#fbbf24';
+      ctx.beginPath();
+      ctx.arc(19, -4, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (this.type === 'giant_centipede') {
+      // Long segmented body with a rippling leg wave and forked tail.
+      const legPhase = this.animTimer * 7;
+      ctx.strokeStyle = isFlashing ? '#ffffff' : '#7f1d1d';
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 7; i++) {
+        const sx = -18 + i * 6.2;
+        const wave = Math.sin(legPhase + i * 0.9) * 3;
+        ctx.beginPath();
+        ctx.moveTo(sx, 3);
+        ctx.lineTo(sx - 3, 12 + wave);
+        ctx.moveTo(sx, -3);
+        ctx.lineTo(sx + 3, -11 - wave);
+        ctx.stroke();
+      }
+
+      for (let i = 0; i < 8; i++) {
+        const sx = -22 + i * 6;
+        const sy = Math.sin(this.animTimer * 0.9 + i * 0.75) * 1.4;
+        if (!isFlashing) ctx.fillStyle = i % 2 === 0 ? '#b91c1c' : '#7f1d1d';
+        ctx.beginPath();
+        ctx.ellipse(sx, sy, 5.5, 4.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Forked tail.
+      ctx.strokeStyle = isFlashing ? '#ffffff' : '#7f1d1d';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-28, 0);
+      ctx.lineTo(-35, -5);
+      ctx.moveTo(-28, 0);
+      ctx.lineTo(-35, 5);
+      ctx.stroke();
+
+      if (!isFlashing) ctx.fillStyle = '#450a0a';
+      ctx.beginPath();
+      ctx.arc(23, 0, 6.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Mandibles and antennae.
+      ctx.strokeStyle = isFlashing ? '#ffffff' : '#450a0a';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.moveTo(27, -3);
+      ctx.lineTo(34, -8);
+      ctx.moveTo(27, 3);
+      ctx.lineTo(34, 8);
+      ctx.moveTo(25, -4);
+      ctx.lineTo(30, -7);
+      ctx.moveTo(25, 4);
+      ctx.lineTo(30, 7);
+      ctx.stroke();
+
+      if (!isFlashing) ctx.fillStyle = '#fbbf24';
+      ctx.beginPath();
+      ctx.arc(25, -2, 1.5, 0, Math.PI * 2);
+      ctx.arc(25, 2, 1.5, 0, Math.PI * 2);
+      ctx.fill();
     } else if (this.type === 'elite_minotaur') {
       if (!isFlashing) ctx.fillStyle = this.skillState === 'dashing' ? '#dc2626' : '#991b1b';
       ctx.beginPath();
