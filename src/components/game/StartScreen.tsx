@@ -60,6 +60,14 @@ const POWERUP_ICONS: Record<string, React.ReactNode> = {
   greed: <Coins className="w-4 h-4 text-amber-400" />,
 };
 
+const DIFFICULTY_DOT_COLORS: Record<DifficultyId, string> = {
+  easy: '#4ade80',
+  normal: '#f97316',
+  hard: '#facc15',
+  nightmare: '#a855f7',
+  infernal: '#ef4444',
+};
+
 const CHARACTER_ICONS: Record<string, React.ReactNode> = {
   Crosshair: <Crosshair className="w-6 h-6 text-white/90 drop-shadow" />,
   Sparkles: <Sparkles className="w-6 h-6 text-white/90 drop-shadow" />,
@@ -119,78 +127,81 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
   };
 
   return (
-    <div className="fixed inset-0 z-40 bg-gradient-to-b from-slate-950 via-slate-900 to-black flex items-center justify-center p-4 select-none overflow-y-auto">
-      <div className="w-full max-w-2xl flex flex-col items-center my-auto">
-        {/* Game Title */}
-        <div className="text-center mb-6">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-950/80 border border-red-800 text-red-400 text-xs font-bold uppercase tracking-widest mb-2 shadow-lg">
-            <span>Roguelite Survival MVP</span>
+    <div className="dungeon-bg font-ui fixed inset-0 z-40 flex items-center justify-center overflow-y-auto p-3 select-none sm:p-5">
+      <div aria-hidden="true" className="torch-glow torch-glow-left" />
+      <div aria-hidden="true" className="torch-glow torch-glow-right" />
+      <div aria-hidden="true" className="dungeon-web dungeon-web-tl" />
+      <div aria-hidden="true" className="dungeon-web dungeon-web-tr" />
+
+      <div className="relative z-10 my-auto flex w-full max-w-[920px] flex-col items-center">
+        {/* Header */}
+        <header className="mb-4 w-full text-center">
+          <div className="badge-pill mb-2.5">
+            <Flame className="h-3 w-3 text-[#ff6b4a]" />
+            <span>Roguelite Survivor MVP</span>
           </div>
-          <h1 className="text-4xl sm:text-5xl font-black uppercase tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-rose-300 to-amber-400 drop-shadow-lg">
-            VAMPIRE SURVIVORS 2D
-          </h1>
-          <p className="text-slate-400 text-xs sm:text-sm mt-1 max-w-md mx-auto">
+          <h1 className="gothic-title text-3xl sm:text-5xl">VAMPIRE SURVIVORS 2D</h1>
+          <p className="mx-auto mt-2 max-w-lg text-xs leading-relaxed text-[#9ca3af] sm:text-sm">
             Sobreviva às hordas noturnas, colete gemas arcanas e desbloqueie armas supremas!
           </p>
-        </div>
+        </header>
 
         {/* Top Currency & Records Bar */}
-        <div className="w-full flex flex-wrap justify-between items-center gap-2 bg-slate-950/80 border border-slate-800 rounded-2xl px-4 py-2.5 mb-5 shadow-xl">
+        <div className="stone-panel mb-3 flex w-full flex-wrap items-center justify-between gap-3 px-4 py-2.5">
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 text-yellow-400 font-mono font-bold text-base">
-              <Coins className="w-5 h-5 text-yellow-500" />
+            <div className="flex items-center gap-2 font-mono text-base font-bold text-[#ffcc33]">
+              <Coins className="h-5 w-5 text-[#ffaa00] drop-shadow-[0_0_6px_rgba(255,170,0,0.55)]" />
               <span>{savedData.gold} Ouro</span>
             </div>
             <div
-              className="flex items-center gap-1 text-purple-300 font-mono font-bold text-xs"
+              className="flex items-center gap-1 font-mono text-xs font-bold text-purple-300"
               title="XP da conta"
             >
-              <Sparkles className="w-4 h-4 text-purple-400" />
+              <Sparkles className="h-4 w-4 text-purple-400" />
               <span>Nv. {getAccountLevel(savedData.accountXp)}</span>
-              <span className="text-slate-500 text-[10px]">{savedData.accountXp} XP</span>
+              <span className="text-[10px] text-[#6b7280]">{savedData.accountXp} XP</span>
             </div>
           </div>
 
-          <div className="flex gap-4 text-xs font-mono text-slate-300">
+          <div className="flex gap-4 text-xs font-mono text-[#cbd5e1]">
             <div className="flex items-center gap-1" title="Melhor Tempo">
-              <Clock className="w-3.5 h-3.5 text-cyan-400" />
+              <Clock className="h-3.5 w-3.5 text-cyan-400" />
               <span>{formatTime(savedData.highScore.timeSurvived)}</span>
             </div>
             <div className="flex items-center gap-1" title="Mais Abates">
-              <Skull className="w-3.5 h-3.5 text-red-400" />
+              <Skull className="h-3.5 w-3.5 text-red-400" />
               <span>{savedData.highScore.kills}</span>
             </div>
             <div className="flex items-center gap-1" title="Vitórias">
-              <Trophy className="w-3.5 h-3.5 text-amber-400" />
+              <Trophy className="h-3.5 w-3.5 text-amber-400" />
               <span>{savedData.highScore.wins}</span>
             </div>
           </div>
         </div>
 
         {/* Difficulty Selector */}
-        <div className="w-full mb-4 bg-slate-950/80 border border-slate-800 rounded-2xl p-3 shadow-xl">
-          <div className="flex items-center justify-between gap-3 mb-2">
-            <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-              <Skull className="w-4 h-4 text-red-400" />
+        <div className="stone-panel mb-3 w-full p-3">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-[#e69f22]">
+              <Skull className="h-4 w-4 text-[#d9381e]" />
               Dificuldade
             </span>
-            <span className="text-[11px] text-slate-400 text-right">{difficultyMeta.description}</span>
+            <span className="text-right text-[11px] text-[#9ca3af]">{difficultyMeta.description}</span>
           </div>
           <div className="grid grid-cols-5 gap-1.5">
             {DIFFICULTIES.map((difficulty) => (
               <button
                 key={difficulty.id}
                 onClick={() => handleSelectDifficulty(difficulty.id)}
-                className={`py-2 rounded-lg border text-[10px] sm:text-xs font-bold uppercase tracking-wider transition cursor-pointer ${
-                  selectedDifficulty === difficulty.id
-                    ? 'bg-red-950/80 border-red-500 text-white shadow-lg'
-                    : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
-                }`}
+                className={`diff-btn ${selectedDifficulty === difficulty.id ? 'diff-btn-active' : ''}`}
                 title={difficulty.description}
               >
                 <span
-                  className="inline-block w-1.5 h-1.5 rounded-full mr-1"
-                  style={{ backgroundColor: difficulty.color }}
+                  className="inline-block h-1.5 w-1.5 shrink-0 rounded-full"
+                  style={{
+                    backgroundColor: DIFFICULTY_DOT_COLORS[difficulty.id],
+                    boxShadow: `0 0 6px ${DIFFICULTY_DOT_COLORS[difficulty.id]}`,
+                  }}
                 />
                 {difficulty.name}
               </button>
@@ -199,41 +210,29 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
         </div>
 
         {/* Tabs: Escolha de Personagem vs Loja de Power-Ups */}
-        <div className="w-full flex gap-2 mb-4">
+        <div className="mb-3 flex w-full gap-2">
           <button
             onClick={() => setActiveTab('character')}
-            className={`flex-1 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition cursor-pointer flex items-center justify-center gap-2 border ${
-              activeTab === 'character'
-                ? 'bg-red-950/80 border-red-500 text-white shadow-lg'
-                : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
-            }`}
+            className={`tab-btn ${activeTab === 'character' ? 'tab-btn-active' : ''}`}
           >
-            <Sword className="w-4 h-4" />
+            <Sword className="h-4 w-4" />
             Personagens
           </button>
           <button
             onClick={() => setActiveTab('shop')}
-            className={`flex-1 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition cursor-pointer flex items-center justify-center gap-2 border ${
-              activeTab === 'shop'
-                ? 'bg-amber-950/80 border-amber-500 text-white shadow-lg'
-                : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
-            }`}
+            className={`tab-btn ${activeTab === 'shop' ? 'tab-btn-active' : ''}`}
           >
-            <ShoppingBag className="w-4 h-4 text-yellow-400" />
+            <ShoppingBag className="h-4 w-4 text-yellow-400" />
             Loja de Power-Ups
           </button>
           <button
             onClick={() => setActiveTab('missions')}
-            className={`flex-1 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition cursor-pointer flex items-center justify-center gap-2 border ${
-              activeTab === 'missions'
-                ? 'bg-purple-950/80 border-purple-500 text-white shadow-lg'
-                : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
-            }`}
+            className={`tab-btn ${activeTab === 'missions' ? 'tab-btn-active' : ''}`}
           >
-            <Target className="w-4 h-4 text-purple-400" />
+            <Target className="h-4 w-4 text-purple-400" />
             Missões
             {claimableMissions > 0 && (
-              <span className="min-w-4 h-4 px-1 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black flex items-center justify-center">
+              <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-black text-slate-950">
                 {claimableMissions}
               </span>
             )}
@@ -242,8 +241,8 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
 
         {/* TAB 1: Character Select */}
         {activeTab === 'character' && (
-          <div className="w-full flex flex-col gap-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="flex w-full flex-col gap-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               {CHARACTERS.map((char, index) => {
                 const isSelected = selectedCharIndex === index;
                 const startingWeaponMeta = WEAPON_REGISTRY[char.startingWeapon];
@@ -251,17 +250,19 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
                   <button
                     key={char.id}
                     onClick={() => setSelectedCharIndex(index)}
-                    className={`p-4 rounded-xl border-2 text-left transition-all duration-150 cursor-pointer flex flex-col justify-between relative overflow-hidden ${
-                      isSelected
-                        ? 'bg-slate-900 border-amber-400 shadow-xl shadow-amber-500/10 scale-[1.02]'
-                        : 'bg-slate-950/90 border-slate-800 hover:border-slate-700'
-                    }`}
+                    className={`char-card ${isSelected ? 'char-card-active' : ''}`}
                   >
                     <div>
                       {/* Character avatar with icon */}
                       <div
-                        className="w-12 h-12 rounded-xl mb-3 flex items-center justify-center border shadow-inner"
-                        style={{ backgroundColor: char.color, borderColor: char.portraitColor }}
+                        className="mb-3 flex h-12 w-12 items-center justify-center rounded-lg border shadow-inner"
+                        style={{
+                          backgroundColor: char.color,
+                          borderColor: isSelected ? '#f5a623' : char.portraitColor,
+                          boxShadow: isSelected
+                            ? '0 0 12px rgba(245,166,35,0.35), inset 0 2px 8px rgba(0,0,0,0.45)'
+                            : 'inset 0 2px 8px rgba(0,0,0,0.45)',
+                        }}
                       >
                         {char.sprite ? (
                           <Image
@@ -270,20 +271,22 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
                             width={48}
                             height={55}
                             unoptimized
-                            className="w-full h-full object-contain drop-shadow"
+                            className="h-full w-full object-contain drop-shadow"
                           />
                         ) : (
                           CHARACTER_ICONS[char.iconName] ?? <Sword className="w-6 h-6 text-white/90 drop-shadow" />
                         )}
                       </div>
-                      <h3 className="font-black text-white text-base">{char.name}</h3>
-                      <p className="text-amber-400 text-[11px] font-semibold mb-2">{char.title}</p>
-                      <p className="text-slate-400 text-xs leading-relaxed">{char.description}</p>
+                      <h3 className="font-display text-base font-black text-[#f3f4f6]">{char.name}</h3>
+                      <p className="mb-2 text-[11px] font-semibold text-[#e69f22]">{char.title}</p>
+                      <p className="text-xs leading-relaxed text-[#9ca3af]">{char.description}</p>
                     </div>
 
-                    <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between">
-                      <span className="text-[10px] text-slate-400 uppercase font-bold">Arma Inicial:</span>
-                      <div className="flex items-center gap-1 text-xs font-bold text-slate-200">
+                    <div className="mt-4 flex items-center justify-between border-t border-[#383e4c] pt-3">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#9ca3af]">
+                        Arma Inicial:
+                      </span>
+                      <div className="flex items-center gap-1 text-xs font-bold text-[#e5e7eb]">
                         {WEAPON_ICONS[char.startingWeapon]}
                         <span>{startingWeaponMeta.name}</span>
                       </div>
@@ -296,9 +299,9 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
             {/* Play Button */}
             <button
               onClick={() => onStartGame(selectedChar, savedData, selectedDifficulty)}
-              className="w-full mt-2 py-4 rounded-xl bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white font-black text-base uppercase tracking-widest shadow-2xl shadow-red-500/30 transition cursor-pointer active:scale-98 flex items-center justify-center gap-2"
+              className="cta-btn"
             >
-              <Play className="w-5 h-5 fill-white" />
+              <Play className="h-5 w-5 fill-white" />
               INICIAR COM {selectedChar.name.toUpperCase()}
             </button>
           </div>
@@ -306,7 +309,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
 
         {/* TAB 2: Power-Ups Meta Shop */}
         {activeTab === 'shop' && (
-          <div className="w-full flex flex-col gap-2.5 max-h-80 overflow-y-auto pr-1">
+          <div className="flex max-h-80 w-full flex-col gap-2.5 overflow-y-auto pr-1">
             {POWER_UP_DEFINITIONS.map((p) => {
               const currentLv = savedData.powerUps[p.id] || 0;
               const isMax = currentLv >= p.maxLevel;
@@ -316,38 +319,38 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
               return (
                 <div
                   key={p.id}
-                  className="w-full bg-slate-950/80 border border-slate-800 rounded-xl p-3 flex items-center justify-between gap-3"
+                  className="stone-panel flex w-full items-center justify-between gap-3 p-3"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-slate-900 border border-slate-700 flex items-center justify-center">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-[#383e4c] bg-[#121419] shadow-inner">
                       {POWERUP_ICONS[p.id]}
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-white text-sm">{p.name}</span>
-                        <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded border border-slate-700 text-amber-300 font-mono">
+                        <span className="text-sm font-bold text-[#f3f4f6]">{p.name}</span>
+                        <span className="rounded border border-[#383e4c] bg-[#121419] px-2 py-0.5 font-mono text-[10px] text-[#ffcc33]">
                           {currentLv} / {p.maxLevel}
                         </span>
                       </div>
-                      <p className="text-slate-400 text-xs">{p.description}</p>
+                      <p className="text-xs text-[#9ca3af]">{p.description}</p>
                     </div>
                   </div>
 
                   {isMax ? (
-                    <span className="text-xs font-black text-emerald-400 uppercase tracking-wider px-3 py-1.5 bg-emerald-950/40 rounded-lg border border-emerald-800">
+                    <span className="rounded-lg border border-emerald-800 bg-emerald-950/40 px-3 py-1.5 text-xs font-black uppercase tracking-wider text-emerald-400">
                       MÁXIMO
                     </span>
                   ) : (
                     <button
                       onClick={() => handleBuyPowerUp(p.id)}
                       disabled={!canAfford}
-                      className={`px-4 py-2 rounded-xl font-bold text-xs font-mono uppercase tracking-wider transition cursor-pointer flex items-center gap-1.5 ${
+                      className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider transition ${
                         canAfford
-                          ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 active:scale-95'
-                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                          ? 'bg-gradient-to-b from-[#ffcc33] to-[#e69f22] text-[#1e1812] shadow-[0_0_12px_rgba(245,166,35,0.25)] hover:from-[#ffe28a] hover:to-[#f5a623] active:scale-95'
+                          : 'cursor-not-allowed bg-[#121419] text-[#6b7280]'
                       }`}
                     >
-                      <Coins className="w-3.5 h-3.5" />
+                      <Coins className="h-3.5 w-3.5" />
                       {cost}
                     </button>
                   )}
@@ -363,8 +366,8 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
         )}
 
         {/* Instructions footer */}
-        <div className="mt-5 flex items-center gap-2 text-slate-500 text-xs">
-          <Info className="w-4 h-4 text-slate-400" />
+        <div className="mt-4 flex items-center gap-2 text-[11px] text-[#6b7280]">
+          <Info className="h-4 w-4 text-[#9ca3af]" />
           <span>Controles: WASD ou Setas no teclado • Arraste o mouse ou toque para mover</span>
         </div>
       </div>
