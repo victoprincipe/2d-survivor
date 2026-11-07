@@ -22,6 +22,7 @@ export class Enemy {
   public isBoss: boolean = false;
   public isElite: boolean = false;
   public name: string = '';
+  private spriteImage: HTMLImageElement | null = null;
 
   constructor(id: number, type: EnemyType, x: number, y: number, hpMultiplier: number = 1.0) {
     this.id = id;
@@ -79,6 +80,10 @@ export class Enemy {
         this.damage = 35;
         this.xpValue = 500;
         this.isBoss = true;
+        if (typeof window !== 'undefined') {
+          this.spriteImage = new Image();
+          this.spriteImage.src = '/boss-lula.gif';
+        }
         break;
     }
 
@@ -261,28 +266,44 @@ export class Enemy {
         ctx.beginPath();
         ctx.arc(0, 0, 45, 0, Math.PI * 2);
         ctx.fill();
-
-        ctx.fillStyle = '#450a0a';
       }
-      // Vampire Cape & Body
-      ctx.beginPath();
-      ctx.roundRect(-24, -20, 48, 46, 10);
-      ctx.fill();
-      // Gold trim
-      ctx.fillStyle = '#f59e0b';
-      ctx.fillRect(-24, 0, 48, 4);
-      // Vampire face
-      ctx.fillStyle = '#fce7f3';
-      ctx.beginPath();
-      ctx.arc(0, -22, 14, 0, Math.PI * 2);
-      ctx.fill();
-      // Crimson Eyes & Fangs
-      ctx.fillStyle = '#dc2626';
-      ctx.fillRect(-5, -24, 4, 3);
-      ctx.fillRect(3, -24, 4, 3);
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(-3, -16, 2, 3);
-      ctx.fillRect(2, -16, 2, 3);
+
+      const sprite = this.spriteImage;
+      if (sprite && sprite.complete && sprite.naturalWidth > 0) {
+        const spriteHeight = 96;
+        const spriteWidth = spriteHeight * (sprite.naturalWidth / sprite.naturalHeight);
+        const bob = Math.sin(this.animTimer * 0.8) * 2;
+        if (isFlashing) ctx.filter = 'brightness(0) invert(1)';
+        ctx.drawImage(
+          sprite,
+          -spriteWidth / 2,
+          this.radius * 0.9 - spriteHeight + bob,
+          spriteWidth,
+          spriteHeight
+        );
+        ctx.filter = 'none';
+      } else {
+        if (!isFlashing) ctx.fillStyle = '#450a0a';
+        // Vampire Cape & Body
+        ctx.beginPath();
+        ctx.roundRect(-24, -20, 48, 46, 10);
+        ctx.fill();
+        // Gold trim
+        ctx.fillStyle = '#f59e0b';
+        ctx.fillRect(-24, 0, 48, 4);
+        // Vampire face
+        ctx.fillStyle = '#fce7f3';
+        ctx.beginPath();
+        ctx.arc(0, -22, 14, 0, Math.PI * 2);
+        ctx.fill();
+        // Crimson Eyes & Fangs
+        ctx.fillStyle = '#dc2626';
+        ctx.fillRect(-5, -24, 4, 3);
+        ctx.fillRect(3, -24, 4, 3);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(-3, -16, 2, 3);
+        ctx.fillRect(2, -16, 2, 3);
+      }
     }
 
     ctx.restore();
