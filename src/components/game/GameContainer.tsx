@@ -7,6 +7,7 @@ import { loadSavedData } from '@/game/data/persistence';
 import { getDifficulty } from '@/game/data/difficulties';
 import { GameEngine } from '@/game/engine/GameEngine';
 import { HUD } from './HUD';
+import { CharacterHUD } from './CharacterHUD';
 import { StartScreen } from './StartScreen';
 import { LevelUpModal } from './LevelUpModal';
 import { TreasureChestModal } from './TreasureChestModal';
@@ -257,6 +258,16 @@ export const GameContainer: React.FC = () => {
           isMuted={isMuted}
           onToggleMute={handleToggleMute}
           difficultyName={getDifficulty(selectedDifficulty).name}
+        />
+      )}
+
+      {/* Floating Character Status HUD */}
+      {gameState === 'playing' && (
+        <CharacterHUD
+          character={selectedCharacter}
+          level={hud.level}
+          currentXp={hud.xp}
+          maxXp={hud.xpToNextLevel}
         />
       )}
 

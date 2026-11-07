@@ -28,39 +28,20 @@ export const HUD: React.FC<HUDProps> = ({ hud, onPause, isMuted, onToggleMute, d
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const xpPercent = Math.min(100, Math.max(0, (hud.xp / Math.max(1, hud.xpToNextLevel)) * 100));
   const hpPercent = Math.min(100, Math.max(0, (hud.playerHp / Math.max(1, hud.playerMaxHp)) * 100));
 
   return (
     <div className="pointer-events-none absolute inset-0 select-none flex flex-col justify-between p-3 font-sans text-white">
-      {/* Top Section */}
-      <div className="flex flex-col gap-2">
-        {/* XP Bar */}
-        <div className="w-full flex items-center gap-3">
-          <div className="flex-1 bg-slate-900/90 border border-slate-700/80 rounded-full h-5 overflow-hidden p-0.5 shadow-lg backdrop-blur-sm relative">
-            <div
-              className="bg-gradient-to-r from-blue-600 via-cyan-400 to-indigo-400 h-full rounded-full transition-all duration-150 relative"
-              style={{ width: `${xpPercent}%` }}
-            >
-              <div className="absolute inset-0 bg-white/20 animate-pulse rounded-full" />
-            </div>
-            <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold tracking-wider text-white drop-shadow">
-              XP {hud.xp} / {hud.xpToNextLevel}
-            </span>
-          </div>
-
-          {/* Level Badge */}
-          <div className="bg-gradient-to-br from-amber-500 to-amber-700 border-2 border-yellow-300 rounded-lg px-2.5 py-0.5 shadow-md font-black text-sm text-yellow-100 flex items-center">
-            LV {hud.level}
-          </div>
-
-          {/* Difficulty Badge */}
-          <div className="bg-slate-900/90 border border-slate-700 rounded-lg px-2.5 py-0.5 shadow-md font-bold text-[10px] uppercase tracking-wider text-slate-200 flex items-center gap-1">
-            <Skull className="w-3 h-3 text-red-400" />
-            {difficultyName}
-          </div>
+      {/* Difficulty Badge */}
+      <div className="pointer-events-none absolute right-3 top-3 select-none">
+        <div className="flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-900/90 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-200 shadow-md backdrop-blur-sm">
+          <Skull className="h-3 w-3 text-red-400" />
+          {difficultyName}
         </div>
+      </div>
 
+      {/* Top Section */}
+      <div className="flex flex-col gap-2 pt-24">
         {/* Boss Health Bar (if active) */}
         {hud.activeBoss && (
           <div className="w-full max-w-lg mx-auto bg-slate-950/90 border-2 border-red-700 rounded-xl p-2 shadow-2xl backdrop-blur-md">
