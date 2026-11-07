@@ -46,7 +46,7 @@ interface BossProjectile {
   damage: number;
   life: number;
   maxLife: number;
-  kind: 'fireball' | 'soundwave';
+  kind: 'fireball' | 'soundwave' | 'water' | 'sonic';
 }
 
 interface BossHazard {
@@ -55,7 +55,7 @@ interface BossHazard {
   radius: number;
   life: number;
   maxLife: number;
-  kind: 'ember' | 'wind';
+  kind: 'ember' | 'wind' | 'puddle';
   tickTimer: number;
   damage: number;
   windStrength: number;
@@ -442,6 +442,102 @@ export class GameEngine {
         }
       }
 
+      if (e.pendingWaterJet > 0) {
+        const burst = e.pendingWaterJet;
+        e.pendingWaterJet = 0;
+        const baseAngle = Math.atan2(this.player.y - e.y, this.player.x - e.x);
+        this.vfx.addSparks(e.x, e.y, '#38bdf8', 12);
+        for (let k = 0; k < burst; k++) {
+          const angle = baseAngle + (k - (burst - 1) / 2) * 0.12;
+          this.bossProjectiles.push({
+            x: e.x,
+            y: e.y,
+            vx: Math.cos(angle) * 430,
+            vy: Math.sin(angle) * 430,
+            radius: 8,
+            damage: Math.max(1, Math.round(e.damage * 0.65)),
+            life: 2.6,
+            maxLife: 2.6,
+            kind: 'water',
+          });
+        }
+      }
+
+      if (e.pendingSlowPool) {
+        e.pendingSlowPool = false;
+        for (let k = 0; k < 4; k++) {
+          const angle = (k * Math.PI * 2) / 4 + Math.random() * 0.4;
+          const offset = 45 + Math.random() * 45;
+          this.bossHazards.push({
+            x: e.x + Math.cos(angle) * offset,
+            y: e.y + Math.sin(angle) * offset,
+            radius: 54,
+            life: 5.5,
+            maxLife: 5.5,
+            kind: 'puddle',
+            tickTimer: 0,
+            damage: 0,
+            windStrength: 0,
+          });
+        }
+        this.vfx.addSparks(e.x, e.y, '#22d3ee', 10);
+      }
+
+      if (e.pendingSummonWild > 0) {
+        const toSpawn = e.pendingSummonWild;
+        e.pendingSummonWild = 0;
+        if (this.enemies.length + spawnedMinions.length < 400) {
+          this.vfx.addDeathBurst(e.x, e.y, '#65a30d', 14);
+          const minutes = this.waveDirector.survivalTime / 60;
+          const hpMult = (1.0 + minutes * 0.4) * this.difficulty.enemyHp;
+          for (let s = 0; s < toSpawn; s++) {
+            const ang = (s * Math.PI * 2) / toSpawn;
+            const mx = e.x + Math.cos(ang) * 70;
+            const my = e.y + Math.sin(ang) * 70;
+            const wildType: EnemyType = s % 2 === 0 ? 'capybara' : 'toucan';
+            spawnedMinions.push(this.waveDirector.createEnemy(wildType, mx, my, hpMult));
+          }
+        }
+      }
+
+      if (e.pendingSonicWave) {
+        e.pendingSonicWave = false;
+        const baseAngle = Math.atan2(this.player.y - e.y, this.player.x - e.x);
+        this.camera.shake(0.16, 4);
+        for (let k = 0; k < 7; k++) {
+          const angle = baseAngle + (k - 3) * 0.2;
+          this.bossProjectiles.push({
+            x: e.x,
+            y: e.y,
+            vx: Math.cos(angle) * 260,
+            vy: Math.sin(angle) * 260,
+            radius: 10,
+            damage: Math.max(1, Math.round(e.damage * 0.6)),
+            life: 3.4,
+            maxLife: 3.4,
+            kind: 'sonic',
+          });
+        }
+      }
+
+      if (e.pendingSummonBirds > 0) {
+        const toSpawn = e.pendingSummonBirds;
+        e.pendingSummonBirds = 0;
+        if (this.enemies.length + spawnedMinions.length < 400) {
+          this.vfx.addDeathBurst(e.x, e.y, '#6b21a8', 14);
+          const minutes = this.waveDirector.survivalTime / 60;
+          const hpMult = (1.0 + minutes * 0.4) * this.difficulty.enemyHp;
+          for (let s = 0; s < toSpawn; s++) {
+            const ang = (s * Math.PI * 2) / toSpawn;
+            const mx = e.x + Math.cos(ang) * 80;
+            const my = e.y + Math.sin(ang) * 80;
+            spawnedMinions.push(
+              this.waveDirector.createEnemy('bat', mx, my, hpMult)
+            );
+          }
+        }
+      }
+
       // Check body collision with player (jumping grants brief immunity)
       const dx = this.player.x - e.x;
       const dy = this.player.y - e.y;
@@ -582,6 +678,12 @@ export class GameEngine {
             this.player.x += moveX;
             this.player.y += moveY;
           }
+        }
+      } else if (h.kind === 'puddle') {
+        // Iara's water puddles do not damage; they simply drag at the player's
+        // steps while they remain inside the pool.
+        if (dist < h.radius + this.player.radius) {
+          this.player.applySlow(0.5, 0.25);
         }
       } else {
         h.tickTimer -= dt;
@@ -1178,6 +1280,40 @@ export class GameEngine {
         ctx.beginPath();
         ctx.ellipse(screen.x, screen.y, h.radius * 0.4 * pulse, h.radius * 0.22 * pulse, 0, 0, Math.PI * 2);
         ctx.fill();
+      } else if (h.kind === 'puddle') {
+        const shimmer = Math.sin(h.life * 6) * 0.06;
+        const pool = ctx.createRadialGradient(
+          screen.x,
+          screen.y,
+          2,
+          screen.x,
+          screen.y,
+          h.radius
+        );
+        pool.addColorStop(0, `rgba(34, 211, 238, ${0.42 * alpha})`);
+        pool.addColorStop(0.6, `rgba(14, 165, 233, ${0.28 * alpha})`);
+        pool.addColorStop(1, 'rgba(8, 47, 73, 0)');
+        ctx.fillStyle = pool;
+        ctx.beginPath();
+        ctx.ellipse(
+          screen.x,
+          screen.y,
+          h.radius * (1 + shimmer),
+          h.radius * 0.55 * (1 - shimmer),
+          0,
+          0,
+          Math.PI * 2
+        );
+        ctx.fill();
+
+        ctx.strokeStyle = `rgba(165, 243, 252, ${0.6 * alpha})`;
+        ctx.lineWidth = 2;
+        for (let ring = 0; ring < 2; ring++) {
+          const rr = h.radius * (0.35 + ring * 0.3) * (1 + shimmer);
+          ctx.beginPath();
+          ctx.ellipse(screen.x, screen.y, rr, rr * 0.55, 0, 0, Math.PI * 2);
+          ctx.stroke();
+        }
       } else {
         const spin = h.life * 2.4 * (h.windStrength >= 0 ? 1 : -1);
         ctx.strokeStyle = `rgba(186, 230, 253, ${0.6 * alpha})`;
@@ -1219,7 +1355,7 @@ export class GameEngine {
         ctx.beginPath();
         ctx.arc(screen.x, screen.y, p.radius * 0.55, 0, Math.PI * 2);
         ctx.fill();
-      } else {
+      } else if (p.kind === 'soundwave') {
         const angle = Math.atan2(p.vy, p.vx);
         ctx.translate(screen.x, screen.y);
         ctx.rotate(angle);
@@ -1234,6 +1370,39 @@ export class GameEngine {
         ctx.lineWidth = 1.5;
         ctx.beginPath();
         ctx.arc(0, 0, p.radius + 14, -0.6, 0.6);
+        ctx.stroke();
+      } else if (p.kind === 'water') {
+        const angle = Math.atan2(p.vy, p.vx);
+        ctx.translate(screen.x, screen.y);
+        ctx.rotate(angle);
+        const jet = ctx.createLinearGradient(-p.radius * 5, 0, p.radius * 2, 0);
+        jet.addColorStop(0, 'rgba(14, 165, 233, 0)');
+        jet.addColorStop(0.6, `rgba(56, 189, 248, ${0.75 * alpha})`);
+        jet.addColorStop(1, `rgba(224, 242, 254, ${alpha})`);
+        ctx.fillStyle = jet;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, p.radius * 4.5, p.radius * 0.75, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = `rgba(224, 242, 254, ${alpha})`;
+        ctx.beginPath();
+        ctx.arc(0, 0, p.radius * 0.6, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        const angle = Math.atan2(p.vy, p.vx);
+        ctx.translate(screen.x, screen.y);
+        ctx.rotate(angle);
+        ctx.strokeStyle = `rgba(167, 139, 250, ${0.9 * alpha})`;
+        ctx.lineWidth = 2.5;
+        for (let ring = 0; ring < 4; ring++) {
+          ctx.beginPath();
+          ctx.arc(0, 0, p.radius + ring * 5, -0.7, 0.7);
+          ctx.stroke();
+        }
+        ctx.strokeStyle = `rgba(216, 180, 254, ${0.75 * alpha})`;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(0, 0, p.radius + 22, -0.45, 0.45);
         ctx.stroke();
       }
       ctx.restore();

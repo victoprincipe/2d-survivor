@@ -414,14 +414,23 @@ export class WaveDirector {
         : this.difficulty.id === 'nightmare' || this.difficulty.id === 'infernal'
           ? 3
           : 1;
-    const order: EnemyType[] = ['boss_curupira', 'boss_saci', 'boss_boto'];
+    const order: EnemyType[] = [
+      'boss_curupira',
+      'boss_saci',
+      'boss_boto',
+      'boss_iara',
+      'boss_caipora',
+      'boss_matinta',
+    ];
     const type = order[this.amazonBossWave % order.length];
     this.amazonBossWave += 1;
 
     let bossName = '';
     for (let i = 0; i < simultaneous; i++) {
       let pos = this.getSpawnPositionOutsideScreen(camera);
-      if (type === 'boss_boto') {
+      // Iara and Boto are water spirits: try to make them surface near the
+      // river or a lake when there is water just outside the camera.
+      if (type === 'boss_boto' || type === 'boss_iara') {
         const waterPos = this.getWaterSpawnPosition(camera, 48);
         if (waterPos) pos = waterPos;
       }

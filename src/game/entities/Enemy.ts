@@ -66,6 +66,13 @@ export class Enemy {
   public pendingTeleport: boolean = false;
   public pendingWindBurst: number = 0;
   public pendingSoundWave: boolean = false;
+  // Iara (water jets + slowing puddles), Caipora (wild summons) and
+  // Matinta Pereira (sonic whistles + shadow birds).
+  public pendingWaterJet: number = 0;
+  public pendingSlowPool: boolean = false;
+  public pendingSummonWild: number = 0;
+  public pendingSonicWave: boolean = false;
+  public pendingSummonBirds: number = 0;
 
   constructor(id: number, type: EnemyType, x: number, y: number, hpMultiplier: number = 1.0) {
     this.id = id;
@@ -368,6 +375,39 @@ export class Enemy {
         this.knockbackResistance = 0.07;
         this.skillCooldown = 2.8;
         break;
+      case 'boss_iara':
+        this.name = 'Iara (Senhora das Águas)';
+        this.radius = 34;
+        this.maxHp = Math.round(1500 * hpMultiplier);
+        this.speed = 84;
+        this.damage = 28;
+        this.xpValue = 540;
+        this.isBoss = true;
+        this.knockbackResistance = 0.07;
+        this.skillCooldown = 2.6;
+        break;
+      case 'boss_caipora':
+        this.name = 'Caipora (Protetor da Mata)';
+        this.radius = 36;
+        this.maxHp = Math.round(1650 * hpMultiplier);
+        this.speed = 100;
+        this.damage = 30;
+        this.xpValue = 580;
+        this.isBoss = true;
+        this.knockbackResistance = 0.06;
+        this.skillCooldown = 2.8;
+        break;
+      case 'boss_matinta':
+        this.name = 'Matinta Pereira (Bruxa da Floresta)';
+        this.radius = 34;
+        this.maxHp = Math.round(1800 * hpMultiplier);
+        this.speed = 96;
+        this.damage = 31;
+        this.xpValue = 620;
+        this.isBoss = true;
+        this.knockbackResistance = 0.07;
+        this.skillCooldown = 2.6;
+        break;
     }
 
     this.hp = this.maxHp;
@@ -515,9 +555,12 @@ export class Enemy {
     if (
       this.type === 'boss_curupira' ||
       this.type === 'boss_saci' ||
-      this.type === 'boss_boto'
+      this.type === 'boss_boto' ||
+      this.type === 'boss_iara' ||
+      this.type === 'boss_caipora' ||
+      this.type === 'boss_matinta'
     ) {
-      this.updateAmazonBossSkills(dt, dist, speedMult);
+      this.updateAmazonBossSkills(dt, dx, dy, dist, speedMult);
       return;
     }
 
@@ -578,7 +621,35 @@ export class Enemy {
     }
   }
 
-  private updateAmazonBossSkills(dt: number, dist: number, speedMult: number): void {
+  private updateAmazonBossSkills(
+    dt: number,
+    dx: number,
+    dy: number,
+    dist: number,
+    speedMult: number
+  ): void {
+    // Caipora's mounted charge has its own short state machine so the engine's
+    // existing dash movement can carry it toward the player.
+    if (this.type === 'boss_caipora') {
+      if (this.skillState === 'telegraph_dash') {
+        this.skillStateTimer -= dt;
+        if (this.skillStateTimer <= 0) {
+          this.skillState = 'dashing';
+          this.skillDuration = 0.5;
+          this.skillStateTimer = 0.5;
+        }
+        return;
+      }
+      if (this.skillState === 'dashing') {
+        this.skillStateTimer -= dt;
+        if (this.skillStateTimer <= 0) {
+          this.skillState = 'idle';
+          this.skillCooldown = 3.0;
+        }
+        return;
+      }
+    }
+
     this.skillCooldown -= dt * speedMult;
     if (this.skillCooldown > 0 || dist > 760) return;
 
@@ -596,9 +667,35 @@ export class Enemy {
         this.pendingWindBurst += 1;
       }
       this.skillCooldown = 2.8;
-    } else {
+    } else if (this.type === 'boss_boto') {
       this.pendingSoundWave = true;
       this.skillCooldown = 3.0;
+    } else if (this.type === 'boss_iara') {
+      if (this.bossSkillIndex % 2 === 0) {
+        this.pendingWaterJet = 3;
+      } else {
+        this.pendingSlowPool = true;
+      }
+      this.skillCooldown = 2.8;
+    } else if (this.type === 'boss_caipora') {
+      if (this.bossSkillIndex % 2 === 0) {
+        const norm = dist > 0 ? dist : 1;
+        this.dashDirX = dx / norm;
+        this.dashDirY = dy / norm;
+        this.skillState = 'telegraph_dash';
+        this.skillDuration = 0.5;
+        this.skillStateTimer = 0.5;
+      } else {
+        this.pendingSummonWild = 5;
+      }
+      this.skillCooldown = 3.2;
+    } else if (this.type === 'boss_matinta') {
+      if (this.bossSkillIndex % 2 === 0) {
+        this.pendingSonicWave = true;
+      } else {
+        this.pendingSummonBirds = 6;
+      }
+      this.skillCooldown = 2.6;
     }
 
     this.bossSkillIndex += 1;
@@ -1519,6 +1616,212 @@ export class Enemy {
         ctx.lineTo(44, 6 + bob);
         ctx.stroke();
       }
+    } else if (this.type === 'boss_iara') {
+      // Iara: river mermaid with a watery aura and a long blue tail.
+      const sway = Math.sin(this.animTimer * 1.9) * 3;
+
+      if (!isFlashing) {
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.35)';
+        ctx.lineWidth = 2;
+        for (let i = 1; i <= 3; i++) {
+          ctx.beginPath();
+          ctx.arc(0, 4, 20 + i * 9 + Math.sin(this.animTimer * 2 + i) * 2, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
+
+      // Tail and caudal fin.
+      if (!isFlashing) ctx.fillStyle = '#0ea5e9';
+      ctx.beginPath();
+      ctx.moveTo(-4, 10 + sway);
+      ctx.quadraticCurveTo(-30, 24 + sway, -48, 8 + sway);
+      ctx.quadraticCurveTo(-34, 12 + sway, -20, 2 + sway);
+      ctx.closePath();
+      ctx.fill();
+      if (!isFlashing) ctx.fillStyle = '#38bdf8';
+      ctx.beginPath();
+      ctx.moveTo(-46, 8 + sway);
+      ctx.lineTo(-58, -4 + sway);
+      ctx.lineTo(-50, 8 + sway);
+      ctx.lineTo(-58, 20 + sway);
+      ctx.closePath();
+      ctx.fill();
+
+      // Torso and shell.
+      if (!isFlashing) ctx.fillStyle = '#7dd3fc';
+      ctx.beginPath();
+      ctx.ellipse(0, 2, 13, 16, 0, 0, Math.PI * 2);
+      ctx.fill();
+      if (!isFlashing) ctx.fillStyle = '#bae6fd';
+      ctx.beginPath();
+      ctx.ellipse(0, 2, 8, 11, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Head and long blue hair.
+      if (!isFlashing) ctx.fillStyle = '#0369a1';
+      ctx.beginPath();
+      ctx.ellipse(-11, -17, 8, 15, 0.25, 0, Math.PI * 2);
+      ctx.ellipse(11, -17, 8, 15, -0.25, 0, Math.PI * 2);
+      ctx.fill();
+      if (!isFlashing) ctx.fillStyle = '#fde68a';
+      ctx.beginPath();
+      ctx.arc(0, -18, 11, 0, Math.PI * 2);
+      ctx.fill();
+      if (!isFlashing) ctx.fillStyle = '#0369a1';
+      ctx.beginPath();
+      ctx.arc(0, -24, 11, Math.PI, Math.PI * 2);
+      ctx.fill();
+
+      // Face.
+      if (!isFlashing) ctx.fillStyle = '#0f172a';
+      ctx.beginPath();
+      ctx.arc(-4, -18, 1.8, 0, Math.PI * 2);
+      ctx.arc(4, -18, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+      if (!isFlashing) ctx.fillStyle = '#f472b6';
+      ctx.beginPath();
+      ctx.arc(0, -11, 2, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (this.type === 'boss_caipora') {
+      // Caipora: forest protector riding a fast peccary (queixada).
+      const gallop = Math.sin(this.animTimer * 5) * 2.5;
+
+      // Peccary legs.
+      if (!isFlashing) ctx.fillStyle = '#3f2a1a';
+      ctx.fillRect(-20, 20, 6, 12 + gallop);
+      ctx.fillRect(-6, 20, 6, 14 - gallop);
+      ctx.fillRect(8, 20, 6, 12 + gallop);
+      ctx.fillRect(20, 20, 6, 14 - gallop);
+
+      // Peccary body.
+      if (!isFlashing) ctx.fillStyle = '#5b3a1c';
+      ctx.beginPath();
+      ctx.ellipse(0, 10, 30, 15, 0, 0, Math.PI * 2);
+      ctx.fill();
+      if (!isFlashing) ctx.fillStyle = '#7c4a23';
+      ctx.beginPath();
+      ctx.ellipse(24, 4, 14, 11, 0.1, 0, Math.PI * 2);
+      ctx.fill();
+      // Snout, ear and tusk.
+      if (!isFlashing) ctx.fillStyle = '#d6a15f';
+      ctx.beginPath();
+      ctx.ellipse(38, 6, 8, 5, 0.1, 0, Math.PI * 2);
+      ctx.fill();
+      if (!isFlashing) ctx.fillStyle = '#3f2a1a';
+      ctx.beginPath();
+      ctx.moveTo(22, -5);
+      ctx.lineTo(27, -16);
+      ctx.lineTo(33, -5);
+      ctx.closePath();
+      ctx.fill();
+      if (!isFlashing) ctx.fillStyle = '#f8fafc';
+      ctx.beginPath();
+      ctx.moveTo(40, 9);
+      ctx.lineTo(47, 4);
+      ctx.lineTo(43, 11);
+      ctx.closePath();
+      ctx.fill();
+
+      // Rider: small green-skinned guardian with a straw cape.
+      if (!isFlashing) ctx.fillStyle = '#4d7c0f';
+      ctx.beginPath();
+      ctx.roundRect(-12, -22, 20, 24, 6);
+      ctx.fill();
+      if (!isFlashing) ctx.fillStyle = '#a3a35a';
+      ctx.beginPath();
+      ctx.moveTo(-18, -20);
+      ctx.lineTo(4, -26);
+      ctx.lineTo(12, -6);
+      ctx.lineTo(-12, -2);
+      ctx.closePath();
+      ctx.fill();
+      if (!isFlashing) ctx.fillStyle = '#65a30d';
+      ctx.beginPath();
+      ctx.arc(-2, -32, 10, 0, Math.PI * 2);
+      ctx.fill();
+      // Straw headdress.
+      if (!isFlashing) ctx.fillStyle = '#eab308';
+      ctx.beginPath();
+      ctx.moveTo(-14, -36);
+      ctx.lineTo(-2, -52);
+      ctx.lineTo(10, -36);
+      ctx.closePath();
+      ctx.fill();
+      if (!isFlashing) ctx.fillStyle = '#1c1917';
+      ctx.beginPath();
+      ctx.arc(-6, -32, 1.7, 0, Math.PI * 2);
+      ctx.arc(2, -32, 1.7, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (this.type === 'boss_matinta') {
+      // Matinta Pereira: hovering forest witch surrounded by shadow birds.
+      const hover = Math.sin(this.animTimer * 2.2) * 4;
+
+      if (!isFlashing) {
+        const aura = ctx.createRadialGradient(0, hover, 6, 0, hover, 52);
+        aura.addColorStop(0, 'rgba(88, 28, 135, 0.45)');
+        aura.addColorStop(1, 'rgba(88, 28, 135, 0)');
+        ctx.fillStyle = aura;
+        ctx.beginPath();
+        ctx.arc(0, hover, 52, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Shadow bird silhouettes circling the witch.
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+        for (let i = 0; i < 3; i++) {
+          const a = this.animTimer * 1.4 + (i * Math.PI * 2) / 3;
+          const bx = Math.cos(a) * 40;
+          const by = Math.sin(a) * 22 + hover;
+          ctx.beginPath();
+          ctx.moveTo(bx - 7, by);
+          ctx.lineTo(bx, by - 4);
+          ctx.lineTo(bx + 7, by);
+          ctx.lineTo(bx, by + 2);
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
+
+      // Cloak.
+      if (!isFlashing) ctx.fillStyle = '#3b0764';
+      ctx.beginPath();
+      ctx.moveTo(-20, 22 + hover);
+      ctx.quadraticCurveTo(-24, -8 + hover, 0, -18 + hover);
+      ctx.quadraticCurveTo(24, -8 + hover, 20, 22 + hover);
+      ctx.quadraticCurveTo(0, 30 + hover, -20, 22 + hover);
+      ctx.closePath();
+      ctx.fill();
+      // Tattered hem.
+      if (!isFlashing) ctx.fillStyle = '#581c87';
+      for (let i = -2; i <= 2; i++) {
+        ctx.beginPath();
+        ctx.moveTo(i * 8 - 4, 22 + hover);
+        ctx.lineTo(i * 8, 32 + hover);
+        ctx.lineTo(i * 8 + 4, 22 + hover);
+        ctx.closePath();
+        ctx.fill();
+      }
+      // Pale face.
+      if (!isFlashing) ctx.fillStyle = '#d6d3d1';
+      ctx.beginPath();
+      ctx.arc(0, -14 + hover, 10, 0, Math.PI * 2);
+      ctx.fill();
+      // Pointed hat.
+      if (!isFlashing) ctx.fillStyle = '#1e1b4b';
+      ctx.beginPath();
+      ctx.moveTo(-16, -20 + hover);
+      ctx.lineTo(0, -54 + hover);
+      ctx.lineTo(16, -20 + hover);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(0, -20 + hover, 22, 5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Glowing eyes.
+      if (!isFlashing) ctx.fillStyle = '#f43f5e';
+      ctx.beginPath();
+      ctx.arc(-4, -15 + hover, 1.8, 0, Math.PI * 2);
+      ctx.arc(4, -15 + hover, 1.8, 0, Math.PI * 2);
+      ctx.fill();
     } else if (this.type === 'ghost') {
       ctx.globalAlpha = 0.75;
       if (!isFlashing) ctx.fillStyle = '#93c5fd';
@@ -2218,7 +2521,10 @@ export class Enemy {
       this.isBoss &&
       (this.type === 'boss_curupira' ||
         this.type === 'boss_saci' ||
-        this.type === 'boss_boto');
+        this.type === 'boss_boto' ||
+        this.type === 'boss_iara' ||
+        this.type === 'boss_caipora' ||
+        this.type === 'boss_matinta');
     if (this.isElite || showBossBar) {
       const barW = showBossBar ? 76 : 44;
       const barH = showBossBar ? 7 : 5;

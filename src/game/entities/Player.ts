@@ -83,6 +83,8 @@ export class Player {
   public goldMultiplier: number = 1.0;
   public recoveryPerSec: number = 0;
   public speedBoostTimer: number = 0;
+  public slowTimer: number = 0;
+  public slowFactor: number = 0;
   public attackSpeedBoostTimer: number = 0;
   public shieldTimer: number = 0;
 
@@ -187,6 +189,11 @@ export class Player {
     this.stamina = this.movementConfig.maxStamina;
   }
 
+  public applySlow(factor: number, duration: number): void {
+    this.slowFactor = Math.max(this.slowFactor, Math.max(0, Math.min(0.8, factor)));
+    this.slowTimer = Math.max(this.slowTimer, duration);
+  }
+
   update(dt: number, input: InputManager): boolean {
     // Invulnerability timer
     if (this.invulnerableTimer > 0) {
@@ -195,6 +202,14 @@ export class Player {
 
     if (this.speedBoostTimer > 0) {
       this.speedBoostTimer -= dt;
+    }
+
+    if (this.slowTimer > 0) {
+      this.slowTimer -= dt;
+      if (this.slowTimer <= 0) {
+        this.slowTimer = 0;
+        this.slowFactor = 0;
+      }
     }
 
     if (this.attackSpeedBoostTimer > 0) {
@@ -278,7 +293,9 @@ export class Player {
     }
 
     const dashing = this.dashTimer > 0;
-    const effectiveSpeed = this.speedBoostTimer > 0 ? this.speed * 1.15 : this.speed;
+    const speedBoost = this.speedBoostTimer > 0 ? 1.15 : 1;
+    const slowMult = this.slowTimer > 0 ? Math.max(0.35, 1 - this.slowFactor) : 1;
+    const effectiveSpeed = this.speed * speedBoost * slowMult;
 
     let moveX = moving ? dx * effectiveSpeed * dt : 0;
     let moveY = moving ? dy * effectiveSpeed * dt : 0;
