@@ -197,6 +197,8 @@ export type DropType =
 export interface HUDState {
   playerHp: number;
   playerMaxHp: number;
+  stamina: number;
+  maxStamina: number;
   level: number;
   xp: number;
   xpToNextLevel: number;

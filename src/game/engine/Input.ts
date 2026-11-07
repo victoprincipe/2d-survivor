@@ -13,6 +13,7 @@ export class InputManager {
   public dy: number = 0;
   public facingX: number = 1;
   public facingY: number = 0;
+  private jumpQueued: boolean = false;
 
   // Virtual Joystick for touch / mouse
   public joystick: VirtualJoystickState = {
@@ -44,8 +45,14 @@ export class InputManager {
   }
 
   private handleKeyDown(e: KeyboardEvent): void {
+    const wasPressed = !!this.keys[e.code];
     this.keys[e.code] = true;
     this.updateVector();
+
+    if (e.code === 'Space') {
+      // Queue a single jump per physical key press (ignore auto-repeat).
+      if (!wasPressed) this.jumpQueued = true;
+    }
 
     if (e.code === 'Escape' || e.code === 'KeyP') {
       this.onPauseToggle?.();
@@ -62,9 +69,24 @@ export class InputManager {
 
   private handleBlur(): void {
     this.keys = {};
+    this.jumpQueued = false;
     this.joystick.active = false;
     this.dx = 0;
     this.dy = 0;
+  }
+
+  public get dashHeld(): boolean {
+    return !!this.keys['ShiftLeft'] || !!this.keys['ShiftRight'];
+  }
+
+  public consumeJump(): boolean {
+    if (!this.jumpQueued) return false;
+    this.jumpQueued = false;
+    return true;
+  }
+
+  public clearJump(): void {
+    this.jumpQueued = false;
   }
 
   public handlePointerDown(x: number, y: number): void {

@@ -20,6 +20,8 @@ type GameState = 'menu' | 'playing' | 'paused' | 'level_up' | 'chest' | 'game_ov
 const DEFAULT_HUD: HUDState = {
   playerHp: 100,
   playerMaxHp: 100,
+  stamina: 100,
+  maxStamina: 100,
   level: 1,
   xp: 0,
   xpToNextLevel: 12,

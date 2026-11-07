@@ -3,6 +3,11 @@ import { Player } from '../entities/Player';
 import { Drop } from '../entities/Drops';
 import { DropType, MapId } from '../types';
 
+// Current maps are effectively open, so this is only a large safety limit
+// that prevents the player from wandering out of the coordinate space.
+const WORLD_HALF_SIZE = 100000;
+const COLLISION_STEP = 8;
+
 export interface TorchProp {
   id: number;
   x: number;
@@ -76,6 +81,52 @@ export class WorldSystem {
     if (roll < 0.72) return 'coin';
     if (roll < 0.94) return 'magnet';
     return 'rosary';
+  }
+
+  /**
+   * Moves the player by (dx, dy) while preventing it from crossing trees or
+   * leaving the playable area. The movement is sub-stepped so fast impulses
+   * (such as the dash) cannot tunnel through obstacles.
+   */
+  public resolvePlayerMovement(
+    fromX: number,
+    fromY: number,
+    dx: number,
+    dy: number,
+    radius: number
+  ): { x: number; y: number } {
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    if (distance < 0.0001) return { x: fromX, y: fromY };
+
+    const steps = Math.max(1, Math.ceil(distance / COLLISION_STEP));
+    const stepX = dx / steps;
+    const stepY = dy / steps;
+    const limit = WORLD_HALF_SIZE - radius;
+    let x = fromX;
+    let y = fromY;
+
+    for (let i = 0; i < steps; i++) {
+      // Resolve each axis independently so the player can slide along props.
+      const nextX = Math.max(-limit, Math.min(limit, x + stepX));
+      if (!this.collidesWithTree(nextX, y, radius)) x = nextX;
+
+      const nextY = Math.max(-limit, Math.min(limit, y + stepY));
+      if (!this.collidesWithTree(x, nextY, radius)) y = nextY;
+    }
+
+    return { x, y };
+  }
+
+  private collidesWithTree(x: number, y: number, radius: number): boolean {
+    for (let i = 0; i < this.trees.length; i++) {
+      const tree = this.trees[i];
+      const treeRadius = tree.size * 0.32;
+      const minDist = radius + treeRadius;
+      const dx = x - tree.x;
+      const dy = y - tree.y;
+      if (dx * dx + dy * dy < minDist * minDist) return true;
+    }
+    return false;
   }
 
   update(dt: number, player: Player, onBuffSpawn?: (drop: Drop) => void): void {

@@ -8,6 +8,40 @@ const HP_BAR_FONT_SIZE = 9;
 const HP_BAR_OUTLINE_WIDTH = 2.5;
 const HP_BAR_TEXT_PADDING_X = 3;
 
+export interface MovementConfig {
+  maxStamina: number;
+  dashStaminaCost: number;
+  staminaRegenPerSec: number;
+  staminaRegenDelay: number;
+  dashSpeed: number;
+  dashDuration: number;
+  dashCooldown: number;
+  jumpHeight: number;
+  jumpDuration: number;
+  jumpCooldown: number;
+}
+
+export const DEFAULT_MOVEMENT_CONFIG: MovementConfig = {
+  maxStamina: 100,
+  dashStaminaCost: 20,
+  staminaRegenPerSec: 20,
+  staminaRegenDelay: 1,
+  dashSpeed: 900,
+  dashDuration: 0.14,
+  dashCooldown: 0.35,
+  jumpHeight: 54,
+  jumpDuration: 0.55,
+  jumpCooldown: 0.35,
+};
+
+export type PlayerCollisionResolver = (
+  fromX: number,
+  fromY: number,
+  dx: number,
+  dy: number,
+  radius: number
+) => { x: number; y: number };
+
 export type PermanentPowerUps = {
   might?: number;
   armor?: number;
@@ -50,6 +84,18 @@ export class Player {
   public recoveryPerSec: number = 0;
   public speedBoostTimer: number = 0;
 
+  // Movement abilities (dash & jump)
+  public movementConfig: MovementConfig = { ...DEFAULT_MOVEMENT_CONFIG };
+  public stamina: number = DEFAULT_MOVEMENT_CONFIG.maxStamina;
+  public staminaRegenTimer: number = 0;
+  public dashCooldownTimer: number = 0;
+  public dashTimer: number = 0;
+  public jumpTimer: number = 0;
+  public jumpCooldownTimer: number = 0;
+  private dashDirX: number = 1;
+  private dashDirY: number = 0;
+  public collisionResolver?: PlayerCollisionResolver;
+
   // Progression
   public level: number = 1;
   public xp: number = 0;
@@ -73,6 +119,21 @@ export class Player {
   public static computeXpToNextLevel(level: number): number {
     const lv = Math.max(0, level - 1);
     return Math.floor(10 + 8 * lv + 2.15 * Math.pow(lv, 1.82));
+  }
+
+  public get isJumping(): boolean {
+    return this.jumpTimer > 0;
+  }
+
+  public get jumpOffset(): number {
+    const config = this.movementConfig;
+    if (this.jumpTimer <= 0 || config.jumpDuration <= 0) return 0;
+    const progress = 1 - this.jumpTimer / config.jumpDuration;
+    return -Math.sin(Math.PI * Math.max(0, Math.min(1, progress))) * config.jumpHeight;
+  }
+
+  public setCollisionResolver(resolver: PlayerCollisionResolver): void {
+    this.collisionResolver = resolver;
   }
 
   constructor(character: CharacterConfig, initialPowerUps: PermanentPowerUps = {}) {
@@ -117,6 +178,7 @@ export class Player {
 
     this.hp = this.maxHp;
     this.speed = this.baseSpeed;
+    this.stamina = this.movementConfig.maxStamina;
   }
 
   update(dt: number, input: InputManager): boolean {
@@ -133,23 +195,101 @@ export class Player {
       this.attackAnimTimer = Math.max(0, this.attackAnimTimer - dt);
     }
 
+    if (this.dashCooldownTimer > 0) {
+      this.dashCooldownTimer = Math.max(0, this.dashCooldownTimer - dt);
+    }
+
+    if (this.jumpCooldownTimer > 0) {
+      this.jumpCooldownTimer = Math.max(0, this.jumpCooldownTimer - dt);
+    }
+
+    if (this.jumpTimer > 0) {
+      this.jumpTimer = Math.max(0, this.jumpTimer - dt);
+    }
+
+    const config = this.movementConfig;
+
+    // Stamina regeneration starts only after the configured delay.
+    if (this.staminaRegenTimer > 0) {
+      this.staminaRegenTimer = Math.max(0, this.staminaRegenTimer - dt);
+    } else if (this.stamina < config.maxStamina) {
+      this.stamina = Math.min(
+        config.maxStamina,
+        this.stamina + config.staminaRegenPerSec * dt
+      );
+    }
+
     // Health recovery
     if (this.recoveryPerSec > 0 && this.hp < this.maxHp) {
       this.hp = Math.min(this.maxHp, this.hp + this.recoveryPerSec * dt);
     }
 
-    // Movement
+    // Jump (a single queued press per keydown; no double jumps).
+    if (input.consumeJump() && this.jumpTimer <= 0 && this.jumpCooldownTimer <= 0) {
+      this.jumpTimer = config.jumpDuration;
+      this.jumpCooldownTimer = config.jumpDuration + config.jumpCooldown;
+    }
+
+    // Movement input
     const dx = input.dx;
     const dy = input.dy;
-    this.isMoving = Math.abs(dx) > 0.05 || Math.abs(dy) > 0.05;
+    const moving = Math.abs(dx) > 0.05 || Math.abs(dy) > 0.05;
 
+    // Dash impulse (held SHIFT). Direction follows movement, or facing when idle.
+    if (
+      input.dashHeld &&
+      this.dashCooldownTimer <= 0 &&
+      this.dashTimer <= 0 &&
+      this.stamina >= config.dashStaminaCost
+    ) {
+      const moveMag = Math.sqrt(dx * dx + dy * dy);
+      if (moveMag > 0.1) {
+        this.dashDirX = dx / moveMag;
+        this.dashDirY = dy / moveMag;
+      } else {
+        const facingMag =
+          Math.sqrt(this.facingX * this.facingX + this.facingY * this.facingY) || 1;
+        this.dashDirX = this.facingX / facingMag;
+        this.dashDirY = this.facingY / facingMag;
+      }
+
+      this.stamina = Math.max(0, this.stamina - config.dashStaminaCost);
+      this.staminaRegenTimer = config.staminaRegenDelay;
+      this.dashCooldownTimer = config.dashCooldown;
+      this.dashTimer = config.dashDuration;
+    }
+
+    const dashing = this.dashTimer > 0;
     const effectiveSpeed = this.speedBoostTimer > 0 ? this.speed * 1.15 : this.speed;
 
-    if (this.isMoving) {
-      this.x += dx * effectiveSpeed * dt;
-      this.y += dy * effectiveSpeed * dt;
+    let moveX = moving ? dx * effectiveSpeed * dt : 0;
+    let moveY = moving ? dy * effectiveSpeed * dt : 0;
+
+    if (dashing) {
+      const dashDt = Math.min(dt, this.dashTimer);
+      moveX += this.dashDirX * config.dashSpeed * dashDt;
+      moveY += this.dashDirY * config.dashSpeed * dashDt;
+      this.dashTimer = Math.max(0, this.dashTimer - dt);
+      this.facingX = this.dashDirX;
+      this.facingY = this.dashDirY;
+    } else if (moving) {
       this.facingX = input.facingX;
       this.facingY = input.facingY;
+    }
+
+    if (moveX !== 0 || moveY !== 0) {
+      if (this.collisionResolver) {
+        const resolved = this.collisionResolver(this.x, this.y, moveX, moveY, this.radius);
+        this.x = resolved.x;
+        this.y = resolved.y;
+      } else {
+        this.x += moveX;
+        this.y += moveY;
+      }
+    }
+
+    this.isMoving = moving || dashing;
+    if (this.isMoving) {
       this.walkAnimTimer += dt * 10;
     } else {
       this.walkAnimTimer = 0;
@@ -219,11 +359,18 @@ export class Player {
     // Spritesheets already animate the gait, so avoid an extra bounce.
     const bob = isUsingSheet ? 0 : Math.sin(this.walkAnimTimer) * 3;
 
-    // Shadow
+    // Shadow (shrinks slightly while airborne, but stays on the ground)
+    const jumpOffset = this.jumpOffset;
+    const shadowScale = 1 - Math.min(0.45, Math.abs(jumpOffset) / 120);
     ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
     ctx.beginPath();
-    ctx.ellipse(0, 16, 16, 7, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, 16, 16 * shadowScale, 7 * shadowScale, 0, 0, Math.PI * 2);
     ctx.fill();
+
+    // Raise only the character body during the jump; the shadow stays grounded.
+    if (jumpOffset !== 0) {
+      ctx.translate(0, jumpOffset);
+    }
 
     const flip = this.facingX < 0 ? -1 : 1;
     const spriteHeight = 52;

@@ -96,6 +96,9 @@ export class GameEngine {
     this.waveDirector = new WaveDirector(this.difficulty);
 
     this.player = new Player(character, savedData.powerUps);
+    this.player.setCollisionResolver((fromX, fromY, dx, dy, radius) =>
+      this.worldProps.resolvePlayerMovement(fromX, fromY, dx, dy, radius)
+    );
     this.weaponSystem = new WeaponSystem(character.startingWeapon);
     this.weaponSystem.recalculatePlayerStats(this.player);
     this.player.hp = this.player.maxHp;
@@ -136,6 +139,7 @@ export class GameEngine {
 
   public resume(): void {
     this.isPaused = false;
+    this.input.clearJump();
     this.lastTime = performance.now();
   }
 
@@ -235,12 +239,12 @@ export class GameEngine {
         }
       }
 
-      // Check body collision with player
+      // Check body collision with player (jumping grants brief immunity)
       const dx = this.player.x - e.x;
       const dy = this.player.y - e.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
 
-      if (dist < this.player.radius + e.radius) {
+      if (!this.player.isJumping && dist < this.player.radius + e.radius) {
         const fatal = this.player.takeDamage(e.damage);
         this.sound.playPlayerHurt();
         this.camera.shake(0.2, 5);
@@ -608,6 +612,8 @@ export class GameEngine {
     this.callbacks.onHUDUpdate({
       playerHp: Math.round(this.player.hp),
       playerMaxHp: Math.round(this.player.maxHp),
+      stamina: Math.round(this.player.stamina),
+      maxStamina: Math.round(this.player.movementConfig.maxStamina),
       level: this.player.level,
       xp: Math.round(this.player.xp),
       xpToNextLevel: this.player.xpToNextLevel,

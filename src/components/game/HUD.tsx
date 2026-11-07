@@ -8,6 +8,7 @@ import {
   Coins,
   Clock,
   Heart,
+  Zap,
   Volume2,
   VolumeX,
   Pause,
@@ -29,6 +30,7 @@ export const HUD: React.FC<HUDProps> = ({ hud, onPause, isMuted, onToggleMute, d
   };
 
   const hpPercent = Math.min(100, Math.max(0, (hud.playerHp / Math.max(1, hud.playerMaxHp)) * 100));
+  const staminaPercent = Math.min(100, Math.max(0, (hud.stamina / Math.max(1, hud.maxStamina)) * 100));
 
   return (
     <div className="pointer-events-none absolute inset-0 select-none flex flex-col justify-between p-3 font-sans text-white">
@@ -84,6 +86,22 @@ export const HUD: React.FC<HUDProps> = ({ hud, onPause, isMuted, onToggleMute, d
               </div>
               <span className="text-xs font-bold font-mono text-slate-200 min-w-14 text-right">
                 {hud.playerHp}/{hud.playerMaxHp}
+              </span>
+            </div>
+
+            {/* Stamina Bar */}
+            <div className="flex items-center gap-2 bg-slate-900/80 border border-slate-700/80 rounded-lg px-2.5 py-1 backdrop-blur-sm shadow">
+              <Zap className={`w-4 h-4 shrink-0 ${staminaPercent > 15 ? 'text-cyan-400' : 'text-red-500'}`} />
+              <div className="w-24 sm:w-36 bg-slate-800 rounded-full h-2 overflow-hidden border border-slate-700">
+                <div
+                  className={`h-full transition-all duration-150 ${
+                    staminaPercent > 40 ? 'bg-cyan-400' : staminaPercent > 15 ? 'bg-amber-400' : 'bg-red-500'
+                  }`}
+                  style={{ width: `${staminaPercent}%` }}
+                />
+              </div>
+              <span className="text-xs font-bold font-mono text-slate-200 min-w-14 text-right">
+                {hud.stamina}/{hud.maxStamina}
               </span>
             </div>
 
@@ -162,7 +180,9 @@ export const HUD: React.FC<HUDProps> = ({ hud, onPause, isMuted, onToggleMute, d
 
       {/* Bottom Hint for mobile/desktop */}
       <div className="flex justify-between items-end text-[10px] text-slate-400/80">
-        <span className="hidden sm:inline">WASD ou Setas para mover • ESC para pausar</span>
+        <span className="hidden sm:inline">
+          WASD ou Setas para mover • SHIFT para dash • ESPAÇO para pular • ESC para pausar
+        </span>
         <span className="sm:hidden">Arraste para mover (Joystick Virtual)</span>
       </div>
     </div>
