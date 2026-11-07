@@ -51,6 +51,11 @@ const DIFFICULTY_DOT_COLORS: Record<DifficultyId, string> = {
   infernal: '#ef4444',
 };
 
+const CHARACTER_SELECTION_MUSIC: Record<string, string> = {
+  kayrurururu: '/audio/job-52-audio-1.mp3',
+  derson: '/audio/job-54-audio-1.mp3',
+};
+
 export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame, onUpdateSave }) => {
   const [selectedCharIndex, setSelectedCharIndex] = useState(0);
   const [activeTab, setActiveTab] = useState<'character' | 'shop' | 'missions'>('character');
@@ -65,9 +70,10 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
 
   const handleSelectCharacter = (index: number) => {
     setSelectedCharIndex(index);
-    if (CHARACTERS[index].id === 'kayrurururu') {
+    const musicUrl = CHARACTER_SELECTION_MUSIC[CHARACTERS[index].id];
+    if (musicUrl) {
       selectionAudioRef.current?.pause();
-      const audio = new Audio('/audio/job-52-audio-1.mp3');
+      const audio = new Audio(musicUrl);
       selectionAudioRef.current = audio;
       audio.play().catch(() => {});
     } else {
