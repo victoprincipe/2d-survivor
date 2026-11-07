@@ -70,6 +70,9 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
       const audio = new Audio('/audio/job-52-audio-1.mp3');
       selectionAudioRef.current = audio;
       audio.play().catch(() => {});
+    } else {
+      selectionAudioRef.current?.pause();
+      selectionAudioRef.current = null;
     }
   };
 
