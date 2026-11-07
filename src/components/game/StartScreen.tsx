@@ -65,6 +65,7 @@ const DIFFICULTY_DOT_COLORS: Record<DifficultyId, string> = {
 const CHARACTER_SELECTION_MUSIC: Record<string, string> = {
   kayrurururu: '/audio/job-57-audio-1.mp3',
   derson: '/audio/job-54-audio-1.mp3',
+  lula: '/audio/job-63-audio-1.mp3',
 };
 
 // Per-character music volume multiplier, applied on top of the selection volume slider.
