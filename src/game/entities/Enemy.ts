@@ -93,6 +93,43 @@ export class Enemy {
         this.xpValue = 20;
         this.knockbackResistance = 0.58;
         break;
+      // Amazon Forest basics: deliberately fragile and quick.
+      case 'bullet_ant':
+        this.name = 'Formiga-bala';
+        this.radius = 9;
+        this.maxHp = Math.round(12 * hpMultiplier);
+        this.speed = 210;
+        this.damage = 6;
+        this.xpValue = 4;
+        this.knockbackResistance = 1.35;
+        break;
+      case 'leafcutter_ant':
+        this.name = 'Formiga-cortadeira';
+        this.radius = 13;
+        this.maxHp = Math.round(26 * hpMultiplier);
+        this.speed = 148;
+        this.damage = 10;
+        this.xpValue = 7;
+        this.knockbackResistance = 0.9;
+        break;
+      case 'blue_butterfly':
+        this.name = 'Borboleta-azul';
+        this.radius = 10;
+        this.maxHp = Math.round(14 * hpMultiplier);
+        this.speed = 185;
+        this.damage = 7;
+        this.xpValue = 5;
+        this.knockbackResistance = 1.25;
+        break;
+      case 'cicada':
+        this.name = 'Cigarra';
+        this.radius = 12;
+        this.maxHp = Math.round(20 * hpMultiplier);
+        this.speed = 165;
+        this.damage = 8;
+        this.xpValue = 6;
+        this.knockbackResistance = 1.1;
+        break;
       case 'ghost':
         this.name = 'Espectro Noturno';
         this.radius = 16;
@@ -451,6 +488,191 @@ export class Enemy {
       ctx.fillRect(-9, 4, 18, 8);
       ctx.fillStyle = '#fde047';
       ctx.fillRect(1, -7, 3, 3);
+    } else if (this.type === 'bullet_ant') {
+      // Small, glossy black ant with a red warning stripe: long and low.
+      const legPhase = Math.sin(this.animTimer * 4) * 2;
+      ctx.strokeStyle = isFlashing ? '#ffffff' : '#24140d';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(-2, 1);
+      ctx.lineTo(-8, 6 + legPhase);
+      ctx.moveTo(-4, 0);
+      ctx.lineTo(-10, 3 - legPhase);
+      ctx.moveTo(-2, 0);
+      ctx.lineTo(-7, -5 - legPhase);
+      ctx.moveTo(3, 1);
+      ctx.lineTo(8, 6 - legPhase);
+      ctx.moveTo(4, 0);
+      ctx.lineTo(10, 3 + legPhase);
+      ctx.moveTo(3, 0);
+      ctx.lineTo(8, -5 + legPhase);
+      ctx.stroke();
+
+      if (!isFlashing) ctx.fillStyle = '#2b1a12';
+      ctx.beginPath();
+      ctx.ellipse(-7, 1, 6, 4, -0.15, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(1, 0, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(7, -1, 3.2, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#dc2626';
+      ctx.fillRect(-10, -1.5, 3, 2);
+      ctx.fillRect(-3, -1.5, 3, 2);
+
+      ctx.strokeStyle = isFlashing ? '#ffffff' : '#24140d';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(8, -3);
+      ctx.lineTo(13, -6);
+      ctx.moveTo(9, -2);
+      ctx.lineTo(14, -2);
+      ctx.moveTo(9, 1);
+      ctx.lineTo(12, 4);
+      ctx.stroke();
+
+      if (!isFlashing) ctx.fillStyle = '#fde68a';
+      ctx.fillRect(7, -2, 1.5, 1.5);
+    } else if (this.type === 'leafcutter_ant') {
+      // Bulky reddish-brown ant carrying a bright green leaf above its head.
+      const legPhase = Math.sin(this.animTimer * 3.2) * 2.4;
+      ctx.strokeStyle = isFlashing ? '#ffffff' : '#3f1d10';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-5, 2);
+      ctx.lineTo(-12, 8 + legPhase);
+      ctx.moveTo(-6, 1);
+      ctx.lineTo(-14, 4 - legPhase);
+      ctx.moveTo(-5, 0);
+      ctx.lineTo(-11, -5 - legPhase);
+      ctx.moveTo(4, 2);
+      ctx.lineTo(11, 8 - legPhase);
+      ctx.moveTo(5, 1);
+      ctx.lineTo(13, 4 + legPhase);
+      ctx.moveTo(4, 0);
+      ctx.lineTo(10, -5 + legPhase);
+      ctx.stroke();
+
+      if (!isFlashing) ctx.fillStyle = '#7f2d1a';
+      ctx.beginPath();
+      ctx.ellipse(-8, 1, 8, 6, -0.1, 0, Math.PI * 2);
+      ctx.fill();
+      if (!isFlashing) ctx.fillStyle = '#a8432a';
+      ctx.beginPath();
+      ctx.arc(1, 0, 5, 0, Math.PI * 2);
+      ctx.fill();
+      if (!isFlashing) ctx.fillStyle = '#4d1f12';
+      ctx.beginPath();
+      ctx.arc(8, -1, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = isFlashing ? '#ffffff' : '#2f130a';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(10, -3);
+      ctx.lineTo(14, -6);
+      ctx.moveTo(11, 0);
+      ctx.lineTo(15, 2);
+      ctx.stroke();
+
+      // Leaf fragment held over the body.
+      if (!isFlashing) ctx.fillStyle = '#22c55e';
+      ctx.beginPath();
+      ctx.ellipse(-2, -12, 9, 4.5, -0.4, 0, Math.PI * 2);
+      ctx.fill();
+      if (!isFlashing) {
+        ctx.strokeStyle = '#166534';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(-10, -10);
+        ctx.lineTo(-1, -15);
+        ctx.stroke();
+      }
+
+      if (!isFlashing) ctx.fillStyle = '#fef3c7';
+      ctx.fillRect(6, -3, 2, 2);
+    } else if (this.type === 'blue_butterfly') {
+      // Vivid blue wings that flap, with a thin dark body.
+      const flap = 0.55 + Math.abs(Math.sin(this.animTimer * 2.2)) * 0.45;
+      if (!isFlashing) ctx.fillStyle = '#2563eb';
+      ctx.beginPath();
+      ctx.ellipse(-7, -2, 8, 10 * flap, -0.35, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(7, -2, 8, 10 * flap, 0.35, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#60a5fa';
+      ctx.beginPath();
+      ctx.ellipse(-5, 7, 5.5, 6 * flap, 0.25, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(5, 7, 5.5, 6 * flap, -0.25, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#bfdbfe';
+      ctx.beginPath();
+      ctx.arc(-7, -3, 2, 0, Math.PI * 2);
+      ctx.arc(7, -3, 2, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#0f172a';
+      ctx.beginPath();
+      ctx.ellipse(0, 1, 2.5, 9, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(0, -9, 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = isFlashing ? '#ffffff' : '#1e293b';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(-1, -11);
+      ctx.lineTo(-6, -16);
+      ctx.moveTo(1, -11);
+      ctx.lineTo(6, -16);
+      ctx.stroke();
+    } else if (this.type === 'cicada') {
+      // Wide green body and translucent veined wings.
+      const wingLift = Math.sin(this.animTimer * 1.7) * 2;
+      ctx.globalAlpha = 0.72;
+      if (!isFlashing) ctx.fillStyle = '#a5f3fc';
+      ctx.beginPath();
+      ctx.ellipse(-7, -1 + wingLift, 9, 4.5, -0.35, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(7, -1 + wingLift, 9, 4.5, 0.35, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+
+      if (!isFlashing) ctx.fillStyle = '#4d7c0f';
+      ctx.beginPath();
+      ctx.ellipse(0, 3, 6, 10, 0, 0, Math.PI * 2);
+      ctx.fill();
+      if (!isFlashing) ctx.fillStyle = '#365314';
+      ctx.beginPath();
+      ctx.arc(0, -7, 5, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#ef4444';
+      ctx.beginPath();
+      ctx.arc(-2.5, -8, 1.5, 0, Math.PI * 2);
+      ctx.arc(2.5, -8, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) {
+        ctx.strokeStyle = '#0e7490';
+        ctx.lineWidth = 0.9;
+        ctx.beginPath();
+        ctx.moveTo(-3, 0);
+        ctx.lineTo(-12, -3 + wingLift);
+        ctx.moveTo(3, 0);
+        ctx.lineTo(12, -3 + wingLift);
+        ctx.stroke();
+      }
     } else if (this.type === 'ghost') {
       ctx.globalAlpha = 0.75;
       if (!isFlashing) ctx.fillStyle = '#93c5fd';
