@@ -2,47 +2,13 @@
 
 import React, { useEffect } from 'react';
 import { UpgradeOption } from '@/game/types';
-import {
-  Flame,
-  Wand2,
-  Sword,
-  BookOpen,
-  Shield,
-  Zap,
-  Sparkles,
-  Feather,
-  Heart,
-  Clock,
-  Compass,
-  Crosshair,
-  Crown,
-  BowArrow,
-  Utensils,
-  Syringe,
-} from 'lucide-react';
+import { renderNamedIcon } from './GameIcons';
+import { Crown, Sparkles } from 'lucide-react';
 
 interface LevelUpModalProps {
   options: UpgradeOption[];
   onSelect: (option: UpgradeOption) => void;
 }
-
-const ICON_MAP: Record<string, React.ReactNode> = {
-  Flame: <Flame className="w-8 h-8 text-orange-400" />,
-  Wand2: <Wand2 className="w-8 h-8 text-blue-400" />,
-  Sword: <Sword className="w-8 h-8 text-slate-200" />,
-  BookOpen: <BookOpen className="w-8 h-8 text-indigo-400" />,
-  Shield: <Shield className="w-8 h-8 text-yellow-300" />,
-  Zap: <Zap className="w-8 h-8 text-cyan-300" />,
-  Sparkles: <Sparkles className="w-8 h-8 text-emerald-400" />,
-  Feather: <Feather className="w-8 h-8 text-sky-400" />,
-  Heart: <Heart className="w-8 h-8 text-rose-400" />,
-  Clock: <Clock className="w-8 h-8 text-purple-400" />,
-  Compass: <Compass className="w-8 h-8 text-amber-400" />,
-  Crosshair: <Crosshair className="w-8 h-8 text-red-400" />,
-  BowArrow: <BowArrow className="w-8 h-8 text-lime-400" />,
-  Utensils: <Utensils className="w-8 h-8 text-amber-300" />,
-  Syringe: <Syringe className="w-8 h-8 text-cyan-300" />,
-};
 
 export const LevelUpModal: React.FC<LevelUpModalProps> = ({ options, onSelect }) => {
   useEffect(() => {
@@ -68,7 +34,7 @@ export const LevelUpModal: React.FC<LevelUpModalProps> = ({ options, onSelect })
         </div>
 
         <p className="text-slate-400 text-xs sm:text-sm mt-4 mb-5 text-center">
-          Escolha uma bênção ou aprimoramento para sua jornada de sobrevivência:
+          Escolha uma arma ou passivo para compor sua sinergia de evolução:
         </p>
 
         {/* Upgrade Cards Grid */}
@@ -82,7 +48,9 @@ export const LevelUpModal: React.FC<LevelUpModalProps> = ({ options, onSelect })
                 className={`group w-full flex items-center gap-4 p-3.5 sm:p-4 rounded-xl border-2 transition-all duration-150 text-left cursor-pointer active:scale-[0.99] relative overflow-hidden ${
                   isEvolution
                     ? 'bg-gradient-to-r from-purple-950/80 via-slate-900 to-rose-950/80 border-amber-400 hover:border-amber-300 shadow-lg shadow-purple-500/20'
-                    : 'bg-slate-900/90 hover:bg-slate-850 border-slate-700/80 hover:border-amber-500/80 shadow-md'
+                    : opt.hasSynergyOwned
+                      ? 'bg-slate-900/95 hover:bg-slate-850 border-emerald-500/70 hover:border-amber-400 shadow-md shadow-emerald-500/10'
+                      : 'bg-slate-900/90 hover:bg-slate-850 border-slate-700/80 hover:border-amber-500/80 shadow-md'
                 }`}
               >
                 {/* Keyboard shortcut badge */}
@@ -92,18 +60,18 @@ export const LevelUpModal: React.FC<LevelUpModalProps> = ({ options, onSelect })
 
                 {/* Icon Box */}
                 <div
-                  className={`w-14 h-14 rounded-xl flex items-center justify-center border shadow-inner ${
+                  className={`w-14 h-14 shrink-0 rounded-xl flex items-center justify-center border shadow-inner ${
                     isEvolution
                       ? 'bg-purple-900/50 border-amber-400'
                       : 'bg-slate-950 border-slate-700 group-hover:border-slate-500'
                   }`}
                 >
-                  {ICON_MAP[opt.iconName] || <Flame className="w-8 h-8 text-amber-400" />}
+                  {renderNamedIcon(opt.iconName, 'w-8 h-8')}
                 </div>
 
                 {/* Info Text */}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
                     <h3 className="font-bold text-base sm:text-lg text-white group-hover:text-amber-300 transition truncate">
                       {opt.name}
                     </h3>
@@ -115,11 +83,25 @@ export const LevelUpModal: React.FC<LevelUpModalProps> = ({ options, onSelect })
                       </span>
                     ) : opt.isNew ? (
                       <span className="bg-blue-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
-                        NOVO
+                        {opt.type === 'weapon' ? 'NOVA ARMA' : 'NOVO PASSIVO'}
                       </span>
                     ) : (
                       <span className="bg-slate-800 text-amber-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-slate-700">
                         Nível {opt.level}
+                      </span>
+                    )}
+
+                    {/* Synergy Partner Badge */}
+                    {opt.synergyWith && !isEvolution && (
+                      <span
+                        className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                          opt.hasSynergyOwned
+                            ? 'bg-emerald-950/90 border-emerald-500/80 text-emerald-300'
+                            : 'bg-slate-950/80 border-slate-700 text-slate-400'
+                        }`}
+                      >
+                        <Sparkles className="w-2.5 h-2.5" />
+                        {opt.hasSynergyOwned ? `Sinergia Ativa: ${opt.synergyWith}` : `Par: ${opt.synergyWith}`}
                       </span>
                     )}
                   </div>
@@ -136,7 +118,7 @@ export const LevelUpModal: React.FC<LevelUpModalProps> = ({ options, onSelect })
         <div className="mt-4 text-slate-500 text-[11px] text-center">
           Pressione <span className="text-amber-400 font-mono">[1]</span>,{' '}
           <span className="text-amber-400 font-mono">[2]</span> ou{' '}
-          <span className="text-amber-400 font-mono">[3]</span> no teclado
+          <span className="text-amber-400 font-mono">[3]</span> no teclado • Evoluções ocorrem nos Baús de Elite
         </div>
       </div>
     </div>

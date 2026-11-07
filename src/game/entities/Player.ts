@@ -23,20 +23,31 @@ export class Player {
   public baseSpeed: number = 160;
   public speed: number = 160;
 
-  // Modifiers
+  // Combat & Global Passive Modifiers
   public might: number = 1.0; // Damage multiplier
   public armor: number = 0; // Flat damage reduction
-  public cooldownReduction: number = 0; // 0 to 0.5
-  public projectileSpeedMultiplier: number = 1;
+  public cooldownReduction: number = 0; // Capped at 0.55
+  public projectileSpeedMultiplier: number = 1.0;
+  public areaMultiplier: number = 1.0;
+  public durationMultiplier: number = 1.0;
+  public critChance: number = 0.05;
+  public critMultiplier: number = 1.75;
+  public bonusAmount: number = 0;
+  public bonusPierce: number = 0;
+  public knockbackMultiplier: number = 1.0;
+  public debuffDamageBonus: number = 0;
+  public luck: number = 0;
+
   public pickupRadius: number = 65;
   public xpMultiplier: number = 1.0;
   public goldMultiplier: number = 1.0;
   public recoveryPerSec: number = 0;
+  public speedBoostTimer: number = 0;
 
   // Progression
   public level: number = 1;
   public xp: number = 0;
-  public xpToNextLevel: number = 12;
+  public xpToNextLevel: number = Player.computeXpToNextLevel(1);
 
   // State & Animations
   public facingX: number = 1;
@@ -48,6 +59,11 @@ export class Player {
   public character: CharacterConfig;
   public powerUps: PermanentPowerUps = {};
   private spriteImage: HTMLImageElement | null = null;
+
+  public static computeXpToNextLevel(level: number): number {
+    const lv = Math.max(0, level - 1);
+    return Math.floor(10 + 8 * lv + 2.15 * Math.pow(lv, 1.82));
+  }
 
   constructor(character: CharacterConfig, initialPowerUps: PermanentPowerUps = {}) {
     this.character = character;
@@ -66,14 +82,17 @@ export class Player {
     if (b.cooldownReduction) this.cooldownReduction += b.cooldownReduction;
     if (b.pickupRadius) this.pickupRadius += b.pickupRadius;
     if (b.xpMultiplier) this.xpMultiplier += b.xpMultiplier;
-    if (b.speed) this.baseSpeed *= (1 + b.speed);
+    if (b.recovery) this.recoveryPerSec += b.recovery;
+    if (b.critChance) this.critChance += b.critChance;
+    if (b.area) this.areaMultiplier += b.area;
+    if (b.speed) this.baseSpeed *= 1 + b.speed;
 
     // Apply permanent power-up bonuses
     if (initialPowerUps.might) this.might += initialPowerUps.might * 0.05;
     if (initialPowerUps.armor) this.armor += initialPowerUps.armor * 1;
     if (initialPowerUps.maxHp) this.maxHp += initialPowerUps.maxHp * 10;
     if (initialPowerUps.recovery) this.recoveryPerSec += initialPowerUps.recovery * 0.5;
-    if (initialPowerUps.speed) this.baseSpeed *= (1 + initialPowerUps.speed * 0.05);
+    if (initialPowerUps.speed) this.baseSpeed *= 1 + initialPowerUps.speed * 0.05;
     if (initialPowerUps.greed) this.goldMultiplier += initialPowerUps.greed * 0.15;
 
     this.hp = this.maxHp;
@@ -86,6 +105,10 @@ export class Player {
       this.invulnerableTimer -= dt;
     }
 
+    if (this.speedBoostTimer > 0) {
+      this.speedBoostTimer -= dt;
+    }
+
     // Health recovery
     if (this.recoveryPerSec > 0 && this.hp < this.maxHp) {
       this.hp = Math.min(this.maxHp, this.hp + this.recoveryPerSec * dt);
@@ -96,9 +119,11 @@ export class Player {
     const dy = input.dy;
     this.isMoving = Math.abs(dx) > 0.05 || Math.abs(dy) > 0.05;
 
+    const effectiveSpeed = this.speedBoostTimer > 0 ? this.speed * 1.15 : this.speed;
+
     if (this.isMoving) {
-      this.x += dx * this.speed * dt;
-      this.y += dy * this.speed * dt;
+      this.x += dx * effectiveSpeed * dt;
+      this.y += dy * effectiveSpeed * dt;
       this.facingX = input.facingX;
       this.facingY = input.facingY;
       this.walkAnimTimer += dt * 10;
@@ -112,7 +137,7 @@ export class Player {
   takeDamage(amount: number): boolean {
     if (this.invulnerableTimer > 0) return false;
 
-    const reducedAmount = Math.max(1, amount - this.armor);
+    const reducedAmount = Math.max(1, Math.round(amount - this.armor));
     this.hp -= reducedAmount;
     this.invulnerableTimer = 0.5; // Half-second i-frames
 
@@ -127,15 +152,19 @@ export class Player {
     this.hp = Math.min(this.maxHp, this.hp + amount);
   }
 
-  addXp(amount: number): boolean {
-    this.xp += amount * this.xpMultiplier;
+  checkLevelUp(): boolean {
     if (this.xp >= this.xpToNextLevel) {
       this.xp -= this.xpToNextLevel;
       this.level += 1;
-      this.xpToNextLevel = Math.floor(12 * Math.pow(1.28, this.level - 1));
-      return true; // Level up!
+      this.xpToNextLevel = Player.computeXpToNextLevel(this.level);
+      return true;
     }
     return false;
+  }
+
+  addXp(amount: number): boolean {
+    this.xp += amount * this.xpMultiplier;
+    return this.checkLevelUp();
   }
 
   render(ctx: CanvasRenderingContext2D, camera: Camera): void {

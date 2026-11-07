@@ -1,6 +1,13 @@
-import { EnemyType } from '../types';
+import { EnemyType, WeaponId } from '../types';
 import { Camera } from '../engine/Camera';
 import { Player } from './Player';
+
+export type BossOrEliteState =
+  | 'idle'
+  | 'telegraph_dash'
+  | 'dashing'
+  | 'telegraph_nova'
+  | 'telegraph_summon';
 
 export class Enemy {
   public id: number;
@@ -14,6 +21,7 @@ export class Enemy {
   public speed: number;
   public damage: number;
   public xpValue: number;
+  public knockbackResistance: number = 1.0;
 
   public knockbackX: number = 0;
   public knockbackY: number = 0;
@@ -23,6 +31,33 @@ export class Enemy {
   public isElite: boolean = false;
   public name: string = '';
   private spriteImage: HTMLImageElement | null = null;
+
+  // Combat Status & Debuffs
+  public slowTimer: number = 0;
+  public slowFactor: number = 0;
+  public vulnerableTimer: number = 0;
+  public vulnerableBonus: number = 0;
+  public poisonTimer: number = 0;
+  public poisonDps: number = 0;
+  public poisonSourceWeapon: WeaponId | null = null;
+  public isContagious: boolean = false;
+  public bleedTimer: number = 0;
+  public bleedDps: number = 0;
+  public bleedSourceWeapon: WeaponId | null = null;
+  public dotTickTimer: number = 0.5;
+  public soulEaterMarkTimer: number = 0;
+
+  // Elite / Boss Special Skill State
+  public skillCooldown: number = 4.5;
+  public skillState: BossOrEliteState = 'idle';
+  public skillStateTimer: number = 0;
+  public skillDuration: number = 0.75;
+  public bossSkillIndex: number = 0;
+  public dashDirX: number = 0;
+  public dashDirY: number = 0;
+  public novaRadius: number = 140;
+  public pendingNovaBurst: boolean = false;
+  public pendingSummonCount: number = 0;
 
   constructor(id: number, type: EnemyType, x: number, y: number, hpMultiplier: number = 1.0) {
     this.id = id;
@@ -34,52 +69,60 @@ export class Enemy {
       case 'bat':
         this.name = 'Morcego Carniceiro';
         this.radius = 12;
-        this.maxHp = Math.round(15 * hpMultiplier);
-        this.speed = 135;
+        this.maxHp = Math.round(16 * hpMultiplier);
+        this.speed = 138 * 0.9;
         this.damage = 8;
         this.xpValue = 5;
+        this.knockbackResistance = 1.15;
         break;
       case 'skeleton':
         this.name = 'Esqueleto Guerreiro';
         this.radius = 15;
-        this.maxHp = Math.round(35 * hpMultiplier);
-        this.speed = 70;
+        this.maxHp = Math.round(36 * hpMultiplier);
+        this.speed = 82 * 0.9;
         this.damage = 12;
-        this.xpValue = 10;
+        this.xpValue = 11;
+        this.knockbackResistance = 0.9;
         break;
       case 'zombie':
         this.name = 'Zumbi Decomposto';
         this.radius = 17;
-        this.maxHp = Math.round(80 * hpMultiplier);
-        this.speed = 45;
+        this.maxHp = Math.round(78 * hpMultiplier);
+        this.speed = 54 * 0.9;
         this.damage = 18;
         this.xpValue = 20;
+        this.knockbackResistance = 0.58;
         break;
       case 'ghost':
         this.name = 'Espectro Noturno';
         this.radius = 16;
-        this.maxHp = Math.round(60 * hpMultiplier);
-        this.speed = 65;
-        this.damage = 14;
-        this.xpValue = 15;
+        this.maxHp = Math.round(58 * hpMultiplier);
+        this.speed = 84 * 0.9;
+        this.damage = 15;
+        this.xpValue = 16;
+        this.knockbackResistance = 0.35;
         break;
       case 'elite_minotaur':
         this.name = 'Minotauro Elite';
         this.radius = 28;
-        this.maxHp = Math.round(550 * hpMultiplier);
-        this.speed = 85;
-        this.damage = 25;
-        this.xpValue = 150;
+        this.maxHp = Math.round(540 * hpMultiplier);
+        this.speed = 92 * 0.9;
+        this.damage = 24;
+        this.xpValue = 140;
         this.isElite = true;
+        this.knockbackResistance = 0.25;
+        this.skillCooldown = 4.0 + Math.random() * 2.0;
         break;
       case 'boss_vampire':
         this.name = 'Senhor da Corrupçao (Chefe Final)';
         this.radius = 36;
-        this.maxHp = Math.round(2400 * hpMultiplier);
-        this.speed = 95;
-        this.damage = 35;
+        this.maxHp = Math.round(3100 * hpMultiplier);
+        this.speed = 98;
+        this.damage = 34;
         this.xpValue = 500;
         this.isBoss = true;
+        this.knockbackResistance = 0.06;
+        this.skillCooldown = 4.2;
         if (typeof window !== 'undefined') {
           this.spriteImage = new Image();
           this.spriteImage.src = '/boss-lula.gif';
@@ -87,18 +130,83 @@ export class Enemy {
         break;
     }
 
-    // Reduce all monster movement speed by 10%
-    this.speed *= 0.9;
-
     this.hp = this.maxHp;
+  }
+
+  public isDebuffed(): boolean {
+    return (
+      this.slowTimer > 0 ||
+      this.vulnerableTimer > 0 ||
+      this.poisonTimer > 0 ||
+      this.bleedTimer > 0
+    );
+  }
+
+  public applySlow(factor: number, duration: number): void {
+    const effective = this.isBoss ? Math.min(0.2, factor * 0.5) : this.isElite ? factor * 0.75 : factor;
+    if (effective >= this.slowFactor || this.slowTimer <= 0) {
+      this.slowFactor = effective;
+    }
+    this.slowTimer = Math.max(this.slowTimer, duration);
+  }
+
+  public applyVulnerability(bonus: number, duration: number): void {
+    this.vulnerableBonus = Math.max(this.vulnerableBonus, bonus);
+    this.vulnerableTimer = Math.max(this.vulnerableTimer, duration);
+  }
+
+  public applyPoison(dps: number, duration: number, source: WeaponId, contagious: boolean): void {
+    this.poisonDps = Math.max(this.poisonDps, dps);
+    this.poisonTimer = Math.max(this.poisonTimer, duration);
+    this.poisonSourceWeapon = source;
+    if (contagious) {
+      this.isContagious = true;
+    }
+  }
+
+  public applyBleed(dpsAdd: number, maxDps: number, duration: number, source: WeaponId): void {
+    this.bleedDps = Math.min(maxDps, (this.bleedTimer > 0 ? this.bleedDps : 0) + dpsAdd);
+    this.bleedTimer = Math.max(this.bleedTimer, duration);
+    this.bleedSourceWeapon = source;
+  }
+
+  public computeDamageTaken(rawAmount: number, playerDebuffBonus: number = 0): number {
+    let mult = 1.0;
+    if (this.vulnerableTimer > 0) {
+      mult *= 1 + this.vulnerableBonus;
+    }
+    if (playerDebuffBonus > 0 && this.isDebuffed()) {
+      mult *= 1 + playerDebuffBonus;
+    }
+    return rawAmount * mult;
   }
 
   update(dt: number, player: Player, separation: { vx: number; vy: number }): boolean {
     this.animTimer += dt * 8;
 
-    // Hit flash decay
-    if (this.hitFlashTimer > 0) {
-      this.hitFlashTimer -= dt;
+    // Decay timers
+    if (this.hitFlashTimer > 0) this.hitFlashTimer -= dt;
+    if (this.slowTimer > 0) {
+      this.slowTimer -= dt;
+      if (this.slowTimer <= 0) this.slowFactor = 0;
+    }
+    if (this.vulnerableTimer > 0) {
+      this.vulnerableTimer -= dt;
+      if (this.vulnerableTimer <= 0) this.vulnerableBonus = 0;
+    }
+    if (this.poisonTimer > 0) {
+      this.poisonTimer -= dt;
+      if (this.poisonTimer <= 0) {
+        this.poisonDps = 0;
+        this.isContagious = false;
+      }
+    }
+    if (this.bleedTimer > 0) {
+      this.bleedTimer -= dt;
+      if (this.bleedTimer <= 0) this.bleedDps = 0;
+    }
+    if (this.soulEaterMarkTimer > 0) {
+      this.soulEaterMarkTimer -= dt;
     }
 
     // Knockback decay
@@ -107,24 +215,51 @@ export class Enemy {
     this.knockbackX *= Math.pow(0.05, dt);
     this.knockbackY *= Math.pow(0.05, dt);
 
-    // Follow player direction
     const dx = player.x - this.x;
     const dy = player.y - this.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
+    const speedMult = this.slowTimer > 0 ? Math.max(0.35, 1 - this.slowFactor) : 1.0;
 
+    // Elite & Boss special skill state machine
+    if (this.isElite || this.isBoss) {
+      this.updateSpecialSkills(dt, dx, dy, dist, speedMult);
+    }
+
+    if (this.skillState === 'dashing') {
+      const dashSpeed = (this.isBoss ? 275 : 210) * speedMult;
+      this.x += this.dashDirX * dashSpeed * dt;
+      this.y += this.dashDirY * dashSpeed * dt;
+      return this.hp > 0;
+    }
+
+    if (
+      this.skillState === 'telegraph_dash' ||
+      this.skillState === 'telegraph_nova' ||
+      this.skillState === 'telegraph_summon'
+    ) {
+      // Slow ominous step while telegraphing
+      if (dist > 0) {
+        this.x += (dx / dist) * this.speed * 0.25 * speedMult * dt;
+        this.y += (dy / dist) * this.speed * 0.25 * speedMult * dt;
+      }
+      return this.hp > 0;
+    }
+
+    // Standard movement towards player
     if (dist > 0) {
-      let vx = (dx / dist) * this.speed;
-      let vy = (dy / dist) * this.speed;
+      const currentSpeed = this.speed * speedMult;
+      let vx = (dx / dist) * currentSpeed;
+      let vy = (dy / dist) * currentSpeed;
 
       // Add separation force from flocking
-      vx += separation.vx * this.speed * 0.8;
-      vy += separation.vy * this.speed * 0.8;
+      vx += separation.vx * currentSpeed * 0.8;
+      vy += separation.vy * currentSpeed * 0.8;
 
       // Special ghost waving movement
       if (this.type === 'ghost') {
         const perpX = -dy / dist;
         const perpY = dx / dist;
-        const wave = Math.sin(this.animTimer * 1.5) * 40;
+        const wave = Math.sin(this.animTimer * 1.5) * 44 * speedMult;
         vx += perpX * wave;
         vy += perpY * wave;
       }
@@ -136,28 +271,123 @@ export class Enemy {
     return this.hp > 0;
   }
 
+  private updateSpecialSkills(dt: number, dx: number, dy: number, dist: number, speedMult: number): void {
+    if (this.skillState === 'idle') {
+      this.skillCooldown -= dt * speedMult;
+      if (this.skillCooldown <= 0 && dist < 520) {
+        if (this.isElite) {
+          // Elite Bull Charge
+          const norm = dist > 0 ? dist : 1;
+          this.dashDirX = dx / norm;
+          this.dashDirY = dy / norm;
+          this.skillState = 'telegraph_dash';
+          this.skillDuration = 0.65;
+          this.skillStateTimer = 0.65;
+        } else if (this.isBoss) {
+          const skill = this.bossSkillIndex % 3;
+          this.bossSkillIndex += 1;
+
+          if (skill === 0) {
+            const norm = dist > 0 ? dist : 1;
+            this.dashDirX = dx / norm;
+            this.dashDirY = dy / norm;
+            this.skillState = 'telegraph_dash';
+            this.skillDuration = 0.75;
+            this.skillStateTimer = 0.75;
+          } else if (skill === 1) {
+            this.skillState = 'telegraph_nova';
+            this.skillDuration = 0.85;
+            this.skillStateTimer = 0.85;
+          } else {
+            this.skillState = 'telegraph_summon';
+            this.skillDuration = 0.6;
+            this.skillStateTimer = 0.6;
+          }
+        }
+      }
+      return;
+    }
+
+    this.skillStateTimer -= dt;
+    if (this.skillStateTimer > 0) return;
+
+    if (this.skillState === 'telegraph_dash') {
+      this.skillState = 'dashing';
+      this.skillDuration = this.isBoss ? 0.65 : 0.68;
+      this.skillStateTimer = this.skillDuration;
+    } else if (this.skillState === 'dashing') {
+      this.skillState = 'idle';
+      this.skillCooldown = this.isBoss ? 4.8 : 6.2;
+    } else if (this.skillState === 'telegraph_nova') {
+      this.pendingNovaBurst = true;
+      this.skillState = 'idle';
+      this.skillCooldown = 5.0;
+    } else if (this.skillState === 'telegraph_summon') {
+      this.pendingSummonCount = 6;
+      this.skillState = 'idle';
+      this.skillCooldown = 5.4;
+    }
+  }
+
   takeDamage(amount: number, knockX: number = 0, knockY: number = 0, knockForce: number = 200): boolean {
     this.hp -= amount;
     this.hitFlashTimer = 0.12;
 
-    // Apply knockback (elites and bosses have heavy resistance)
-    const resistance = this.isBoss ? 0.08 : this.isElite ? 0.35 : 1.0;
-    this.knockbackX += knockX * knockForce * resistance;
-    this.knockbackY += knockY * knockForce * resistance;
+    this.knockbackX += knockX * knockForce * this.knockbackResistance;
+    this.knockbackY += knockY * knockForce * this.knockbackResistance;
 
     return this.hp <= 0;
   }
 
   render(ctx: CanvasRenderingContext2D, camera: Camera): void {
-    if (!camera.isInView(this.x, this.y, 60)) return;
+    if (!camera.isInView(this.x, this.y, 160)) return;
 
     const screen = camera.worldToScreen(this.x, this.y);
     const flip = this.x > camera.x ? -1 : 1;
 
+    // Render Boss / Elite Telegraphs beneath character
+    if (this.skillState === 'telegraph_dash') {
+      const progress = 1 - Math.max(0, this.skillStateTimer / Math.max(0.1, this.skillDuration));
+      const lineLen = this.isBoss ? 185 : 145;
+      ctx.save();
+      ctx.strokeStyle = this.isBoss ? `rgba(239, 68, 68, ${0.4 + progress * 0.5})` : `rgba(249, 115, 22, ${0.4 + progress * 0.5})`;
+      ctx.lineWidth = this.radius * 1.1;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(screen.x, screen.y);
+      ctx.lineTo(screen.x + this.dashDirX * lineLen, screen.y + this.dashDirY * lineLen);
+      ctx.stroke();
+      ctx.restore();
+    } else if (this.skillState === 'telegraph_nova') {
+      const progress = 1 - Math.max(0, this.skillStateTimer / Math.max(0.1, this.skillDuration));
+      ctx.save();
+      ctx.fillStyle = `rgba(220, 38, 38, ${0.12 + progress * 0.22})`;
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(screen.x, screen.y, this.novaRadius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.strokeStyle = 'rgba(254, 202, 202, 0.8)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(screen.x, screen.y, this.novaRadius * progress, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    } else if (this.skillState === 'telegraph_summon') {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(168, 85, 247, 0.8)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(screen.x, screen.y, this.radius + 18, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
     ctx.save();
     ctx.translate(screen.x, screen.y);
 
-    // Hit flash white
     const isFlashing = this.hitFlashTimer > 0;
 
     // Shadow
@@ -165,6 +395,20 @@ export class Enemy {
     ctx.beginPath();
     ctx.ellipse(0, this.radius * 0.9, this.radius, this.radius * 0.45, 0, 0, Math.PI * 2);
     ctx.fill();
+
+    // Subtle Status Ring Indicators
+    if (this.vulnerableTimer > 0 || this.poisonTimer > 0 || this.slowTimer > 0) {
+      ctx.strokeStyle =
+        this.poisonTimer > 0
+          ? 'rgba(34, 211, 238, 0.75)'
+          : this.vulnerableTimer > 0
+            ? 'rgba(250, 204, 21, 0.7)'
+            : 'rgba(56, 189, 248, 0.7)';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.ellipse(0, this.radius * 0.85, this.radius + 3, this.radius * 0.55, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
 
     ctx.scale(flip, 1);
 
@@ -175,11 +419,9 @@ export class Enemy {
     if (this.type === 'bat') {
       const wingFlap = Math.sin(this.animTimer) * 10;
       if (!isFlashing) ctx.fillStyle = '#6b21a8';
-      // Body
       ctx.beginPath();
       ctx.arc(0, 0, 8, 0, Math.PI * 2);
       ctx.fill();
-      // Wings
       ctx.beginPath();
       ctx.moveTo(0, 0);
       ctx.lineTo(-15, -6 + wingFlap);
@@ -188,32 +430,25 @@ export class Enemy {
       ctx.lineTo(15, -6 + wingFlap);
       ctx.lineTo(6, 2);
       ctx.fill();
-      // Eyes
       ctx.fillStyle = '#ef4444';
       ctx.fillRect(-2, -2, 2, 2);
       ctx.fillRect(2, -2, 2, 2);
     } else if (this.type === 'skeleton') {
       if (!isFlashing) ctx.fillStyle = '#e2e8f0';
-      // Skull
       ctx.beginPath();
       ctx.arc(0, -6, 9, 0, Math.PI * 2);
       ctx.fill();
-      // Ribs / Spine
       ctx.fillRect(-6, 3, 12, 10);
-      // Eye sockets
       ctx.fillStyle = '#0f172a';
       ctx.fillRect(-4, -8, 3, 3);
       ctx.fillRect(2, -8, 3, 3);
     } else if (this.type === 'zombie') {
       if (!isFlashing) ctx.fillStyle = '#4d7c0f';
-      // Body
       ctx.beginPath();
       ctx.roundRect(-9, -10, 18, 22, 4);
       ctx.fill();
-      // Tattered clothes
       ctx.fillStyle = '#3f3f46';
       ctx.fillRect(-9, 4, 18, 8);
-      // Yellow eyes
       ctx.fillStyle = '#fde047';
       ctx.fillRect(1, -7, 3, 3);
     } else if (this.type === 'ghost') {
@@ -228,7 +463,6 @@ export class Enemy {
       ctx.lineTo(-11, 8);
       ctx.closePath();
       ctx.fill();
-      // Hollow eyes
       ctx.fillStyle = '#1e3a8a';
       ctx.beginPath();
       ctx.arc(-3, -5, 2.5, 0, Math.PI * 2);
@@ -236,12 +470,10 @@ export class Enemy {
       ctx.fill();
       ctx.globalAlpha = 1.0;
     } else if (this.type === 'elite_minotaur') {
-      if (!isFlashing) ctx.fillStyle = '#991b1b';
-      // Massive body
+      if (!isFlashing) ctx.fillStyle = this.skillState === 'dashing' ? '#dc2626' : '#991b1b';
       ctx.beginPath();
       ctx.roundRect(-22, -18, 44, 40, 8);
       ctx.fill();
-      // Horns
       ctx.fillStyle = '#fef08a';
       ctx.beginPath();
       ctx.moveTo(-16, -18);
@@ -251,20 +483,17 @@ export class Enemy {
       ctx.quadraticCurveTo(28, -32, 18, -36);
       ctx.lineTo(12, -22);
       ctx.fill();
-      // Glowing red eyes
       ctx.fillStyle = '#f87171';
       ctx.fillRect(-6, -12, 4, 4);
       ctx.fillRect(4, -12, 4, 4);
     } else if (this.type === 'boss_vampire') {
-      // Crimson Vampire Lord
       if (!isFlashing) {
-        // Red glowing aura
-        const aura = ctx.createRadialGradient(0, 0, 10, 0, 0, 45);
-        aura.addColorStop(0, 'rgba(239, 68, 68, 0.4)');
+        const aura = ctx.createRadialGradient(0, 0, 10, 0, 0, 48);
+        aura.addColorStop(0, 'rgba(239, 68, 68, 0.45)');
         aura.addColorStop(1, 'rgba(239, 68, 68, 0)');
         ctx.fillStyle = aura;
         ctx.beginPath();
-        ctx.arc(0, 0, 45, 0, Math.PI * 2);
+        ctx.arc(0, 0, 48, 0, Math.PI * 2);
         ctx.fill();
       }
 
@@ -296,19 +525,15 @@ export class Enemy {
         ctx.filter = 'none';
       } else {
         if (!isFlashing) ctx.fillStyle = '#450a0a';
-        // Vampire Cape & Body
         ctx.beginPath();
         ctx.roundRect(-24, -20, 48, 46, 10);
         ctx.fill();
-        // Gold trim
         ctx.fillStyle = '#f59e0b';
         ctx.fillRect(-24, 0, 48, 4);
-        // Vampire face
         ctx.fillStyle = '#fce7f3';
         ctx.beginPath();
         ctx.arc(0, -22, 14, 0, Math.PI * 2);
         ctx.fill();
-        // Crimson Eyes & Fangs
         ctx.fillStyle = '#dc2626';
         ctx.fillRect(-5, -24, 4, 3);
         ctx.fillRect(3, -24, 4, 3);
@@ -322,7 +547,7 @@ export class Enemy {
 
     ctx.restore();
 
-    // Health bar for Elites and Bosses
+    // Health bar for Elites
     if (this.isElite) {
       const barW = 44;
       const barH = 5;
@@ -331,7 +556,7 @@ export class Enemy {
       ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
       ctx.fillRect(barX, barY, barW, barH);
       ctx.fillStyle = '#eab308';
-      ctx.fillRect(barX, barY, barW * (this.hp / this.maxHp), barH);
+      ctx.fillRect(barX, barY, barW * Math.max(0, this.hp / this.maxHp), barH);
     }
   }
 }

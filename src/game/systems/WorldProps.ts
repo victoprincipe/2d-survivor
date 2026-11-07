@@ -16,8 +16,8 @@ export class WorldSystem {
   public torches: TorchProp[] = [];
   private nextTorchId: number = 1;
   private torchSpawnTimer: number = 0;
-  private maxTorches: number = 7;
-  private readonly torchSpawnInterval: number = 9; // 1/3 of the previous 3s spawn rate
+  private maxTorches: number = 6;
+  private readonly torchSpawnInterval: number = 13;
 
   private floorImage: HTMLImageElement | null = null;
   private floorPattern: CanvasPattern | null = null;
@@ -39,8 +39,8 @@ export class WorldSystem {
   private rollTorchBuff(): DropType {
     // Healing (chicken) is intentionally excluded from lamps.
     const roll = Math.random();
-    if (roll < 0.6) return 'coin';
-    if (roll < 0.85) return 'magnet';
+    if (roll < 0.72) return 'coin';
+    if (roll < 0.94) return 'magnet';
     return 'rosary';
   }
 

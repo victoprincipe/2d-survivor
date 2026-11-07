@@ -3,7 +3,8 @@
 import React, { useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import { UpgradeOption } from '@/game/types';
-import { Coins, Sparkles } from 'lucide-react';
+import { renderNamedIcon } from './GameIcons';
+import { Coins, Sparkles, Heart } from 'lucide-react';
 
 interface TreasureChestModalProps {
   gold: number;
@@ -13,33 +14,52 @@ interface TreasureChestModalProps {
 
 export const TreasureChestModal: React.FC<TreasureChestModalProps> = ({ gold, upgrade, onClose }) => {
   useEffect(() => {
-    // Fire festive golden confetti burst
     try {
       confetti({
-        particleCount: 70,
-        spread: 60,
+        particleCount: upgrade?.isEvolution ? 110 : 70,
+        spread: upgrade?.isEvolution ? 80 : 60,
         origin: { y: 0.6 },
-        colors: ['#fbbf24', '#f59e0b', '#d97706', '#ef4444', '#ffffff'],
+        colors: ['#fbbf24', '#f59e0b', '#d97706', '#ef4444', '#a855f7', '#ffffff'],
       });
     } catch {
       // Ignore if confetti context not available
     }
-  }, []);
+  }, [upgrade]);
+
+  const isEvo = Boolean(upgrade?.isEvolution);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-gradient-to-b from-slate-900 via-amber-950/40 to-black border-2 border-yellow-500 rounded-2xl shadow-2xl p-6 relative flex flex-col items-center text-center">
+      <div
+        className={`w-full max-w-md bg-gradient-to-b rounded-2xl shadow-2xl p-6 relative flex flex-col items-center text-center border-2 ${
+          isEvo
+            ? 'from-purple-950/90 via-slate-900 to-black border-amber-400 shadow-purple-500/30'
+            : 'from-slate-900 via-amber-950/40 to-black border-yellow-500'
+        }`}
+      >
         {/* Chest Icon / Animation */}
-        <div className="w-20 h-20 bg-gradient-to-br from-amber-400 to-yellow-600 rounded-2xl border-4 border-yellow-200 shadow-xl flex items-center justify-center mb-4 animate-bounce">
-          <Sparkles className="w-10 h-10 text-amber-950" />
+        <div
+          className={`w-20 h-20 rounded-2xl border-4 shadow-xl flex items-center justify-center mb-4 animate-bounce ${
+            isEvo
+              ? 'bg-gradient-to-br from-purple-500 via-rose-500 to-amber-400 border-yellow-200'
+              : 'bg-gradient-to-br from-amber-400 to-yellow-600 border-yellow-200'
+          }`}
+        >
+          {upgrade ? (
+            renderNamedIcon(upgrade.iconName, 'w-10 h-10', 'text-white drop-shadow')
+          ) : (
+            <Sparkles className="w-10 h-10 text-amber-950" />
+          )}
         </div>
 
         <h2 className="text-2xl font-black uppercase tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-200 to-yellow-400 drop-shadow">
-          BAÚ DE TESOURO!
+          {isEvo ? 'ARMA EVOLUÍDA!' : 'BAÚ DE TESOURO!'}
         </h2>
 
         <p className="text-slate-300 text-xs mt-1 mb-5">
-          O monstro de elite deixou despojos valiosos para sua sobrevivência!
+          {isEvo
+            ? 'A sinergia despertou a forma suprema da sua arma!'
+            : 'O monstro de elite deixou despojos valiosos para sua sobrevivência!'}
         </p>
 
         {/* Rewards Box */}
@@ -51,13 +71,24 @@ export const TreasureChestModal: React.FC<TreasureChestModalProps> = ({ gold, up
           </div>
 
           {/* Upgrade reward if provided */}
-          {upgrade && (
+          {upgrade ? (
             <div className="border-t border-slate-800 pt-3 flex flex-col items-center">
-              <span className="text-[10px] text-amber-400 uppercase font-black tracking-wider mb-1">
-                Bônus Adicional Concedido:
+              <span
+                className={`text-[10px] uppercase font-black tracking-wider mb-1 px-2.5 py-0.5 rounded-full ${
+                  isEvo
+                    ? 'bg-gradient-to-r from-amber-500 to-rose-500 text-slate-950'
+                    : 'text-amber-400'
+                }`}
+              >
+                {isEvo ? '🔥 Evolução Suprema Concedida' : `Aprimoramento Concedido (Nv. ${upgrade.level})`}
               </span>
-              <span className="text-white font-bold text-base">{upgrade.name}</span>
-              <span className="text-slate-400 text-xs mt-0.5">{upgrade.description}</span>
+              <span className="text-white font-bold text-base mt-1">{upgrade.name}</span>
+              <span className="text-slate-300 text-xs mt-1 leading-relaxed">{upgrade.description}</span>
+            </div>
+          ) : (
+            <div className="border-t border-slate-800 pt-3 flex items-center justify-center gap-1.5 text-emerald-400 text-xs font-bold">
+              <Heart className="w-4 h-4 fill-emerald-400" />
+              <span>Inventário no máximo: +35 HP Recuperado e Ouro Bônus!</span>
             </div>
           )}
         </div>

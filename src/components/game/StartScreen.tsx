@@ -9,10 +9,10 @@ import { DIFFICULTIES, getDifficulty } from '@/game/data/difficulties';
 import { countClaimableMissions, getAccountLevel } from '@/game/data/missions';
 import { WEAPON_REGISTRY } from '@/game/data/upgrades';
 import { MissionsTab } from './MissionsTab';
+import { renderWeaponIcon, renderNamedIcon } from './GameIcons';
 import {
   Flame,
   Sword,
-  Wand2,
   Coins,
   Trophy,
   Skull,
@@ -25,13 +25,6 @@ import {
   Play,
   ShoppingBag,
   Info,
-  Crosshair,
-  Swords,
-  BowArrow,
-  Dumbbell,
-  Bike,
-  Utensils,
-  Syringe,
   Target,
 } from 'lucide-react';
 
@@ -40,16 +33,6 @@ interface StartScreenProps {
   onStartGame: (character: CharacterConfig, savedData: SavedGameData, difficulty: DifficultyId) => void;
   onUpdateSave: (savedData: SavedGameData) => void;
 }
-
-const WEAPON_ICONS: Record<string, React.ReactNode> = {
-  whip: <Flame className="w-5 h-5 text-orange-400" />,
-  wand: <Wand2 className="w-5 h-5 text-blue-400" />,
-  knife: <Sword className="w-5 h-5 text-slate-300" />,
-  bow: <BowArrow className="w-5 h-5 text-lime-400" />,
-  garlic: <Shield className="w-5 h-5 text-emerald-400" />,
-  derson_combo: <Utensils className="w-5 h-5 text-amber-400" />,
-  syringe: <Syringe className="w-5 h-5 text-cyan-400" />,
-};
 
 const POWERUP_ICONS: Record<string, React.ReactNode> = {
   might: <Sparkles className="w-4 h-4 text-orange-400" />,
@@ -66,17 +49,6 @@ const DIFFICULTY_DOT_COLORS: Record<DifficultyId, string> = {
   hard: '#facc15',
   nightmare: '#a855f7',
   infernal: '#ef4444',
-};
-
-const CHARACTER_ICONS: Record<string, React.ReactNode> = {
-  Crosshair: <Crosshair className="w-6 h-6 text-white/90 drop-shadow" />,
-  Sparkles: <Sparkles className="w-6 h-6 text-white/90 drop-shadow" />,
-  Swords: <Swords className="w-6 h-6 text-white/90 drop-shadow" />,
-  Shield: <Shield className="w-6 h-6 text-white/90 drop-shadow" />,
-  Dumbbell: <Dumbbell className="w-6 h-6 text-white/90 drop-shadow" />,
-  Bike: <Bike className="w-6 h-6 text-white/90 drop-shadow" />,
-  Syringe: <Syringe className="w-6 h-6 text-white/90 drop-shadow" />,
-  Utensils: <Utensils className="w-6 h-6 text-white/90 drop-shadow" />,
 };
 
 export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame, onUpdateSave }) => {
@@ -274,7 +246,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
                             className="h-full w-full object-contain drop-shadow"
                           />
                         ) : (
-                          CHARACTER_ICONS[char.iconName] ?? <Sword className="w-6 h-6 text-white/90 drop-shadow" />
+                          renderNamedIcon(char.iconName, 'w-6 h-6', 'text-white/90 drop-shadow')
                         )}
                       </div>
                       <h3 className="font-display text-base font-black text-[#f3f4f6]">{char.name}</h3>
@@ -287,7 +259,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
                         Arma Inicial:
                       </span>
                       <div className="flex items-center gap-1 text-xs font-bold text-[#e5e7eb]">
-                        {WEAPON_ICONS[char.startingWeapon]}
+                        {renderWeaponIcon(char.startingWeapon, 'w-5 h-5')}
                         <span>{startingWeaponMeta.name}</span>
                       </div>
                     </div>

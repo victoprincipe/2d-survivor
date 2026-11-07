@@ -95,6 +95,8 @@ export class GameEngine {
 
     this.player = new Player(character, savedData.powerUps);
     this.weaponSystem = new WeaponSystem(character.startingWeapon);
+    this.weaponSystem.recalculatePlayerStats(this.player);
+    this.player.hp = this.player.maxHp;
 
     // Initial resize
     this.handleResize();
@@ -148,7 +150,7 @@ export class GameEngine {
 
     const rawDt = (currentTime - this.lastTime) / 1000;
     this.lastTime = currentTime;
-    const dt = Math.min(rawDt, 0.1); // Prevent physics explosions after backgrounding
+    const dt = Math.min(rawDt, 0.1);
 
     if (!this.isPaused && !this.isGameOver) {
       this.update(dt);
@@ -160,7 +162,6 @@ export class GameEngine {
   }
 
   private update(dt: number): void {
-    // Update streak timer
     if (this.gemStreakTimer > 0) {
       this.gemStreakTimer -= dt;
       if (this.gemStreakTimer <= 0) this.gemStreak = 0;
@@ -182,7 +183,8 @@ export class GameEngine {
       this.spatialGrid.insert(this.enemies[i]);
     }
 
-    // 4. Update Enemies with soft separation
+    // 4. Update Enemies + Boss Special Attacks
+    const spawnedMinions: Enemy[] = [];
     for (let i = this.enemies.length - 1; i >= 0; i--) {
       const e = this.enemies[i];
       const sep = this.spatialGrid.applySeparation(e, e.radius * 2, 0.45);
@@ -193,7 +195,45 @@ export class GameEngine {
         continue;
       }
 
-      // Check collision with player
+      // Boss Nova Burst Resolution
+      if (e.pendingNovaBurst) {
+        e.pendingNovaBurst = false;
+        this.weaponSystem.spawnRingPulse(e.x, e.y, e.novaRadius, '#ef4444', 0.32);
+        this.sound.playThunder();
+        this.camera.shake(0.25, 6);
+
+        const ndx = this.player.x - e.x;
+        const ndy = this.player.y - e.y;
+        if (Math.sqrt(ndx * ndx + ndy * ndy) <= e.novaRadius + this.player.radius) {
+          const novaDmg = Math.max(1, Math.round(e.damage * 0.85));
+          const fatal = this.player.takeDamage(novaDmg);
+          this.sound.playPlayerHurt();
+          this.vfx.addDamageNumber(this.player.x, this.player.y, novaDmg, true, false);
+          if (fatal) {
+            this.handlePlayerDeath();
+            return;
+          }
+        }
+      }
+
+      // Boss Dark Summon Resolution
+      if (e.pendingSummonCount > 0) {
+        const toSpawn = e.pendingSummonCount;
+        e.pendingSummonCount = 0;
+        if (this.enemies.length + spawnedMinions.length < 400) {
+          this.vfx.addDeathBurst(e.x, e.y, '#a855f7', 16);
+          const minutes = this.waveDirector.survivalTime / 60;
+          const hpMult = (1.0 + minutes * 0.4) * this.difficulty.enemyHp;
+          for (let s = 0; s < toSpawn; s++) {
+            const ang = (s * Math.PI * 2) / toSpawn;
+            const mx = e.x + Math.cos(ang) * 65;
+            const my = e.y + Math.sin(ang) * 65;
+            spawnedMinions.push(this.waveDirector.createEnemy('bat', mx, my, hpMult));
+          }
+        }
+      }
+
+      // Check body collision with player
       const dx = this.player.x - e.x;
       const dy = this.player.y - e.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
@@ -211,6 +251,11 @@ export class GameEngine {
       }
     }
 
+    for (let m = 0; m < spawnedMinions.length; m++) {
+      this.enemies.push(spawnedMinions[m]);
+      this.spatialGrid.insert(spawnedMinions[m]);
+    }
+
     // 5. Update World Props (Torches)
     this.worldProps.update(dt, this.player, (drop) => this.drops.push(drop));
 
@@ -220,15 +265,16 @@ export class GameEngine {
       this.player,
       this.enemies,
       this.spatialGrid,
+      this.camera,
       this.vfx,
       this.sound,
       (enemy) => this.onEnemyKilled(enemy)
     );
 
-    // 6.5. Spawn a random pickup item every 2 minutes
+    // 6.5. Periodic Supply Drop on Map (every 75s)
     this.itemSpawnTimer += dt;
-    if (this.itemSpawnTimer >= 120) {
-      this.itemSpawnTimer -= 120;
+    if (this.itemSpawnTimer >= 75) {
+      this.itemSpawnTimer -= 75;
       this.spawnRandomItem();
     }
 
@@ -265,33 +311,38 @@ export class GameEngine {
   }
 
   private onEnemyKilled(enemy: Enemy): void {
-    // Multiple weapons/projectiles can resolve a kill for the same enemy in a
-    // single frame (the enemy is only removed from the array next update).
-    // Ensure kills, XP, gold and drops are granted exactly once per enemy.
     if (this.processedEnemyDeaths.has(enemy)) return;
     this.processedEnemyDeaths.add(enemy);
 
     this.kills += 1;
-    this.vfx.addDeathBurst(enemy.x, enemy.y, enemy.type === 'bat' ? '#a855f7' : '#ef4444', enemy.isElite ? 25 : 8);
+    this.vfx.addDeathBurst(
+      enemy.x,
+      enemy.y,
+      enemy.type === 'bat' ? '#a855f7' : '#ef4444',
+      enemy.isElite ? 25 : 8
+    );
 
     if (enemy.isBoss) {
-      // Crimson Vampire Boss defeated!
       this.bossesDefeated += 1;
       const bossXp = Math.round(250 * this.difficulty.xpMultiplier);
-      this.drops.push(new Drop(Date.now(), 'chest', enemy.x, enemy.y));
-      this.drops.push(new Drop(Date.now() + 1, 'gem_red', enemy.x + 20, enemy.y, bossXp));
-      this.drops.push(new Drop(Date.now() + 2, 'gem_red', enemy.x - 20, enemy.y, bossXp));
-      this.handleVictory();
+      this.drops.push(new Drop(Date.now() + Math.random(), 'chest', enemy.x, enemy.y));
+      this.drops.push(new Drop(Date.now() + 1 + Math.random(), 'gem_red', enemy.x + 22, enemy.y, bossXp));
+      this.drops.push(new Drop(Date.now() + 2 + Math.random(), 'gem_red', enemy.x - 22, enemy.y, bossXp));
+
+      if (!this.waveDirector.isEndless) {
+        this.handleVictory();
+      } else {
+        this.persistRunStats(false);
+      }
       return;
     }
 
     if (enemy.isElite) {
-      // Drops a guaranteed Treasure Chest!
-      this.drops.push(new Drop(Date.now(), 'chest', enemy.x, enemy.y));
+      this.drops.push(new Drop(Date.now() + Math.random(), 'chest', enemy.x, enemy.y));
+      this.drops.push(new Drop(Date.now() + 1 + Math.random(), 'gem_green', enemy.x + 14, enemy.y, enemy.xpValue));
       return;
     }
 
-    // Standard XP gem drop
     let dropType: Drop['type'] = 'gem_blue';
     if (enemy.xpValue >= 20) {
       dropType = 'gem_green';
@@ -300,20 +351,21 @@ export class GameEngine {
   }
 
   private spawnRandomItem(): void {
+    const luckBias = Math.min(0.12, this.player.luck * 0.25);
     const roll = Math.random();
     let type: Drop['type'] = 'coin';
-    if (roll < 0.5) {
-      type = 'coin';
-    } else if (roll < 0.75) {
+    if (roll < 0.4 + luckBias * 0.5) {
       type = 'chicken';
-    } else if (roll < 0.9) {
+    } else if (roll < 0.75) {
+      type = 'coin';
+    } else if (roll < 0.93) {
       type = 'magnet';
     } else {
       type = 'rosary';
     }
 
     const angle = Math.random() * Math.PI * 2;
-    const dist = 200 + Math.random() * 300;
+    const dist = 200 + Math.random() * 280;
     this.drops.push(
       new Drop(
         Date.now() + Math.random(),
@@ -332,10 +384,12 @@ export class GameEngine {
       const leveledUp = this.player.addXp(drop.value);
 
       if (leveledUp) {
-        this.sound.playLevelUp();
-        this.pause();
         const options = this.weaponSystem.generateUpgradeOptions();
-        this.callbacks.onLevelUp(options);
+        if (options.length > 0) {
+          this.sound.playLevelUp();
+          this.pause();
+          this.callbacks.onLevelUp(options);
+        }
       }
     } else if (drop.type === 'coin') {
       const gained = Math.round(
@@ -358,11 +412,27 @@ export class GameEngine {
       }
     } else if (drop.type === 'rosary') {
       this.sound.playThunder();
-      this.vfx.triggerFlash('#ffffff', 0.9);
-      // Eliminate all non-boss enemies on screen
+      this.vfx.triggerFlash('#ffffff', 0.85);
+      // Purges regular monsters, deals heavy % damage to Elites & chip damage to Bosses
       for (let i = this.enemies.length - 1; i >= 0; i--) {
         const e = this.enemies[i];
-        if (!e.isBoss) {
+        if (e.isBoss) {
+          const bossDmg = Math.max(1, Math.round(e.maxHp * 0.06));
+          const dead = e.takeDamage(bossDmg, 0, 0, 0);
+          this.vfx.addDamageNumber(e.x, e.y, bossDmg, true);
+          if (dead) {
+            this.onEnemyKilled(e);
+            this.enemies.splice(i, 1);
+          }
+        } else if (e.isElite) {
+          const eliteDmg = Math.max(1, Math.round(e.maxHp * 0.35));
+          const dead = e.takeDamage(eliteDmg, 0, 0, 80);
+          this.vfx.addDamageNumber(e.x, e.y, eliteDmg, true);
+          if (dead) {
+            this.onEnemyKilled(e);
+            this.enemies.splice(i, 1);
+          }
+        } else {
           this.onEnemyKilled(e);
           this.enemies.splice(i, 1);
         }
@@ -370,14 +440,17 @@ export class GameEngine {
     } else if (drop.type === 'chest') {
       this.sound.playChestOpen();
       this.pause();
+      const chosenUpgrade = this.weaponSystem.resolveChestUpgrade();
+      const baseGold = chosenUpgrade
+        ? 55 + Math.floor(Math.random() * 45)
+        : 135 + Math.floor(Math.random() * 45);
       const goldBonus = Math.round(
-        (50 + Math.floor(Math.random() * 50)) *
-          this.difficulty.goldMultiplier *
-          this.player.goldMultiplier
+        baseGold * this.difficulty.goldMultiplier * this.player.goldMultiplier
       );
       this.goldCollected += goldBonus;
-      const upgradeOptions = this.weaponSystem.generateUpgradeOptions();
-      const chosenUpgrade = upgradeOptions.length > 0 ? upgradeOptions[0] : undefined;
+      if (!chosenUpgrade) {
+        this.player.heal(35);
+      }
       this.callbacks.onTreasureChest(goldBonus, chosenUpgrade);
     }
   }
@@ -398,6 +471,18 @@ export class GameEngine {
       const pId = option.id as PassiveId;
       this.weaponSystem.addPassive(pId, this.player);
     }
+
+    // Handle multi-level overflow XP (e.g. Boss gem)
+    if (this.player.checkLevelUp()) {
+      const nextOptions = this.weaponSystem.generateUpgradeOptions();
+      if (nextOptions.length > 0) {
+        this.sound.playLevelUp();
+        this.pause();
+        this.callbacks.onLevelUp(nextOptions);
+        return;
+      }
+    }
+
     this.resume();
   }
 
@@ -413,6 +498,7 @@ export class GameEngine {
 
   private handleVictory(): void {
     this.hasWon = true;
+    this.pause();
     this.sound.playVictory();
     this.persistRunStats(true);
 
@@ -466,7 +552,10 @@ export class GameEngine {
   private persistRunStats(won: boolean): void {
     const data = loadSavedData();
     data.gold += this.goldCollected;
-    data.highScore.timeSurvived = Math.max(data.highScore.timeSurvived, Math.floor(this.waveDirector.survivalTime));
+    data.highScore.timeSurvived = Math.max(
+      data.highScore.timeSurvived,
+      Math.floor(this.waveDirector.survivalTime)
+    );
     data.highScore.kills = Math.max(data.highScore.kills, this.kills);
     data.highScore.highestLevel = Math.max(data.highScore.highestLevel, this.player.level);
     if (won) data.highScore.wins += 1;
@@ -544,15 +633,17 @@ export class GameEngine {
       this.drops[i].render(ctx, camera);
     }
 
-    // 4. Render Enemies
+    // 4. Render Ground Hazards & Auras beneath Enemies/Player
+    this.weaponSystem.renderGround(ctx, camera, this.player);
+
+    // 5. Render Enemies & Player
     for (let i = 0; i < this.enemies.length; i++) {
       this.enemies[i].render(ctx, camera);
     }
 
-    // 5. Render Player
     this.player.render(ctx, camera);
 
-    // 6. Render Weapons (Auras, Slashes, Bibles, Projectiles, Lightning)
+    // 6. Render Aerial Projectiles, Slashes, Orbitals & Lightning
     this.weaponSystem.render(ctx, camera, this.player);
 
     // 7. Render VFX (Damage numbers, death particles, screen flash)
@@ -562,7 +653,6 @@ export class GameEngine {
     if (this.input.joystick.active) {
       const { startX, startY, currentX, currentY, radius } = this.input.joystick;
       ctx.save();
-      // Outer ring
       ctx.beginPath();
       ctx.arc(startX, startY, radius, 0, Math.PI * 2);
       ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
@@ -571,7 +661,6 @@ export class GameEngine {
       ctx.lineWidth = 2;
       ctx.stroke();
 
-      // Inner stick
       ctx.beginPath();
       ctx.arc(currentX, currentY, radius * 0.45, 0, Math.PI * 2);
       ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';

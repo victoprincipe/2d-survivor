@@ -7,7 +7,11 @@ export type WeaponId =
   | 'garlic'
   | 'lightning'
   | 'derson_combo'
-  | 'syringe';
+  | 'flying_tray'
+  | 'syringe'
+  | 'fire_flask'
+  | 'executioner_axe';
+
 export type EvolvedWeaponId =
   | 'holy_wand'
   | 'bloody_tear'
@@ -17,9 +21,24 @@ export type EvolvedWeaponId =
   | 'soul_eater'
   | 'thunder_loop'
   | 'derson_banquet'
-  | 'supreme_serum';
+  | 'infinite_rodizio'
+  | 'supreme_serum'
+  | 'purifying_blaze'
+  | 'death_spiral';
 
-export type PassiveId = 'spinach' | 'wings' | 'heart' | 'tome' | 'magnet' | 'bracer';
+export type PassiveId =
+  | 'spinach'
+  | 'wings'
+  | 'heart'
+  | 'tome'
+  | 'magnet'
+  | 'bracer'
+  | 'lantern'
+  | 'clover'
+  | 'hourglass'
+  | 'duplicator'
+  | 'hunter_mark'
+  | 'bio_shield';
 
 export interface WeaponInstance {
   id: WeaponId;
@@ -29,6 +48,7 @@ export interface WeaponInstance {
   evolved: boolean;
   cooldownTimer: number;
   totalDamageDealt: number;
+  comboStep?: number;
 }
 
 export interface PassiveInstance {
@@ -55,6 +75,9 @@ export interface CharacterConfig {
     xpMultiplier?: number;
     pickupRadius?: number;
     armor?: number;
+    recovery?: number;
+    critChance?: number;
+    area?: number;
   };
 }
 
@@ -68,6 +91,7 @@ export interface UpgradeOption {
   isNew: boolean;
   isEvolution?: boolean;
   synergyWith?: string;
+  hasSynergyOwned?: boolean;
   iconName: string;
 }
 

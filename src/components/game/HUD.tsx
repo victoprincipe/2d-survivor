@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { HUDState } from '@/game/types';
+import { renderWeaponIcon, renderPassiveIcon } from './GameIcons';
 import {
   Skull,
   Coins,
@@ -10,19 +11,6 @@ import {
   Volume2,
   VolumeX,
   Pause,
-  Zap,
-  Flame,
-  Shield,
-  BookOpen,
-  Sword,
-  Wand2,
-  Feather,
-  Sparkles,
-  Compass,
-  Crosshair,
-  BowArrow,
-  Utensils,
-  Syringe,
 } from 'lucide-react';
 
 interface HUDProps {
@@ -32,27 +20,6 @@ interface HUDProps {
   onToggleMute: () => void;
   difficultyName: string;
 }
-
-const WEAPON_ICONS: Record<string, React.ReactNode> = {
-  whip: <Flame className="w-4 h-4 text-orange-400" />,
-  wand: <Wand2 className="w-4 h-4 text-blue-400" />,
-  knife: <Sword className="w-4 h-4 text-slate-300" />,
-  bow: <BowArrow className="w-4 h-4 text-lime-400" />,
-  bible: <BookOpen className="w-4 h-4 text-indigo-400" />,
-  garlic: <Shield className="w-4 h-4 text-yellow-300" />,
-  lightning: <Zap className="w-4 h-4 text-cyan-300" />,
-  derson_combo: <Utensils className="w-4 h-4 text-amber-300" />,
-  syringe: <Syringe className="w-4 h-4 text-cyan-300" />,
-};
-
-const PASSIVE_ICONS: Record<string, React.ReactNode> = {
-  spinach: <Sparkles className="w-4 h-4 text-emerald-400" />,
-  wings: <Feather className="w-4 h-4 text-sky-400" />,
-  heart: <Heart className="w-4 h-4 text-rose-400" />,
-  tome: <Clock className="w-4 h-4 text-purple-400" />,
-  magnet: <Compass className="w-4 h-4 text-amber-400" />,
-  bracer: <Crosshair className="w-4 h-4 text-red-400" />,
-};
 
 export const HUD: React.FC<HUDProps> = ({ hud, onPause, isMuted, onToggleMute, difficultyName }) => {
   const formatTime = (seconds: number) => {
@@ -99,7 +66,7 @@ export const HUD: React.FC<HUDProps> = ({ hud, onPause, isMuted, onToggleMute, d
           <div className="w-full max-w-lg mx-auto bg-slate-950/90 border-2 border-red-700 rounded-xl p-2 shadow-2xl backdrop-blur-md">
             <div className="flex justify-between items-center mb-1 text-xs font-bold text-red-400 uppercase tracking-widest">
               <span>👑 {hud.activeBoss.name}</span>
-              <span>{Math.round((hud.activeBoss.hp / hud.activeBoss.maxHp) * 100)}%</span>
+              <span>{Math.max(0, Math.round((hud.activeBoss.hp / hud.activeBoss.maxHp) * 100))}%</span>
             </div>
             <div className="w-full bg-red-950/80 rounded-full h-3.5 overflow-hidden border border-red-900">
               <div
@@ -120,13 +87,13 @@ export const HUD: React.FC<HUDProps> = ({ hud, onPause, isMuted, onToggleMute, d
         )}
 
         {/* Middle Stats Bar: HP, Kills, Gold, Timer, Audio/Pause Controls */}
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-start sm:items-center gap-2">
           {/* Left: Player HP & Inventory */}
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-1.5 max-w-[46%] sm:max-w-none">
             {/* HP Bar */}
             <div className="flex items-center gap-2 bg-slate-900/80 border border-slate-700/80 rounded-lg px-2.5 py-1 backdrop-blur-sm shadow">
-              <Heart className="w-4 h-4 text-red-500 fill-red-500 animate-pulse" />
-              <div className="w-28 sm:w-36 bg-slate-800 rounded-full h-3 overflow-hidden border border-slate-700">
+              <Heart className="w-4 h-4 text-red-500 fill-red-500 animate-pulse shrink-0" />
+              <div className="w-24 sm:w-36 bg-slate-800 rounded-full h-3 overflow-hidden border border-slate-700">
                 <div
                   className={`h-full transition-all duration-150 ${
                     hpPercent > 50 ? 'bg-emerald-500' : hpPercent > 25 ? 'bg-amber-500' : 'bg-red-500'
@@ -140,7 +107,7 @@ export const HUD: React.FC<HUDProps> = ({ hud, onPause, isMuted, onToggleMute, d
             </div>
 
             {/* Weapons & Passives Slots */}
-            <div className="flex gap-1">
+            <div className="flex flex-wrap gap-1">
               {hud.weapons.map((w) => (
                 <div
                   key={w.id}
@@ -149,7 +116,7 @@ export const HUD: React.FC<HUDProps> = ({ hud, onPause, isMuted, onToggleMute, d
                   }`}
                   title={`${w.name} (Lv. ${w.level})`}
                 >
-                  {WEAPON_ICONS[w.id]}
+                  {renderWeaponIcon(w.id, 'w-4 h-4')}
                   <span className="absolute -bottom-1 -right-1 text-[9px] font-black bg-slate-950 px-1 rounded border border-slate-700 text-yellow-300">
                     {w.evolved ? '★' : w.level}
                   </span>
@@ -161,7 +128,7 @@ export const HUD: React.FC<HUDProps> = ({ hud, onPause, isMuted, onToggleMute, d
                   className="relative p-1 rounded-md border border-slate-700 bg-slate-900/85 backdrop-blur-sm flex items-center justify-center"
                   title={`${p.name} (Lv. ${p.level})`}
                 >
-                  {PASSIVE_ICONS[p.id]}
+                  {renderPassiveIcon(p.id, 'w-4 h-4')}
                   <span className="absolute -bottom-1 -right-1 text-[9px] font-black bg-slate-950 px-1 rounded border border-slate-700 text-emerald-300">
                     {p.level}
                   </span>

@@ -44,13 +44,14 @@ export class WaveDirector {
       this.bossActive = null;
     }
 
-    // Calculate dynamic spawn rate and HP scaling based on time and difficulty
+    // Smooth early scaling + steeper late/endless scaling
     const minutes = this.survivalTime / 60;
-    const hpMultiplier = (1.0 + minutes * 0.45) * this.difficulty.enemyHp;
-    const spawnInterval = Math.max(0.12, 0.6 - minutes * 0.09) / this.difficulty.spawnRate;
+    const endlessExtra = minutes > 5 ? Math.pow(minutes - 5, 1.35) * 0.45 : 0;
+    const hpMultiplier = (1.0 + minutes * 0.52 + endlessExtra) * this.difficulty.enemyHp;
+    const spawnInterval = Math.max(0.11, 0.56 - minutes * 0.085) / this.difficulty.spawnRate;
     const maxEnemies = Math.min(
-      400,
-      Math.floor((90 + Math.floor(minutes * 55)) * this.difficulty.enemyCount)
+      420,
+      Math.floor((95 + Math.floor(minutes * 58)) * this.difficulty.enemyCount)
     );
 
     // Regular interval spawning
@@ -59,48 +60,73 @@ export class WaveDirector {
       this.spawnRegularEnemy(player, camera, hpMultiplier, onSpawn);
     }
 
-    // Timed Events
+    // Timed Events (4 Elite Chests before 05:00 + Final Boss + Endless Loop)
     const sec = Math.floor(this.survivalTime);
 
-    // Event 1: 01:00 - Bat Swarm
-    if (sec === 60 && !this.triggeredEvents.has('bat_swarm')) {
-      this.triggeredEvents.add('bat_swarm');
-      this.triggerAlert('🦇 ENXAME DE MORCEGOS APROXIMA-SE!', 4);
+    // Event 1: 01:00 - Bat Swarm + Vanguard Elite (#1 Chest)
+    if (sec >= 60 && !this.triggeredEvents.has('wave_60')) {
+      this.triggeredEvents.add('wave_60');
+      this.triggerAlert('🦇 ENXAME DE MORCEGOS E GUARDA ELITE SURGIRAM!', 4.5);
       sound.playBossWarning();
       this.spawnBatSwarm(player, camera, onSpawn);
+      this.spawnElite(player, camera, hpMultiplier * 0.75, 'Capitão da Guarda Elite', onSpawn);
     }
 
-    // Event 2: 02:00 - Elite Minotaur (Treasure Chest drop!)
-    if (sec === 120 && !this.triggeredEvents.has('elite_1')) {
-      this.triggeredEvents.add('elite_1');
-      this.triggerAlert('⚔️ MINOTAURO ELITE SURGIU! DERROTE-O PARA UM BAÚ DE TESOURO!', 5);
+    // Event 2: 02:00 - Minotaur Elite (#2 Chest)
+    if (sec >= 120 && !this.triggeredEvents.has('wave_120')) {
+      this.triggeredEvents.add('wave_120');
+      this.triggerAlert('⚔️ MINOTAURO ELITE SURGIU! DERROTE-O PARA EVOLUIR NO BAÚ!', 5);
       sound.playBossWarning();
-      this.spawnElite(player, camera, hpMultiplier, onSpawn);
+      this.spawnElite(player, camera, hpMultiplier, 'Minotauro Elite', onSpawn);
     }
 
-    // Event 3: 03:00 - Ring Formation
-    if (sec === 180 && !this.triggeredEvents.has('ring_swarm')) {
-      this.triggeredEvents.add('ring_swarm');
-      this.triggerAlert('💀 CERCO DE ZUMBIS! ELES ESTÃO TE CERCANDO!', 4);
+    // Event 3: 03:00 - Zombie Ring + Butcher Elite (#3 Chest)
+    if (sec >= 180 && !this.triggeredEvents.has('wave_180')) {
+      this.triggeredEvents.add('wave_180');
+      this.triggerAlert('💀 CERCO DE ZUMBIS COM CARNICEIRO ELITE!', 4.5);
       sound.playBossWarning();
-      this.spawnRingEnemies(player, hpMultiplier, onSpawn);
+      this.spawnRingEnemies(player, hpMultiplier, 'zombie', onSpawn);
+      this.spawnElite(player, camera, hpMultiplier * 1.05, 'Carniceiro Elite', onSpawn);
     }
 
-    // Event 4: 04:00 - Second Elite
-    if (sec === 240 && !this.triggeredEvents.has('elite_2')) {
-      this.triggeredEvents.add('elite_2');
+    // Event 4: 04:00 - Spectral General Elite (#4 Chest)
+    if (sec >= 240 && !this.triggeredEvents.has('wave_240')) {
+      this.triggeredEvents.add('wave_240');
       this.triggerAlert('⚔️ GENERAL ESPECTRAL ELITE SURGIU!', 5);
       sound.playBossWarning();
-      this.spawnElite(player, camera, hpMultiplier, onSpawn);
+      this.spawnElite(player, camera, hpMultiplier * 1.15, 'General Espectral Elite', onSpawn);
+      if (this.difficulty.enemyCount >= 1.15) {
+        this.spawnElite(player, camera, hpMultiplier, 'Guardião Sombrio Elite', onSpawn);
+      }
     }
 
-    // Event 5: 05:00 - Final Boss: Crimson Vampire Lord!
-    if (sec === 300 && !this.triggeredEvents.has('final_boss')) {
+    // Event 5: 05:00 - Final Boss: Senhor da Corrupção!
+    if (sec >= 300 && !this.triggeredEvents.has('final_boss')) {
       this.triggeredEvents.add('final_boss');
-      this.triggerAlert('👑 LORDE CARMESIM SURGIU! DERROTE-O PARA VENCER A PARTIDA!', 6);
+      this.triggerAlert('👑 SENHOR DA CORRUPÇÃO SURGIU! DERROTE-O PARA VENCER!', 6);
       sound.playBossWarning();
       const boss = this.spawnBoss(player, camera, hpMultiplier, onSpawn);
       this.bossActive = boss;
+    }
+
+    // Endless Mode Events (> 05:00): Every 60s Elite + Wave, Every 180s Reincarnated Boss!
+    if (this.isEndless && sec >= 360) {
+      const minuteMark = Math.floor(sec / 60);
+      const endlessKey = `endless_min_${minuteMark}`;
+      if (!this.triggeredEvents.has(endlessKey)) {
+        this.triggeredEvents.add(endlessKey);
+        sound.playBossWarning();
+
+        if ((minuteMark - 5) % 3 === 0 && !this.bossActive) {
+          this.triggerAlert(`👑 REENCARNAÇÃO DO SENHOR DA CORRUPÇÃO (MINUTO ${minuteMark})!`, 5.5);
+          const boss = this.spawnBoss(player, camera, hpMultiplier * 1.15, onSpawn);
+          this.bossActive = boss;
+        } else {
+          this.triggerAlert(`🔥 ONDA INFINITA DO MINUTO ${minuteMark}: CAÇADORES ELITE!`, 4.5);
+          this.spawnRingEnemies(player, hpMultiplier * 0.95, minuteMark % 2 === 0 ? 'ghost' : 'skeleton', onSpawn);
+          this.spawnElite(player, camera, hpMultiplier * 1.1, 'Executor Abissal Elite', onSpawn);
+        }
+      }
     }
   }
 
@@ -114,7 +140,6 @@ export class WaveDirector {
     const halfW = camera.viewportWidth / 2 + margin;
     const halfH = camera.viewportHeight / 2 + margin;
 
-    // Pick a random side: 0=top, 1=right, 2=bottom, 3=left
     const side = Math.floor(Math.random() * 4);
     let x = camera.x;
     let y = camera.y;
@@ -149,19 +174,19 @@ export class WaveDirector {
     const roll = Math.random();
 
     if (minutes < 1) {
-      type = roll < 0.7 ? 'bat' : 'zombie';
+      type = roll < 0.68 ? 'bat' : roll < 0.9 ? 'skeleton' : 'zombie';
     } else if (minutes < 2) {
-      type = roll < 0.4 ? 'bat' : roll < 0.8 ? 'skeleton' : 'zombie';
+      type = roll < 0.35 ? 'bat' : roll < 0.78 ? 'skeleton' : 'zombie';
     } else if (minutes < 3.5) {
-      type = roll < 0.3 ? 'skeleton' : roll < 0.65 ? 'ghost' : 'zombie';
+      type = roll < 0.28 ? 'skeleton' : roll < 0.65 ? 'ghost' : 'zombie';
     } else {
-      type = roll < 0.25 ? 'bat' : roll < 0.5 ? 'ghost' : roll < 0.8 ? 'skeleton' : 'zombie';
+      type = roll < 0.22 ? 'bat' : roll < 0.52 ? 'ghost' : roll < 0.78 ? 'skeleton' : 'zombie';
     }
 
     onSpawn(this.createEnemy(type, pos.x, pos.y, hpMult));
   }
 
-  private createEnemy(type: EnemyType, x: number, y: number, hpMult: number): Enemy {
+  public createEnemy(type: EnemyType, x: number, y: number, hpMult: number): Enemy {
     const enemy = new Enemy(this.nextEnemyId++, type, x, y, hpMult);
     enemy.damage = Math.max(1, Math.round(enemy.damage * this.difficulty.enemyDamage));
     enemy.xpValue = Math.max(1, Math.round(enemy.xpValue * this.difficulty.xpMultiplier));
@@ -169,21 +194,26 @@ export class WaveDirector {
   }
 
   private spawnBatSwarm(player: Player, camera: Camera, onSpawn: (enemy: Enemy) => void): void {
-    const count = Math.round(35 * this.difficulty.enemyCount);
+    const count = Math.round(32 * this.difficulty.enemyCount);
     for (let i = 0; i < count; i++) {
       const pos = this.getSpawnPositionOutsideScreen(camera);
-      onSpawn(this.createEnemy('bat', pos.x, pos.y, 0.8));
+      onSpawn(this.createEnemy('bat', pos.x, pos.y, 0.85));
     }
   }
 
-  private spawnRingEnemies(player: Player, hpMult: number, onSpawn: (enemy: Enemy) => void): void {
-    const count = Math.round(28 * this.difficulty.enemyCount);
+  private spawnRingEnemies(
+    player: Player,
+    hpMult: number,
+    type: EnemyType,
+    onSpawn: (enemy: Enemy) => void
+  ): void {
+    const count = Math.round(26 * this.difficulty.enemyCount);
     const radius = 420;
     for (let i = 0; i < count; i++) {
       const angle = (i * Math.PI * 2) / count;
       const x = player.x + Math.cos(angle) * radius;
       const y = player.y + Math.sin(angle) * radius;
-      onSpawn(this.createEnemy('zombie', x, y, hpMult));
+      onSpawn(this.createEnemy(type, x, y, hpMult));
     }
   }
 
@@ -191,10 +221,13 @@ export class WaveDirector {
     player: Player,
     camera: Camera,
     hpMult: number,
+    customName: string,
     onSpawn: (enemy: Enemy) => void
   ): void {
     const pos = this.getSpawnPositionOutsideScreen(camera);
-    onSpawn(this.createEnemy('elite_minotaur', pos.x, pos.y, hpMult));
+    const elite = this.createEnemy('elite_minotaur', pos.x, pos.y, hpMult);
+    elite.name = customName;
+    onSpawn(elite);
   }
 
   private spawnBoss(
