@@ -174,8 +174,9 @@ export class WaveDirector {
       this.spawnElite(player, camera, hpMultiplier * 0.75, 'Capitão da Guarda Elite', onSpawn);
     }
 
-    // Event 2: 02:00 - Minotaur Elite (#2 Chest)
-    if (sec >= 120 && !this.triggeredEvents.has('wave_120')) {
+    // Event 2: 02:00 - Minotaur Elite (#2 Chest, night plain only). The
+    // Amazon Forest never spawns the Minotaur or any of its variations.
+    if (!this.isAmazonForest && sec >= 120 && !this.triggeredEvents.has('wave_120')) {
       this.triggeredEvents.add('wave_120');
       this.triggerAlert('⚔️ MINOTAURO ELITE SURGIU! DERROTE-O PARA EVOLUIR NO BAÚ!', 5);
       sound.playBossWarning();
@@ -419,7 +420,12 @@ export class WaveDirector {
     onSpawn: (enemy: Enemy) => void
   ): void {
     const pos = this.getSpawnPositionOutsideScreen(camera);
-    const elite = this.createEnemy('elite_minotaur', pos.x, pos.y, hpMult);
+    // The Minotaur base enemy is exclusive to the night plain. In the Amazon
+    // Forest the timed elite slots use the forest's own oversized predators.
+    const eliteType = this.isAmazonForest
+      ? AMAZON_ELITE_ENEMIES[Math.floor(Math.random() * AMAZON_ELITE_ENEMIES.length)]
+      : 'elite_minotaur';
+    const elite = this.createEnemy(eliteType, pos.x, pos.y, hpMult);
     elite.name = customName;
     onSpawn(elite);
   }

@@ -2055,6 +2055,10 @@ export class GameEngine {
   // --- DevTools Public API ---
 
   public devSpawnEnemy(type: EnemyType, count: number = 1): void {
+    // The Minotaur is night-plain content and must never appear in the forest,
+    // even when spawned manually through the developer tools.
+    if (type === 'elite_minotaur' && this.waveDirector.isAmazonForest) return;
+
     const minutes = this.waveDirector.survivalTime / 60;
     const hpMult = (1.0 + minutes * 0.52) * this.difficulty.enemyHp;
     for (let i = 0; i < count; i++) {

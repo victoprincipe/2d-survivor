@@ -1005,39 +1005,43 @@ export class WorldSystem {
   }
 
   update(dt: number, player: Player, onBuffSpawn?: (drop: Drop) => void): void {
-    this.torchSpawnTimer += dt;
+    // Torches/candles belong to the night plain. The Amazon Forest only keeps
+    // its fruit trees as collectible resources, so no torch ever spawns there.
+    if (this.mapId !== 'amazon_forest') {
+      this.torchSpawnTimer += dt;
 
-    // Spawn new torches periodically near player
-    if (this.torchSpawnTimer > this.torchSpawnInterval && this.torches.length < this.maxTorches) {
-      this.torchSpawnTimer = 0;
-      const angle = Math.random() * Math.PI * 2;
-      const dist = 350 + Math.random() * 250;
-      const x = player.x + Math.cos(angle) * dist;
-      const y = player.y + Math.sin(angle) * dist;
-      const buff = this.rollTorchBuff();
+      // Spawn new torches periodically near player
+      if (this.torchSpawnTimer > this.torchSpawnInterval && this.torches.length < this.maxTorches) {
+        this.torchSpawnTimer = 0;
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 350 + Math.random() * 250;
+        const x = player.x + Math.cos(angle) * dist;
+        const y = player.y + Math.sin(angle) * dist;
+        const buff = this.rollTorchBuff();
 
-      this.torches.push({
-        id: this.nextTorchId++,
-        x,
-        y,
-        radius: 12,
-        animTimer: Math.random() * 5,
-        buff,
-      });
+        this.torches.push({
+          id: this.nextTorchId++,
+          x,
+          y,
+          radius: 12,
+          animTimer: Math.random() * 5,
+          buff,
+        });
 
-      // The lamp already carries its random buff when it spawns.
-      onBuffSpawn?.(new Drop(Date.now() + Math.random(), buff, x, y));
-    }
+        // The lamp already carries its random buff when it spawns.
+        onBuffSpawn?.(new Drop(Date.now() + Math.random(), buff, x, y));
+      }
 
-    // Clean up torches that are way too far away (> 1500 px)
-    for (let i = this.torches.length - 1; i >= 0; i--) {
-      const t = this.torches[i];
-      t.animTimer += dt * 6;
+      // Clean up torches that are way too far away (> 1500 px)
+      for (let i = this.torches.length - 1; i >= 0; i--) {
+        const t = this.torches[i];
+        t.animTimer += dt * 6;
 
-      const dx = player.x - t.x;
-      const dy = player.y - t.y;
-      if (dx * dx + dy * dy > 1600 * 1600) {
-        this.torches.splice(i, 1);
+        const dx = player.x - t.x;
+        const dy = player.y - t.y;
+        if (dx * dx + dy * dy > 1600 * 1600) {
+          this.torches.splice(i, 1);
+        }
       }
     }
 
