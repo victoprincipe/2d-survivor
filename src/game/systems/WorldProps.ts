@@ -27,6 +27,11 @@ const ACAI_SPRITE_WIDTH = 32;
 const ACAI_SPRITE_HEIGHT = 40;
 const ACAI_SPRITE_SCALE = 3;
 
+// Açaí minimap marker: a hand-drawn 16x16 pixel-art bunch, rasterized once
+// into an offscreen canvas and blitted at 14x14 with smoothing disabled.
+const ACAI_MINIMAP_ICON_SIZE = 16;
+const ACAI_MINIMAP_ICON_DRAW_SIZE = 14;
+
 // Amazon water. For the player the river and lakes are purely visual, but
 // aquatic enemies use the stricter isNavigableWater check below to stay wet.
 const RIVER_WIDTH = 980;
@@ -174,6 +179,7 @@ export class WorldSystem {
   private floorImage: HTMLImageElement | null = null;
   private floorPattern: CanvasPattern | null = null;
   private acaiPixelSprite: HTMLCanvasElement | null = null;
+  private acaiMinimapIcon: HTMLCanvasElement | null = null;
   private waterAnimTimer: number = 0;
 
   constructor(mapId: MapId = 'night_plain') {
@@ -1037,6 +1043,26 @@ export class WorldSystem {
       const treeX = toX(tree.x);
       const treeY = toY(tree.y);
 
+      // The açaí gets a dedicated pixel-art bunch icon so it stands out from
+      // the other fruit dots on the minimap.
+      if (tree.kind === 'acai') {
+        const icon = this.getAcaiMinimapIcon();
+        if (icon) {
+          const drawSize = ACAI_MINIMAP_ICON_DRAW_SIZE;
+          ctx.save();
+          ctx.imageSmoothingEnabled = false;
+          ctx.drawImage(
+            icon,
+            Math.round(treeX - drawSize / 2),
+            Math.round(treeY - drawSize / 2),
+            drawSize,
+            drawSize
+          );
+          ctx.restore();
+          continue;
+        }
+      }
+
       // Dark backing keeps the icon readable over water and tree wall.
       ctx.fillStyle = 'rgba(8, 15, 20, 0.75)';
       ctx.beginPath();
@@ -1272,6 +1298,154 @@ export class WorldSystem {
     }
 
     this.acaiPixelSprite = canvas;
+    return canvas;
+  }
+
+  /**
+   * Builds (once) the 16x16 pixel-art açaí bunch used by the minimap. The
+   * reference art shows dark purple berries with lilac glints under a small
+   * green crown, so the icon is plotted pixel by pixel, wrapped in a dark
+   * outline and then blitted without smoothing.
+   */
+  private getAcaiMinimapIcon(): HTMLCanvasElement | null {
+    if (this.acaiMinimapIcon) return this.acaiMinimapIcon;
+    if (typeof document === 'undefined') return null;
+
+    const size = ACAI_MINIMAP_ICON_SIZE;
+    const pixels: (string | null)[] = new Array(size * size).fill(null);
+
+    const setPixel = (x: number, y: number, color: string): void => {
+      const px = Math.round(x);
+      const py = Math.round(y);
+      if (px < 0 || px >= size || py < 0 || py >= size) return;
+      pixels[py * size + px] = color;
+    };
+
+    const fillCircle = (cx: number, cy: number, radius: number, color: string): void => {
+      const minX = Math.floor(cx - radius);
+      const maxX = Math.ceil(cx + radius);
+      const minY = Math.floor(cy - radius);
+      const maxY = Math.ceil(cy + radius);
+      for (let y = minY; y <= maxY; y++) {
+        for (let x = minX; x <= maxX; x++) {
+          const dx = x - cx;
+          const dy = y - cy;
+          if (dx * dx + dy * dy <= radius * radius + 0.2) setPixel(x, y, color);
+        }
+      }
+    };
+
+    const fillEllipse = (
+      cx: number,
+      cy: number,
+      rx: number,
+      ry: number,
+      color: string
+    ): void => {
+      const minX = Math.floor(cx - rx);
+      const maxX = Math.ceil(cx + rx);
+      const minY = Math.floor(cy - ry);
+      const maxY = Math.ceil(cy + ry);
+      for (let y = minY; y <= maxY; y++) {
+        for (let x = minX; x <= maxX; x++) {
+          const dx = (x - cx) / rx;
+          const dy = (y - cy) / ry;
+          if (dx * dx + dy * dy <= 1.05) setPixel(x, y, color);
+        }
+      }
+    };
+
+    const outline = '#160a1e';
+    const leafDark = '#1d6b34';
+    const leafLight = '#3fa257';
+    const stem = '#4a3420';
+    const berryBody = '#3a1050';
+    const berryMid = '#4f1a66';
+    const berryGlint = '#b985e4';
+
+    const drawLine = (
+      x0: number,
+      y0: number,
+      x1: number,
+      y1: number,
+      color: string
+    ): void => {
+      const steps = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+      for (let i = 0; i <= steps; i++) {
+        const t = steps === 0 ? 0 : i / steps;
+        setPixel(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, color);
+      }
+    };
+
+    // Two short stems fanning out from the crown into the bunch.
+    drawLine(8, 4, 6, 6, stem);
+    drawLine(8, 4, 9, 6, stem);
+
+    // Green crown: two side leaves and one upright leaf.
+    fillEllipse(4.2, 4.3, 2.5, 1.3, leafDark);
+    fillEllipse(3.9, 4.0, 1.9, 0.8, leafLight);
+    fillEllipse(11.8, 4.0, 2.5, 1.3, leafDark);
+    fillEllipse(12.1, 3.7, 1.9, 0.8, leafLight);
+    fillEllipse(8.4, 3.0, 1.5, 1.6, leafDark);
+    fillEllipse(8.2, 2.8, 1.0, 1.1, leafLight);
+
+    // Compact bunch: back row first so the front berries overlap naturally.
+    const berries: { x: number; y: number }[] = [
+      { x: 5.0, y: 6.9 },
+      { x: 7.9, y: 6.5 },
+      { x: 10.7, y: 7.4 },
+      { x: 3.9, y: 9.3 },
+      { x: 6.6, y: 9.2 },
+      { x: 9.4, y: 9.4 },
+      { x: 12.0, y: 9.9 },
+      { x: 5.3, y: 11.4 },
+      { x: 8.2, y: 11.7 },
+      { x: 10.7, y: 12.0 },
+    ];
+
+    for (let i = 0; i < berries.length; i++) {
+      const berry = berries[i];
+      // Dark ring separates neighbouring berries; the body sits on top.
+      fillCircle(berry.x, berry.y, 2.1, outline);
+      fillCircle(berry.x, berry.y, 1.35, berryBody);
+      fillCircle(berry.x - 0.15, berry.y - 0.35, 0.9, berryMid);
+      // Lilac glint, like the reference fruit.
+      setPixel(berry.x - 0.8, berry.y - 0.8, berryGlint);
+      setPixel(berry.x - 0.1, berry.y - 1.0, berryGlint);
+    }
+
+    // One-pixel dark contour around the whole bunch so the marker keeps a
+    // crisp silhouette on the dark minimap panel.
+    const filled = pixels.slice();
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        if (filled[y * size + x]) continue;
+        const nearFilled =
+          (y > 0 && Boolean(filled[(y - 1) * size + x])) ||
+          (y < size - 1 && Boolean(filled[(y + 1) * size + x])) ||
+          (x > 0 && Boolean(filled[y * size + (x - 1)])) ||
+          (x < size - 1 && Boolean(filled[y * size + (x + 1)]));
+        if (nearFilled) pixels[y * size + x] = outline;
+      }
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    ctx.imageSmoothingEnabled = false;
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const color = pixels[y * size + x];
+        if (!color) continue;
+        ctx.fillStyle = color;
+        ctx.fillRect(x, y, 1, 1);
+      }
+    }
+
+    this.acaiMinimapIcon = canvas;
     return canvas;
   }
 
