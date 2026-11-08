@@ -27,6 +27,14 @@ const ACAI_SPRITE_WIDTH = 32;
 const ACAI_SPRITE_HEIGHT = 40;
 const ACAI_SPRITE_SCALE = 3;
 
+// The cupuaçuzeiro is likewise hand-crafted pixel art: a 48x56 sprite with a
+// large oval ground shadow, rasterized once into an offscreen canvas and then
+// upscaled with nearest-neighbour so the canopy, branches and hanging fruits
+// keep crisp pixel edges at any zoom.
+const CUPUACU_SPRITE_WIDTH = 48;
+const CUPUACU_SPRITE_HEIGHT = 56;
+const CUPUACU_SPRITE_SCALE = 2;
+
 // Fruit tree minimap markers: hand-drawn 16x16 pixel-art icons, rasterized
 // once into offscreen canvases and blitted at 16x16 with smoothing disabled
 // so every pixel of the art is preserved.
@@ -234,6 +242,7 @@ export class WorldSystem {
   private sandGrainPattern: CanvasPattern | null = null;
   private waterShimmerPattern: CanvasPattern | null = null;
   private acaiPixelSprite: HTMLCanvasElement | null = null;
+  private cupuacuPixelSprite: HTMLCanvasElement | null = null;
   private acaiMinimapIcon: HTMLCanvasElement | null = null;
   private fruitMinimapIcons: Partial<Record<FruitTreeKind, HTMLCanvasElement>> = {};
   private waterAnimTimer: number = 0;
@@ -1789,6 +1798,316 @@ export class WorldSystem {
     }
 
     this.acaiPixelSprite = canvas;
+    return canvas;
+  }
+
+  /**
+   * Builds (once) the Cupuaçu tree sprite. The 48x56 pixel-art canvas follows
+   * the reference image: dark contour, light-brown trunk forking into branches,
+   * a full rounded canopy of dark green leaves, five large velvety brown fruits
+   * hanging under the crown and a wide oval shadow centred on the ground.
+   */
+  private getCupuacuPixelSprite(): HTMLCanvasElement | null {
+    if (this.cupuacuPixelSprite) return this.cupuacuPixelSprite;
+    if (typeof document === 'undefined') return null;
+
+    const width = CUPUACU_SPRITE_WIDTH;
+    const height = CUPUACU_SPRITE_HEIGHT;
+    const pixels: (string | null)[] = new Array(width * height).fill(null);
+
+    const setPixel = (x: number, y: number, color: string): void => {
+      const px = Math.round(x);
+      const py = Math.round(y);
+      if (px < 0 || px >= width || py < 0 || py >= height) return;
+      pixels[py * width + px] = color;
+    };
+
+    const fillEllipse = (
+      cx: number,
+      cy: number,
+      rx: number,
+      ry: number,
+      color: string
+    ): void => {
+      const minX = Math.floor(cx - rx);
+      const maxX = Math.ceil(cx + rx);
+      const minY = Math.floor(cy - ry);
+      const maxY = Math.ceil(cy + ry);
+      for (let y = minY; y <= maxY; y++) {
+        for (let x = minX; x <= maxX; x++) {
+          const dx = (x - cx) / rx;
+          const dy = (y - cy) / ry;
+          if (dx * dx + dy * dy <= 1.05) setPixel(x, y, color);
+        }
+      }
+    };
+
+    const drawLine = (
+      x0: number,
+      y0: number,
+      x1: number,
+      y1: number,
+      color: string
+    ): void => {
+      const steps = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+      for (let i = 0; i <= steps; i++) {
+        const t = steps === 0 ? 0 : i / steps;
+        setPixel(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, color);
+      }
+    };
+
+    const fillCircle = (cx: number, cy: number, radius: number, color: string): void => {
+      fillEllipse(cx, cy, radius, radius, color);
+    };
+
+    // Draws a tapered branch segment by stamping circles along its axis.
+    const drawBranch = (
+      x0: number,
+      y0: number,
+      x1: number,
+      y1: number,
+      startRadius: number,
+      endRadius: number,
+      color: string
+    ): void => {
+      const steps = Math.max(2, Math.ceil(Math.hypot(x1 - x0, y1 - y0) * 2));
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        fillCircle(
+          x0 + (x1 - x0) * t,
+          y0 + (y1 - y0) * t,
+          startRadius + (endRadius - startRadius) * t,
+          color
+        );
+      }
+    };
+
+    // A pointed pixel-art leaf: dark outline, two-tone blade and pale vein.
+    const drawLeaf = (
+      cx: number,
+      cy: number,
+      length: number,
+      spread: number,
+      angle: number,
+      fill: string,
+      light: string
+    ): void => {
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      const nx = -sin;
+      const ny = cos;
+      const baseX = cx - cos * length * 0.5;
+      const baseY = cy - sin * length * 0.5;
+      const steps = Math.max(16, Math.ceil(length * 6));
+      const halfWidth = spread * 0.5;
+
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const px = baseX + cos * length * t;
+        const py = baseY + sin * length * t;
+        const radius = Math.sin(Math.PI * t) * halfWidth + 0.55;
+        const maxOffset = Math.ceil(radius);
+        for (let offset = -maxOffset; offset <= maxOffset; offset++) {
+          if (Math.abs(offset) > radius) continue;
+          setPixel(px + nx * offset, py + ny * offset, '#06180c');
+        }
+      }
+
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const px = baseX + cos * length * t;
+        const py = baseY + sin * length * t;
+        const radius = Math.sin(Math.PI * t) * halfWidth;
+        const maxOffset = Math.ceil(radius);
+        for (let offset = -maxOffset; offset <= maxOffset; offset++) {
+          if (Math.abs(offset) > radius) continue;
+          setPixel(px + nx * offset, py + ny * offset, offset <= 0 ? light : fill);
+        }
+        // Pale central vein, like the hand-drawn reference leaves.
+        setPixel(px, py, '#6dbb64');
+      }
+    };
+
+    // Wide dark oval shadow sitting on the forest floor under the trunk.
+    fillEllipse(24, 52.5, 20, 3.6, 'rgba(4, 10, 6, 0.62)');
+
+    const canopyOutline = '#06180c';
+    const canopyBase = '#123a21';
+    const canopyBlobs: [number, number, number, number][] = [
+      [24, 13, 18, 11],
+      [12, 18, 10, 9],
+      [36, 18, 10, 9],
+      [16, 8, 11, 8],
+      [32, 8, 11, 8],
+      [24, 20, 17, 8],
+      [16, 27, 9, 7],
+      [32, 27, 9, 7],
+    ];
+
+    for (let i = 0; i < canopyBlobs.length; i++) {
+      const [cx, cy, rx, ry] = canopyBlobs[i];
+      fillEllipse(cx, cy, rx + 1.1, ry + 1.1, canopyOutline);
+    }
+    for (let i = 0; i < canopyBlobs.length; i++) {
+      const [cx, cy, rx, ry] = canopyBlobs[i];
+      fillEllipse(cx, cy, rx, ry, canopyBase);
+    }
+    // Slightly darker lower half gives the crown its 2.5D volume.
+    fillEllipse(24, 26, 15, 6, 'rgba(5, 23, 12, 0.38)');
+
+    const trunkOutline = '#24150a';
+    const trunkBody = '#947a52';
+    const trunkLight = '#b59b6d';
+    const trunkShade = '#6f5638';
+
+    // Two main branches fork out of the trunk, visible through the lower crown.
+    drawBranch(24, 35, 13, 25, 2.3, 1.1, trunkOutline);
+    drawBranch(24, 34, 35, 24, 2.3, 1.1, trunkOutline);
+    drawBranch(24, 35, 13, 25, 1.2, 0.55, trunkBody);
+    drawBranch(24, 34, 35, 24, 1.2, 0.55, trunkBody);
+
+    // Trunk: dark contour, lighter bark and a flared root base.
+    for (let y = 29; y <= 54; y++) {
+      const t = (y - 29) / 25;
+      const halfWidth =
+        y >= 50 ? 1.9 + t * 1.5 + (y - 49) * 0.4 : 1.9 + t * 1.5;
+      for (let x = Math.floor(24 - halfWidth - 0.8); x <= Math.ceil(24 + halfWidth + 0.8); x++) {
+        setPixel(x, y, trunkOutline);
+      }
+      for (let x = Math.floor(24 - halfWidth); x <= Math.ceil(24 + halfWidth); x++) {
+        const relative = (x - 24) / halfWidth;
+        setPixel(
+          x,
+          y,
+          relative < -0.25 ? trunkLight : relative > 0.45 ? trunkShade : trunkBody
+        );
+      }
+      if (y % 3 === 0) {
+        setPixel(24 - halfWidth * 0.4, y, trunkShade);
+        setPixel(24 + halfWidth * 0.35, y, trunkLight);
+      }
+    }
+
+    // Small roots spreading out over the shadow.
+    drawLine(20, 53, 16, 55, trunkOutline);
+    drawLine(21, 53, 18, 55, trunkBody);
+    drawLine(28, 53, 32, 55, trunkOutline);
+    drawLine(27, 53, 30, 55, trunkBody);
+
+    const leafShade = '#174d29';
+    const leafMid = '#23723b';
+    const leafLight = '#349a4f';
+    const leafHighlight = '#55bb68';
+
+    const leaves: {
+      x: number;
+      y: number;
+      length: number;
+      spread: number;
+      angle: number;
+      fill: string;
+      light: string;
+    }[] = [
+      // Outer crown, darker leaves defining the silhouette.
+      { x: 10, y: 10, length: 11, spread: 5, angle: -2.2, fill: leafShade, light: leafMid },
+      { x: 17, y: 6, length: 11, spread: 5, angle: -1.75, fill: leafShade, light: leafMid },
+      { x: 24, y: 4, length: 11, spread: 5, angle: -1.57, fill: leafShade, light: leafMid },
+      { x: 31, y: 6, length: 11, spread: 5, angle: -1.39, fill: leafShade, light: leafMid },
+      { x: 38, y: 10, length: 11, spread: 5, angle: -0.94, fill: leafShade, light: leafMid },
+      { x: 6, y: 18, length: 10, spread: 5, angle: 3.05, fill: leafShade, light: leafMid },
+      { x: 42, y: 18, length: 10, spread: 5, angle: 0.09, fill: leafShade, light: leafMid },
+      { x: 6, y: 27, length: 10, spread: 5, angle: 2.85, fill: leafShade, light: leafMid },
+      { x: 42, y: 26, length: 10, spread: 5, angle: 0.3, fill: leafShade, light: leafMid },
+      { x: 13, y: 31, length: 9, spread: 4, angle: 2.3, fill: leafShade, light: leafMid },
+      { x: 35, y: 31, length: 9, spread: 4, angle: 0.85, fill: leafShade, light: leafMid },
+      { x: 20, y: 33, length: 8, spread: 4, angle: 1.9, fill: leafShade, light: leafMid },
+      { x: 28, y: 33, length: 8, spread: 4, angle: 1.25, fill: leafShade, light: leafMid },
+      // Middle layer, warmer greens over the dark base.
+      { x: 14, y: 15, length: 10, spread: 5, angle: -2.55, fill: leafMid, light: leafLight },
+      { x: 24, y: 12, length: 11, spread: 5, angle: -1.75, fill: leafMid, light: leafLight },
+      { x: 34, y: 15, length: 10, spread: 5, angle: -0.6, fill: leafMid, light: leafLight },
+      { x: 10, y: 23, length: 10, spread: 5, angle: 2.75, fill: leafMid, light: leafLight },
+      { x: 38, y: 22, length: 10, spread: 5, angle: 0.4, fill: leafMid, light: leafLight },
+      { x: 18, y: 23, length: 10, spread: 5, angle: 2.4, fill: leafMid, light: leafLight },
+      { x: 30, y: 22, length: 10, spread: 5, angle: 0.7, fill: leafMid, light: leafLight },
+      { x: 24, y: 20, length: 11, spread: 5, angle: -1.85, fill: leafMid, light: leafLight },
+      { x: 16, y: 28, length: 9, spread: 4, angle: 2.65, fill: leafMid, light: leafLight },
+      { x: 32, y: 28, length: 9, spread: 4, angle: 0.5, fill: leafMid, light: leafLight },
+      // Sunlit leaves concentrated on the upper-left, as in the reference.
+      { x: 15, y: 12, length: 9, spread: 4, angle: -2.3, fill: leafLight, light: leafHighlight },
+      { x: 23, y: 9, length: 9, spread: 4, angle: -1.9, fill: leafLight, light: leafHighlight },
+      { x: 20, y: 18, length: 8, spread: 4, angle: -2.6, fill: leafLight, light: leafHighlight },
+      { x: 13, y: 20, length: 8, spread: 4, angle: -2.9, fill: leafLight, light: leafHighlight },
+      { x: 28, y: 17, length: 8, spread: 4, angle: -0.9, fill: leafLight, light: leafHighlight },
+    ];
+
+    for (let i = 0; i < leaves.length; i++) {
+      const leaf = leaves[i];
+      drawLeaf(
+        leaf.x,
+        leaf.y,
+        leaf.length,
+        leaf.spread,
+        leaf.angle,
+        leaf.fill,
+        leaf.light
+      );
+    }
+
+    const fruitOutline = '#1d0f07';
+    const fruitBody = '#7a4a2b';
+    const fruitLight = '#ab7647';
+    const fruitShade = '#4a2915';
+    const fruitRib = '#5c3620';
+
+    const drawFruit = (
+      cx: number,
+      cy: number,
+      rx: number,
+      ry: number,
+      stemX: number,
+      stemY: number
+    ): void => {
+      // Short dark stem attaching the fruit to the branch under the canopy.
+      drawLine(cx, cy - ry - 0.5, stemX, stemY, fruitOutline);
+      drawLine(cx + 1, cy - ry - 0.5, stemX + 1, stemY, '#5a3a1c');
+
+      // Large oval capsule with a dark contour and velvety brown shading.
+      fillEllipse(cx, cy, rx + 0.6, ry + 0.6, fruitOutline);
+      fillEllipse(cx, cy, rx, ry, fruitBody);
+      fillEllipse(cx - rx * 0.32, cy - ry * 0.28, rx * 0.62, ry * 0.55, fruitLight);
+      fillEllipse(cx + rx * 0.45, cy + ry * 0.28, rx * 0.48, ry * 0.52, fruitShade);
+      drawLine(cx - rx * 0.62, cy - ry * 0.55, cx - rx * 0.62, cy + ry * 0.62, fruitRib);
+      drawLine(cx + rx * 0.62, cy - ry * 0.5, cx + rx * 0.62, cy + ry * 0.58, fruitRib);
+      setPixel(cx - rx * 0.4, cy - ry * 0.5, '#c08a58');
+      setPixel(cx - rx * 0.65, cy - ry * 0.2, '#c08a58');
+      setPixel(cx, cy - ry - 0.6, '#3a2412');
+    };
+
+    // Five heavy cupuaçu fruits hanging at different heights around the crown.
+    drawFruit(37.5, 17.5, 2.6, 5, 36.5, 12.5);
+    drawFruit(27, 22, 2.9, 5.5, 27.5, 16.5);
+    drawFruit(12, 29, 2.8, 5.2, 13, 24);
+    drawFruit(33, 29.5, 2.8, 5.2, 33.5, 24);
+    drawFruit(16.5, 36.5, 2.7, 5, 18, 31.5);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    ctx.imageSmoothingEnabled = false;
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const color = pixels[y * width + x];
+        if (!color) continue;
+        ctx.fillStyle = color;
+        ctx.fillRect(x, y, 1, 1);
+      }
+    }
+
+    this.cupuacuPixelSprite = canvas;
     return canvas;
   }
 
@@ -3648,12 +3967,14 @@ export class WorldSystem {
       const screen = camera.worldToScreen(tree.x, tree.y);
       const sway = Math.sin(tree.animTimer) * 2;
       const acaiSprite = tree.kind === 'acai' ? this.getAcaiPixelSprite() : null;
+      const cupuacuSprite =
+        tree.kind === 'cupuacu' ? this.getCupuacuPixelSprite() : null;
 
       ctx.save();
       ctx.translate(screen.x, screen.y);
 
-      if (tree.kind !== 'acai' || !acaiSprite) {
-        // Shared shadow and a soft golden glow that marks a harvestable tree.
+      if (!acaiSprite && !cupuacuSprite) {
+        // Shared ground shadow for the procedurally drawn trees.
         ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
         ctx.beginPath();
         ctx.ellipse(0, 8, 34, 12, 0, 0, Math.PI * 2);
@@ -3679,47 +4000,20 @@ export class WorldSystem {
           spriteHeight
         );
         ctx.restore();
-      } else if (tree.kind === 'cupuacu') {
-        // Cupuaçuzeiro: short thick trunk, broad canopy and big brown fruit.
-        ctx.fillStyle = '#5b3a1e';
-        ctx.fillRect(-6, -42, 12, 46);
-
-        ctx.fillStyle = '#166534';
-        ctx.beginPath();
-        ctx.arc(-18 + sway, -54, 24, 0, Math.PI * 2);
-        ctx.arc(18 + sway, -56, 26, 0, Math.PI * 2);
-        ctx.arc(0 + sway, -72, 28, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.fillStyle = '#15803d';
-        ctx.beginPath();
-        ctx.arc(-4 + sway, -66, 18, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Stems holding the two large fruits.
-        ctx.strokeStyle = '#4a2f1b';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(-20 + sway, -56);
-        ctx.lineTo(-20, -46);
-        ctx.moveTo(18 + sway, -54);
-        ctx.lineTo(18, -44);
-        ctx.stroke();
-
-        ctx.fillStyle = '#7c4a21';
-        ctx.beginPath();
-        ctx.ellipse(-20, -38, 12, 16, 0.2, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.fillStyle = '#9a5f2d';
-        ctx.beginPath();
-        ctx.ellipse(18, -34, 11, 15, -0.2, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.fillStyle = 'rgba(253, 230, 138, 0.35)';
-        ctx.beginPath();
-        ctx.ellipse(-23, -43, 4, 6, 0.2, 0, Math.PI * 2);
-        ctx.fill();
+      } else if (cupuacuSprite) {
+        // Nearest-neighbour upscale keeps every pixel of the crafted sprite.
+        const spriteWidth = CUPUACU_SPRITE_WIDTH * CUPUACU_SPRITE_SCALE;
+        const spriteHeight = CUPUACU_SPRITE_HEIGHT * CUPUACU_SPRITE_SCALE;
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(
+          cupuacuSprite,
+          -spriteWidth / 2,
+          -spriteHeight,
+          spriteWidth,
+          spriteHeight
+        );
+        ctx.restore();
       } else if (tree.kind === 'castanha') {
         // Castanheira-do-Brasil: tall trunk, high canopy and spiky seed pods.
         ctx.fillStyle = '#5b3a1e';
