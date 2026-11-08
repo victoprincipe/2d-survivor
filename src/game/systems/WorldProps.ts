@@ -105,6 +105,11 @@ const MUD_BAND = 130;
 export const WATER_SPEED_MULTIPLIER = 0.7;
 export const MUD_SPEED_MULTIPLIER = 0.8;
 
+// Mud advantages: river predators slide over the clay instead of sinking into
+// it, while the Ariranha keeps its footing and gains a smaller burst.
+export const MUD_RIVER_PREDATOR_SPEED_MULTIPLIER = 1.3;
+export const MUD_OTTER_SPEED_MULTIPLIER = 1.2;
+
 // Repeating pixel-art tiles used by the Amazon ground/beach/water textures.
 const FOREST_GROUND_TILE = 320;
 const SAND_GRAIN_TILE = 160;
@@ -1696,14 +1701,16 @@ export class WorldSystem {
   /**
    * Moves an aquatic enemy from one valid water position to another while
    * refusing any step that would reach dry land. Each axis is resolved
-   * independently so the creature can slide along the riverbank.
+   * independently so the creature can slide along the riverbank. When
+   * `allowMud` is set, the creature may also haul out into the muddy margin.
    */
   public resolveAquaticMovement(
     fromX: number,
     fromY: number,
     toX: number,
     toY: number,
-    radius: number
+    radius: number,
+    allowMud: boolean = false
   ): { x: number; y: number } {
     if (this.mapId !== 'amazon_forest') return { x: toX, y: toY };
 
@@ -1720,10 +1727,10 @@ export class WorldSystem {
 
     for (let i = 0; i < steps; i++) {
       const nextX = x + stepX;
-      if (this.isNavigableWater(nextX, y, radius)) x = nextX;
+      if (this.isNavigableWater(nextX, y, radius) || (allowMud && this.isMud(nextX, y))) x = nextX;
 
       const nextY = y + stepY;
-      if (this.isNavigableWater(x, nextY, radius)) y = nextY;
+      if (this.isNavigableWater(x, nextY, radius) || (allowMud && this.isMud(x, nextY))) y = nextY;
     }
 
     return { x, y };

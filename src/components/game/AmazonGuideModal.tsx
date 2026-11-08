@@ -509,6 +509,12 @@ const RULES: { title: string; icon: React.ReactNode; accent: string; text: strin
     text: 'A partida é dividida em três turnos: 00:00–05:00, 05:00–15:00 e 15:00–20:00. Complete os objetivos de cada turno e faça o resgate por clique antes do tempo acabar.',
   },
   {
+    title: 'Física da Água e Lama',
+    icon: <Droplets className="h-4 w-4" />,
+    accent: 'text-cyan-300',
+    text: 'Andar no rio reduz a velocidade em 30% e na lama em 20%. No entanto, Jacaré-açu e Sucuri ganham +30% de velocidade ao deslizarem na lama, e a Ariranha ganha +20%.',
+  },
+  {
     title: 'Animais aquáticos ocultos',
     icon: <Droplets className="h-4 w-4" />,
     accent: 'text-cyan-300',

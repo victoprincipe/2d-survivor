@@ -34,6 +34,8 @@ import { WaveDirector } from '../systems/WaveDirector';
 import {
   CollectedFruit,
   HerbProp,
+  MUD_OTTER_SPEED_MULTIPLIER,
+  MUD_RIVER_PREDATOR_SPEED_MULTIPLIER,
   MUD_SPEED_MULTIPLIER,
   WATER_SPEED_MULTIPLIER,
   WorldSystem,
@@ -614,14 +616,21 @@ export class GameEngine {
       // The forest night frenzy accelerates every animal by 25%.
       e.isAmazonNight = amazonNight;
       // Terrain physics for land animals: the river slows them by 30% and the
-      // muddy margins by 20%. River predators keep their own water/beach boost.
+      // muddy margins by 20%. River predators ignore the mud penalty and get a
+      // +30% boost there; the Ariranha gets +20% instead.
       const enemyInWater = this.worldProps.isWaterSurface(e.x, e.y);
+      const enemyInMud = !enemyInWater && this.worldProps.isMud(e.x, e.y);
       if (e.isRiverPredator) {
-        e.terrainSpeedMultiplier = playerInWater ? (enemyInWater ? 1.5 : 1.3) : 1.0;
+        e.terrainSpeedMultiplier = enemyInMud
+          ? MUD_RIVER_PREDATOR_SPEED_MULTIPLIER
+          : playerInWater
+            ? (enemyInWater ? 1.5 : 1.3)
+            : 1.0;
+      } else if (e.type === 'giant_otter') {
+        e.terrainSpeedMultiplier = enemyInMud ? MUD_OTTER_SPEED_MULTIPLIER : 1.0;
       } else if (e.isWaterDweller) {
         e.terrainSpeedMultiplier = 1.0;
       } else {
-        const enemyInMud = !enemyInWater && this.worldProps.isMud(e.x, e.y);
         e.terrainSpeedMultiplier = enemyInWater
           ? WATER_SPEED_MULTIPLIER
           : enemyInMud
@@ -673,8 +682,9 @@ export class GameEngine {
       }
 
       // Aquatic enemies are locked to the water: reject any step that would
-      // carry them onto the riverbank or dry forest floor. River predators may
-      // haul out onto the beach, but never leave the river/beach band.
+      // carry them onto the riverbank or dry forest floor. The Ariranha may
+      // also slide through the muddy margin, while river predators may haul
+      // out onto the beach but never leave the river/beach band.
       if (e.isRiverPredator) {
         const resolved = this.worldProps.resolveRiverBankMovement(
           previousX,
@@ -691,7 +701,8 @@ export class GameEngine {
           previousY,
           e.x,
           e.y,
-          e.radius
+          e.radius,
+          e.type === 'giant_otter'
         );
         e.x = resolved.x;
         e.y = resolved.y;
