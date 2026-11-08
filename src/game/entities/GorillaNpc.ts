@@ -9,9 +9,6 @@ export class GorillaNpc {
 
   private readonly sprite: HTMLImageElement;
   private animationTime = 0;
-  private readonly cycleDuration = animationData.animations.idle.durations.reduce(
-    (total, duration) => total + duration, 0
-  );
 
   constructor() {
     this.sprite = new Image();
@@ -19,15 +16,33 @@ export class GorillaNpc {
   }
 
   update(dt: number): void {
-    this.animationTime = (this.animationTime + dt * 1000) % this.cycleDuration;
+    this.animationTime += dt * 1000;
   }
 
-  render(ctx: CanvasRenderingContext2D, camera: Camera): void {
-    if (!this.sprite.complete || this.sprite.naturalWidth === 0) return;
-    if (!camera.isInView(this.x, this.y, 240)) return;
+  canInteract(player: { x: number; y: number }): boolean {
+    return Math.hypot(player.x - this.x, player.y - this.y) <= 150;
+  }
 
-    const idle = animationData.animations.idle;
-    let time = this.animationTime;
+  renderPrompt(ctx: CanvasRenderingContext2D, camera: Camera): void {
+    const screen = camera.worldToScreen(this.x, this.y);
+    ctx.save();
+    ctx.font = 'bold 14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(15, 23, 18, 0.92)';
+    ctx.beginPath();
+    ctx.roundRect(screen.x - 100, screen.y - 242, 200, 34, 8);
+    ctx.fill();
+    ctx.fillStyle = '#fde68a';
+    ctx.fillText('[E] Conversar com o gorila', screen.x, screen.y - 220);
+    ctx.restore();
+  }
+
+  render(ctx: CanvasRenderingContext2D, camera: Camera, x = this.x, y = this.y, challenge = false, flashing = false): void {
+    if (!this.sprite.complete || this.sprite.naturalWidth === 0) return;
+    if (!camera.isInView(x, y, 240)) return;
+
+    const idle = challenge ? animationData.animations.challenge : animationData.animations.idle;
+    let time = this.animationTime % idle.durations.reduce((sum, duration) => sum + duration, 0);
     let frameIndex = 0;
     while (frameIndex < idle.durations.length - 1 && time >= idle.durations[frameIndex]) {
       time -= idle.durations[frameIndex];
@@ -35,7 +50,7 @@ export class GorillaNpc {
     }
     const frame = idle.frames[frameIndex];
     const { frameWidth, frameHeight, columns } = animationData;
-    const screen = camera.worldToScreen(this.x, this.y);
+    const screen = camera.worldToScreen(x, y);
     const scale = 0.46;
 
     ctx.save();
@@ -44,6 +59,7 @@ export class GorillaNpc {
     ctx.ellipse(screen.x, screen.y, 72, 20, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.imageSmoothingEnabled = true;
+    if (flashing) ctx.globalAlpha = 0.6;
     ctx.drawImage(
       this.sprite,
       (frame % columns) * frameWidth,

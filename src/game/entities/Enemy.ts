@@ -1,6 +1,7 @@
 import { EnemyType, WeaponId } from '../types';
 import { Camera } from '../engine/Camera';
 import { Player } from './Player';
+import { GORILLA_CHARGE, GORILLA_SKILL_SPEED, GORILLA_SLAM_COOLDOWN } from '../data/gorilla';
 
 export type BossOrEliteState =
   | 'idle'
@@ -139,6 +140,18 @@ export class Enemy {
     this.y = y;
 
     switch (type) {
+      case 'boss_gorilla':
+        this.name = 'Gorila — O Maior da Floresta';
+        this.radius = 50;
+        this.maxHp = Math.round(3200 * hpMultiplier);
+        this.speed = 78;
+        this.damage = 32;
+        this.xpValue = 800;
+        this.isBoss = true;
+        this.knockbackResistance = 0.04;
+        this.novaRadius = 185;
+        this.skillCooldown = 2;
+        break;
       case 'bat':
         this.name = 'Morcego Carniceiro';
         this.radius = 12;
@@ -737,7 +750,9 @@ export class Enemy {
 
     if (this.skillState === 'dashing') {
       const baseDashSpeed =
-        this.type === 'boss_cobra_grande'
+        this.type === 'boss_gorilla'
+          ? GORILLA_CHARGE.speed
+          : this.type === 'boss_cobra_grande'
           ? 620
           : this.type === 'boss_boitata'
             ? 340
@@ -914,7 +929,7 @@ export class Enemy {
           this.skillDuration = 0.65;
           this.skillStateTimer = 0.65;
         } else if (this.isBoss) {
-          const skill = this.bossSkillIndex % 3;
+          const skill = this.bossSkillIndex % (this.type === 'boss_gorilla' ? 2 : 3);
           this.bossSkillIndex += 1;
 
           if (skill === 0) {
@@ -922,12 +937,12 @@ export class Enemy {
             this.dashDirX = dx / norm;
             this.dashDirY = dy / norm;
             this.skillState = 'telegraph_dash';
-            this.skillDuration = 0.75;
-            this.skillStateTimer = 0.75;
+            this.skillDuration = this.type === 'boss_gorilla' ? 0.75 / GORILLA_SKILL_SPEED : 0.75;
+            this.skillStateTimer = this.skillDuration;
           } else if (skill === 1) {
             this.skillState = 'telegraph_nova';
-            this.skillDuration = 0.85;
-            this.skillStateTimer = 0.85;
+            this.skillDuration = this.type === 'boss_gorilla' ? 0.85 / GORILLA_SKILL_SPEED : 0.85;
+            this.skillStateTimer = this.skillDuration;
           } else {
             this.skillState = 'telegraph_summon';
             this.skillDuration = 0.6;
@@ -943,15 +958,15 @@ export class Enemy {
 
     if (this.skillState === 'telegraph_dash') {
       this.skillState = 'dashing';
-      this.skillDuration = this.isBoss ? 0.65 : 0.68;
+      this.skillDuration = this.type === 'boss_gorilla' ? GORILLA_CHARGE.duration : this.isBoss ? 0.65 : 0.68;
       this.skillStateTimer = this.skillDuration;
     } else if (this.skillState === 'dashing') {
       this.skillState = 'idle';
-      this.skillCooldown = this.isBoss ? 4.8 : 6.2;
+      this.skillCooldown = this.type === 'boss_gorilla' ? GORILLA_CHARGE.cooldown : this.isBoss ? 4.8 : 6.2;
     } else if (this.skillState === 'telegraph_nova') {
       this.pendingNovaBurst = true;
       this.skillState = 'idle';
-      this.skillCooldown = 5.0;
+      this.skillCooldown = this.type === 'boss_gorilla' ? GORILLA_SLAM_COOLDOWN : 5.0;
     } else if (this.skillState === 'telegraph_summon') {
       this.pendingSummonCount = 6;
       this.skillState = 'idle';

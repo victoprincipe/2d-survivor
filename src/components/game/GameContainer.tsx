@@ -15,8 +15,9 @@ import { TreasureChestModal } from './TreasureChestModal';
 import { EndGameModal } from './EndGameModal';
 import { PauseModal } from './PauseModal';
 import { DevTools } from './DevTools';
+import { GorillaDialogue } from './GorillaDialogue';
 
-type GameState = 'menu' | 'playing' | 'paused' | 'level_up' | 'chest' | 'game_over' | 'victory';
+type GameState = 'menu' | 'playing' | 'paused' | 'level_up' | 'chest' | 'game_over' | 'victory' | 'dialogue';
 
 const DEFAULT_HUD: HUDState = {
   playerHp: 100,
@@ -89,6 +90,10 @@ export const GameContainer: React.FC = () => {
       }
 
       const engine = new GameEngine(canvas, character, currentSavedData, difficulty, mapId, {
+        onGorillaDialogue: () => {
+          gameStateRef.current = 'dialogue';
+          setGameState('dialogue');
+        },
         onHUDUpdate: (newHud) => {
           setHud(newHud);
         },
@@ -284,6 +289,18 @@ export const GameContainer: React.FC = () => {
       )}
 
       {/* Overlays / Modals */}
+      {gameState === 'dialogue' && (
+        <GorillaDialogue onStartCombat={() => {
+          if (engineRef.current?.startGorillaCombat()) {
+            gameStateRef.current = 'playing';
+            setGameState('playing');
+          }
+        }} onClose={() => {
+          engineRef.current?.resume();
+          gameStateRef.current = 'playing';
+          setGameState('playing');
+        }} />
+      )}
       {gameState === 'menu' && (
         <StartScreen
           savedData={savedData}

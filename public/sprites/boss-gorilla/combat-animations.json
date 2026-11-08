@@ -1,0 +1,9 @@
+{
+  "image": "/sprites/boss-gorilla/combat-atlas.png",
+  "frameWidth": 320,
+  "frameCount": 6,
+  "scale": 0.7,
+  "walk": { "sourceY": 0, "height": 406, "baseline": 344, "stride": 100 },
+  "run": { "sourceY": 406, "height": 406, "baseline": 333, "stride": 140 },
+  "slam": { "sourceY": 812, "height": 406, "baseline": 347, "recoverySeconds": 0.4 }
+}

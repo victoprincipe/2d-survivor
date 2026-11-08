@@ -23,6 +23,8 @@ import { SpatialGrid } from './SpatialGrid';
 import { Player } from '../entities/Player';
 import { Enemy } from '../entities/Enemy';
 import { GorillaNpc } from '../entities/GorillaNpc';
+import { GorillaBoss } from '../entities/GorillaBoss';
+import { GORILLA_LEAP } from '../data/gorilla';
 import { Drop } from '../entities/Drops';
 import { VFXManager } from '../entities/VFX';
 import { WeaponSystem } from '../weapons/WeaponSystem';
@@ -34,6 +36,7 @@ import { getDifficulty } from '../data/difficulties';
 import { applyRunToMissions } from '../data/missions';
 
 export interface GameEngineCallbacks {
+  onGorillaDialogue?: () => void;
   onHUDUpdate: (hud: HUDState) => void;
   onLevelUp: (options: UpgradeOption[]) => void;
   onTreasureChest: (gold: number, upgrade?: UpgradeOption) => void;
@@ -262,6 +265,30 @@ export class GameEngine {
 
   public enemies: Enemy[] = [];
   private readonly gorillaNpc: GorillaNpc | null;
+  private gorillaDefeated = false;
+  private gorillaFight: { boss: GorillaBoss; hiddenEnemies: Enemy[]; previousBoss: Enemy | null } | null = null;
+
+  private get gorillaAvailable(): boolean {
+    return !!this.gorillaNpc && !this.gorillaFight && !this.gorillaDefeated;
+  }
+
+  public startGorillaCombat(): boolean {
+    if (!this.gorillaAvailable || !this.gorillaNpc?.canInteract(this.player) || this.isGameOver) return false;
+    const minutes = this.waveDirector.survivalTime / 60;
+    const boss = new GorillaBoss(-1, this.gorillaNpc.x, this.gorillaNpc.y,
+      (1 + minutes * 0.3) * this.difficulty.enemyHp);
+    boss.damage = Math.round(boss.damage * this.difficulty.enemyDamage);
+    this.gorillaFight = { boss, hiddenEnemies: this.enemies, previousBoss: this.waveDirector.bossActive };
+    this.enemies = [boss];
+    this.spatialGrid.clear();
+    this.bossProjectiles = [];
+    this.bossHazards = [];
+    this.waveDirector.bossActive = boss;
+    this.sound.playBossRoar();
+    this.resume();
+    this.syncHUD();
+    return true;
+  }
   public drops: Drop[] = [];
   private bossProjectiles: BossProjectile[] = [];
   private bossHazards: BossHazard[] = [];
@@ -450,6 +477,13 @@ export class GameEngine {
 
   private update(dt: number): void {
     this.gorillaNpc?.update(dt);
+    const interactRequested = this.input.consumeInteract();
+    if (interactRequested && this.gorillaAvailable && this.gorillaNpc?.canInteract(this.player) && this.callbacks.onGorillaDialogue) {
+      this.pause();
+      this.input.handlePointerUp();
+      this.callbacks.onGorillaDialogue();
+      return;
+    }
     if (this.gemStreakTimer > 0) {
       this.gemStreakTimer -= dt;
       if (this.gemStreakTimer <= 0) this.gemStreak = 0;
@@ -564,7 +598,7 @@ export class GameEngine {
         );
         e.x = resolved.x;
         e.y = resolved.y;
-      } else if (!(e.isJaguarPredator && e.jaguarAttack === 'leap' &&
+      } else if (!(e instanceof GorillaBoss && (e.isLeaping || e.pendingLeapImpact)) && !(e.isJaguarPredator && e.jaguarAttack === 'leap' &&
         (e.jaguarState === 'active' || e.pendingJaguarStrike === 'leap'))) {
         // Land animals cannot cross the plateau cliffs either: they must use
         // the dirt ramps, just like the hero.
@@ -577,6 +611,20 @@ export class GameEngine {
         );
         e.x = resolved.x;
         e.y = resolved.y;
+      }
+
+      if (e instanceof GorillaBoss && e.pendingLeapImpact) {
+        e.pendingLeapImpact = false;
+        this.weaponSystem.spawnRingPulse(e.x, e.y, GORILLA_LEAP.radius, '#f59e0b', 0.4);
+        this.camera.shake(0.25, 8);
+        this.sound.playThunder();
+        if (Math.hypot(this.player.x - e.x, this.player.y - e.y) <= GORILLA_LEAP.radius + this.player.radius &&
+          !this.player.isJumping && !this.player.godMode && this.player.invulnerableTimer <= 0) {
+          const hp = this.player.hp;
+          const fatal = this.applyPlayerDamage(e.damage, true, true);
+          if (this.player.hp < hp) this.player.applyStun(GORILLA_LEAP.stun);
+          if (fatal) { this.handlePlayerDeath(); return; }
+        }
       }
 
       // Land creatures standing on the river/lake surface are drawn waist-deep.
@@ -960,7 +1008,11 @@ export class GameEngine {
       const dy = this.player.y - e.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
 
-      if (!e.isSubmerged && !e.jaguarBusy && !this.player.isJumping && dist < this.player.radius + e.radius) {
+      // Sweep the wider charge over this step so a fast dash cannot skip the hero.
+      const bodyHit = e instanceof GorillaBoss && e.skillState === 'dashing'
+        ? e.chargeHits(this.player, previousX, previousY)
+        : dist < this.player.radius + e.radius;
+      if (!e.isSubmerged && !e.jaguarBusy && !(e instanceof GorillaBoss && e.isLeaping) && !this.player.isJumping && bodyHit) {
         const fatal = this.applyPlayerDamage(e.damage, false, true);
 
         if (fatal) {
@@ -979,7 +1031,7 @@ export class GameEngine {
     this.worldProps.update(dt, this.player, (drop) => this.drops.push(drop));
 
     // 5.1. Fruit trees are harvested only when the player presses E nearby.
-    if (this.input.consumeInteract()) {
+    if (interactRequested) {
       const fruit = this.worldProps.collectNearbyFruitTree(this.player);
       if (fruit) this.handleFruitCollected(fruit);
     }
@@ -1018,7 +1070,15 @@ export class GameEngine {
     }
 
     // 8. Update Wave Director (Spawns)
-    this.waveDirector.update(
+    if (this.gorillaFight && this.gorillaDefeated) {
+      this.enemies = this.gorillaFight.hiddenEnemies.filter(enemy => enemy.hp > 0);
+      this.waveDirector.bossActive = this.gorillaFight.previousBoss;
+      this.gorillaFight = null;
+      this.bossProjectiles = [];
+      this.bossHazards = [];
+      this.spatialGrid.clear();
+    }
+    if (!this.gorillaFight) this.waveDirector.update(
       dt,
       this.player,
       this.camera,
@@ -1392,6 +1452,7 @@ export class GameEngine {
   }
 
   private trackAmazonObjectiveKill(enemy: Enemy): void {
+    if (enemy.type === 'boss_gorilla') return;
     if (!this.waveDirector.isAmazonForest) return;
     if (enemy.isAquatic) {
       this.amazonObjectives.waterKills += 1;
@@ -1574,6 +1635,7 @@ export class GameEngine {
   private onEnemyKilled(enemy: Enemy): void {
     if (this.processedEnemyDeaths.has(enemy)) return;
     this.processedEnemyDeaths.add(enemy);
+    if (enemy === this.gorillaFight?.boss) this.gorillaDefeated = true;
 
     this.trackAmazonObjectiveKill(enemy);
 
@@ -2024,11 +2086,23 @@ export class GameEngine {
     }
 
     // Match the player's depth at the NPC's feet without adding it to combat.
-    if (this.gorillaNpc && this.player.y >= this.gorillaNpc.y) {
+    if (this.gorillaAvailable && this.gorillaNpc && this.player.y >= this.gorillaNpc.y) {
       this.gorillaNpc.render(ctx, camera);
     }
     this.player.render(ctx, camera);
-    if (this.gorillaNpc && this.player.y < this.gorillaNpc.y) {
+    if (this.player.stunTimer > 0) {
+      const playerScreen = camera.worldToScreen(this.player.x, this.player.y);
+      ctx.save();
+      ctx.font = 'bold 12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#1c1917';
+      ctx.fillStyle = '#fde047';
+      ctx.strokeText('ATORDOADO', playerScreen.x, playerScreen.y - 64);
+      ctx.fillText('ATORDOADO', playerScreen.x, playerScreen.y - 64);
+      ctx.restore();
+    }
+    if (this.gorillaAvailable && this.gorillaNpc && this.player.y < this.gorillaNpc.y) {
       this.gorillaNpc.render(ctx, camera);
     }
     this.renderBossProjectiles();
@@ -2049,6 +2123,9 @@ export class GameEngine {
 
     // 7.3. Fire bosses shine through the jungle night.
     this.renderNightFireBossGlow();
+    if (!this.isPaused && !this.isGameOver && this.gorillaAvailable && this.gorillaNpc?.canInteract(this.player)) {
+      this.gorillaNpc.renderPrompt(ctx, camera);
+    }
 
     // 7.5. Render Debug Overlay (Hitboxes, Ranges, Spatial Grid)
     this.renderDebugOverlay();
@@ -2573,6 +2650,7 @@ export class GameEngine {
   // --- DevTools Public API ---
 
   public devSpawnEnemy(type: EnemyType, count: number = 1): void {
+    if (this.gorillaFight || type === 'boss_gorilla') return;
     // The Minotaur is night-plain content and must never appear in the forest,
     // even when spawned manually through the developer tools.
     if (type === 'elite_minotaur' && this.waveDirector.isAmazonForest) return;
@@ -2594,6 +2672,7 @@ export class GameEngine {
   }
 
   public devSpawnDummy(): void {
+    if (this.gorillaFight) return;
     const angle = Math.random() * Math.PI * 2;
     const dist = 130;
     const x = this.player.x + Math.cos(angle) * dist;
