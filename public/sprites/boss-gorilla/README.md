@@ -22,6 +22,10 @@ O salto tem recarga de 3 segundos a partir da aterrissagem e aguarda o ataque at
 
 ## Animações de combate
 
+### Grito
+
+O chefe interrompe a locomoção e bate no peito, anunciando o Grito. Ao iniciar o efeito, recupera uma única vez 20% da vida máxima, respeitando o limite de vida. Durante 5 segundos, emite cinco pulsos, um por segundo, num raio de 800 unidades; cada pulso causa metade do dano base do chefe. A área tem contorno e ondas visíveis. Sair do raio evita os pulsos; proteções normais do jogador continuam válidas. A recarga é de 15 segundos após o término. A habilidade aguarda o fim de outros ataques, inclusive os três pulos; morte cancela o efeito e pausa congela seus temporizadores.
+
 `combat-spritesheet.png` contém 18 quadros, em seis colunas e três linhas: caminhada, corrida e golpe com dois punhos no chão. `combat-animations.json` define os recortes e as linhas de apoio dos pés. Cada linha tem seis poses. Os quadros do NPC continuam sendo usados em repouso.
 
 O jogo carrega `combat-atlas.png`, com células isoladas de 320 × 406 e margem transparente. A folha gerada originalmente tem membros que atravessam algumas divisões; `build-isolated-sprites.mjs` identifica cada silhueta inteira e a reposiciona em sua própria célula, preservando a suavização da borda. Isso impede fragmentos de poses vizinhas e vazamento na interpolação do Canvas. Para reconstruir os arquivos, execute primeiro `node public/sprites/boss-gorilla/build-isolated-sprites.mjs` e depois o script de prévias.

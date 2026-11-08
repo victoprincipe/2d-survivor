@@ -16,6 +16,67 @@ export class SoundEngine {
   private amazonHurtBuffer: AudioBuffer | null = null;
   private deathBuffer: Promise<AudioBuffer | null> | null = null;
   private jaguarBuffer: Promise<AudioBuffer | null> | null = null;
+  private gorillaRoarBuffer: Promise<AudioBuffer | null> | null = null;
+  private gorillaLeapBuffer: Promise<AudioBuffer | null> | null = null;
+  private gorillaChargeBuffer: Promise<AudioBuffer | null> | null = null;
+  private gorillaGroundSlamBuffer: Promise<AudioBuffer | null> | null = null;
+
+  playGorillaGroundSlam(): void {
+    if (this.muted || !this.initCtx() || !this.ctx || !this.sfxGain) return;
+    const ctx = this.ctx;
+    const gain = this.sfxGain;
+    void this.gorillaGroundSlamBuffer?.then(buffer => {
+      if (!buffer || this.ctx !== ctx || ctx.state === 'closed') return;
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(gain);
+      source.onended = () => source.disconnect();
+      source.start();
+    });
+  }
+
+  playGorillaCharge(): void {
+    if (this.muted || !this.initCtx() || !this.ctx || !this.sfxGain) return;
+    const ctx = this.ctx;
+    const gain = this.sfxGain;
+    void this.gorillaChargeBuffer?.then(buffer => {
+      if (!buffer || this.ctx !== ctx || ctx.state === 'closed') return;
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(gain);
+      source.onended = () => source.disconnect();
+      source.start();
+    });
+  }
+  playGorillaLeap(): void {
+    if (this.muted || !this.initCtx() || !this.ctx || !this.sfxGain) return;
+    const ctx = this.ctx;
+    const gain = this.sfxGain;
+    void this.gorillaLeapBuffer?.then(buffer => {
+      if (!buffer || this.ctx !== ctx || ctx.state === 'closed') return;
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(gain);
+      source.onended = () => source.disconnect();
+      source.start();
+    });
+  }
+
+  /** Custom recording reserved for the gorilla's Grito skill. */
+  playGorillaRoar(): void {
+    if (this.muted || !this.initCtx() || !this.ctx || !this.sfxGain) return;
+    const ctx = this.ctx;
+    const gain = this.sfxGain;
+    void this.gorillaRoarBuffer?.then(buffer => {
+      if (this.ctx !== ctx || ctx.state === 'closed') return;
+      if (!buffer) { this.playBossRoar(); return; }
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(gain);
+      source.onended = () => source.disconnect();
+      source.start();
+    });
+  }
 
   playJaguarCharge(): void {
     if (!this.initCtx() || !this.ctx || !this.sfxGain) return;
@@ -76,6 +137,22 @@ export class SoundEngine {
         .catch(() => {});
       this.jaguarBuffer = fetch('/audio/jaguar-charge.mp3')
         .then(response => { if (!response.ok) throw new Error('Jaguar audio unavailable'); return response.arrayBuffer(); })
+        .then(data => ctx.decodeAudioData(data))
+        .catch(() => null);
+      this.gorillaRoarBuffer = fetch('/audio/gorilla-roar.mp3')
+        .then(response => { if (!response.ok) throw new Error('Gorilla roar audio unavailable'); return response.arrayBuffer(); })
+        .then(data => ctx.decodeAudioData(data))
+        .catch(() => null);
+      this.gorillaLeapBuffer = fetch('/audio/gorilla-leap.mp3')
+        .then(response => { if (!response.ok) throw new Error('Gorilla leap audio unavailable'); return response.arrayBuffer(); })
+        .then(data => ctx.decodeAudioData(data))
+        .catch(() => null);
+      this.gorillaChargeBuffer = fetch('/audio/gorilla-charge.mp3')
+        .then(response => { if (!response.ok) throw new Error('Gorilla charge audio unavailable'); return response.arrayBuffer(); })
+        .then(data => ctx.decodeAudioData(data))
+        .catch(() => null);
+      this.gorillaGroundSlamBuffer = fetch('/audio/gorilla-ground-slam.mp3')
+        .then(response => { if (!response.ok) throw new Error('Gorilla ground slam audio unavailable'); return response.arrayBuffer(); })
         .then(data => ctx.decodeAudioData(data))
         .catch(() => null);
 
@@ -684,6 +761,10 @@ export class SoundEngine {
   }
 
   destroy(): void {
+    this.gorillaGroundSlamBuffer = null;
+    this.gorillaChargeBuffer = null;
+    this.gorillaLeapBuffer = null;
+    this.gorillaRoarBuffer = null;
     this.deathBuffer = null;
     this.amazonHurtBuffer = null;
     this.stopBgm();

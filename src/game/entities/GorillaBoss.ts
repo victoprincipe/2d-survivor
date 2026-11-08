@@ -3,7 +3,7 @@ import { GorillaNpc } from './GorillaNpc';
 import { Player } from './Player';
 import { Camera } from '../engine/Camera';
 import combat from '../../../public/sprites/boss-gorilla/combat-animations.json';
-import { GORILLA_CHARGE, GORILLA_LEAP, GORILLA_SKILL_SPEED } from '../data/gorilla';
+import { GORILLA_CHARGE, GORILLA_LEAP, GORILLA_SKILL_SPEED, GORILLA_ROAR } from '../data/gorilla';
 
 export class GorillaBoss extends Enemy {
   private readonly visual = new GorillaNpc();
@@ -25,6 +25,56 @@ export class GorillaBoss extends Enemy {
   private remainingLeaps = 0;
   private leapLanded = false;
   public pendingLeapImpact = false;
+  public pendingLeapSound = false;
+  private roarPhase: 'none' | 'warning' | 'active' = 'none';
+  private roarCooldown = GORILLA_ROAR.cooldown;
+  private roarTimer = 0;
+  public pendingRoarStart = false;
+  public pendingRoarHeal = 0;
+  public pendingRoarTicks = 0;
+
+  public get isRoaring(): boolean {
+    return this.roarPhase !== 'none';
+  }
+
+  private updateRoar(dt: number, player: Player, separation: { vx: number; vy: number }): boolean {
+    const x = this.x;
+    const y = this.y;
+    const cooldown = this.skillCooldown;
+    this.skillCooldown = Number.MAX_SAFE_INTEGER;
+    const alive = super.update(dt, player, separation);
+    this.skillCooldown = cooldown;
+    this.x = x;
+    this.y = y;
+    this.previousX = x;
+    this.previousY = y;
+    if (!alive) {
+      this.pendingRoarTicks = 0;
+      this.pendingRoarStart = false;
+      this.roarPhase = 'none';
+      return false;
+    }
+    const previousTimer = this.roarTimer;
+    this.roarTimer = Math.max(0, this.roarTimer - dt);
+    if (this.roarPhase === 'warning') {
+      if (this.roarTimer === 0) {
+        this.roarPhase = 'active';
+        this.roarTimer = GORILLA_ROAR.duration;
+        const previousHp = this.hp;
+        this.hp = Math.min(this.maxHp, this.hp + this.maxHp * GORILLA_ROAR.healFraction);
+        this.pendingRoarHeal = this.hp - previousHp;
+        this.pendingRoarStart = true;
+      }
+    } else {
+      const tick = (timer: number) => Math.floor(GORILLA_ROAR.duration - timer + 1e-8);
+      this.pendingRoarTicks += tick(this.roarTimer) - tick(previousTimer);
+      if (this.roarTimer === 0) {
+        this.roarPhase = 'none';
+        this.roarCooldown = GORILLA_ROAR.cooldown;
+      }
+    }
+    return true;
+  }
 
   public get isLeaping(): boolean {
     return this.leapPhase === 'airborne';
@@ -51,12 +101,14 @@ export class GorillaBoss extends Enemy {
     this.y = y;
     if (!alive) {
       this.pendingLeapImpact = false;
+      this.pendingLeapSound = false;
       return false;
     }
     this.leapTimer = Math.max(0, this.leapTimer - dt);
     if (this.leapPhase === 'warning') {
       if (this.leapTimer === 0) {
         this.leapPhase = 'airborne';
+        this.pendingLeapSound = true;
         this.leapTimer = GORILLA_LEAP.flight;
       }
     } else {
@@ -94,9 +146,20 @@ export class GorillaBoss extends Enemy {
     this.leapCooldown = Math.max(0, this.leapCooldown - dt);
     if (this.hp <= 0) {
       this.pendingLeapImpact = false;
+      this.pendingLeapSound = false;
+      this.pendingRoarTicks = 0;
+      this.pendingRoarStart = false;
+      this.roarPhase = 'none';
       return false;
     }
+    if (this.isRoaring) return this.updateRoar(dt, player, separation);
+    this.roarCooldown = Math.max(0, this.roarCooldown - dt);
     if (this.leapPhase !== 'none') return this.updateLeap(dt, player, separation);
+    if (this.roarCooldown === 0 && this.remainingLeaps === 0 && this.skillState === 'idle' && this.recoveryTime === 0) {
+      this.roarPhase = 'warning';
+      this.roarTimer = GORILLA_ROAR.warning;
+      return this.updateRoar(0, player, separation);
+    }
     if (this.leapCooldown === 0 && this.skillState === 'idle' && this.recoveryTime === 0 &&
       (this.remainingLeaps > 0 || Math.hypot(player.x - this.x, player.y - this.y) <= GORILLA_LEAP.range)) {
       this.leapPhase = 'warning';
@@ -150,6 +213,31 @@ export class GorillaBoss extends Enemy {
   }
 
   override render(ctx: CanvasRenderingContext2D, camera: Camera): void {
+    if (this.isRoaring) {
+      const origin = camera.worldToScreen(this.x, this.y);
+      ctx.save();
+      ctx.fillStyle = this.roarPhase === 'warning' ? 'rgba(251,191,36,0.08)' : 'rgba(239,68,68,0.12)';
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(origin.x, origin.y, GORILLA_ROAR.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      if (this.roarPhase === 'active') {
+        const pulse = (GORILLA_ROAR.duration - this.roarTimer) % 1;
+        ctx.strokeStyle = `rgba(251,191,36,${1 - pulse})`;
+        ctx.beginPath();
+        ctx.arc(origin.x, origin.y, pulse * GORILLA_ROAR.radius, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.font = 'bold 16px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#fde68a';
+      ctx.fillText('GRITO!', origin.x, origin.y - 220);
+      ctx.restore();
+      this.visual.render(ctx, camera, this.x, this.y + 25, true, this.hitFlashTimer > 0);
+      return;
+    }
     if (this.leapPhase !== 'none') {
       const target = camera.worldToScreen(this.leapTargetX, this.leapTargetY);
       ctx.save();

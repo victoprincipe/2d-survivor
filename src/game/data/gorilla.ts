@@ -21,3 +21,12 @@ export const GORILLA_LEAP = {
 };
 
 export const GORILLA_SLAM_COOLDOWN = 3.75;
+
+export const GORILLA_ROAR = {
+  cooldown: 15,
+  warning: 0.8 / GORILLA_SKILL_SPEED,
+  duration: 5,
+  radius: 800,
+  healFraction: 0.2,
+  damageMultiplier: 0.5,
+};

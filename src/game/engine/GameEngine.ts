@@ -24,7 +24,7 @@ import { Player } from '../entities/Player';
 import { Enemy } from '../entities/Enemy';
 import { GorillaNpc } from '../entities/GorillaNpc';
 import { GorillaBoss } from '../entities/GorillaBoss';
-import { GORILLA_LEAP } from '../data/gorilla';
+import { GORILLA_LEAP, GORILLA_ROAR } from '../data/gorilla';
 import { Drop } from '../entities/Drops';
 import { VFXManager } from '../entities/VFX';
 import { WeaponSystem } from '../weapons/WeaponSystem';
@@ -549,7 +549,11 @@ export class GameEngine {
       const previousX = e.x;
       const previousY = e.y;
       const previousJaguarState = e.jaguarState;
+      const previousSkillState = e.skillState;
       const alive = e.update(dt, this.player, sep);
+      if (alive && e instanceof GorillaBoss && previousSkillState !== 'dashing' && e.skillState === 'dashing') {
+        this.sound.playGorillaCharge();
+      }
       if (e.isJaguarPredator && e.jaguarState === 'warning' && e.jaguarAttack !== 'bite' &&
         (previousJaguarState === 'idle' || (e.jaguarAttack === 'charge' && e.jaguarTimer > 0.15))) {
         // Keep the displayed corridor terrain-safe while aiming; lock it before launch.
@@ -620,6 +624,27 @@ export class GameEngine {
         e.y = resolved.y;
       }
 
+      if (e instanceof GorillaBoss) {
+        if (e.pendingLeapSound) {
+          e.pendingLeapSound = false;
+          this.sound.playGorillaLeap();
+        }
+        if (e.pendingRoarStart) {
+          e.pendingRoarStart = false;
+          if (e.pendingRoarHeal > 0) this.vfx.addDamageNumber(e.x, e.y - 80, e.pendingRoarHeal, false, true);
+          e.pendingRoarHeal = 0;
+          this.sound.playGorillaRoar();
+          this.weaponSystem.spawnRingPulse(e.x, e.y, GORILLA_ROAR.radius, '#4ade80', 0.5);
+        }
+        const ticks = e.pendingRoarTicks;
+        e.pendingRoarTicks = 0;
+        for (let tick = 0; tick < ticks; tick++) {
+          if (Math.hypot(this.player.x - e.x, this.player.y - e.y) > GORILLA_ROAR.radius + this.player.radius) continue;
+          const fatal = this.applyPlayerDamage(Math.max(1, Math.round(e.damage * GORILLA_ROAR.damageMultiplier)), true, false);
+          if (fatal) { this.handlePlayerDeath(); return; }
+        }
+      }
+
       if (e instanceof GorillaBoss && e.pendingLeapImpact) {
         e.pendingLeapImpact = false;
         this.weaponSystem.spawnRingPulse(e.x, e.y, GORILLA_LEAP.radius, '#f59e0b', 0.4);
@@ -656,7 +681,8 @@ export class GameEngine {
       if (e.pendingNovaBurst) {
         e.pendingNovaBurst = false;
         this.weaponSystem.spawnRingPulse(e.x, e.y, e.novaRadius, '#ef4444', 0.32);
-        this.sound.playThunder();
+        if (e instanceof GorillaBoss) this.sound.playGorillaGroundSlam();
+        else this.sound.playThunder();
         this.camera.shake(0.25, 6);
 
         const ndx = this.player.x - e.x;
@@ -1019,7 +1045,7 @@ export class GameEngine {
       const bodyHit = e instanceof GorillaBoss && e.skillState === 'dashing'
         ? e.chargeHits(this.player, previousX, previousY)
         : dist < this.player.radius + e.radius;
-      if (!e.isSubmerged && !e.jaguarBusy && !(e instanceof GorillaBoss && e.isLeaping) && !this.player.isJumping && bodyHit) {
+      if (!e.isSubmerged && !e.jaguarBusy && !(e instanceof GorillaBoss && (e.isLeaping || e.isRoaring)) && !this.player.isJumping && bodyHit) {
         const fatal = this.applyPlayerDamage(e.damage, false, true);
 
         if (fatal) {
