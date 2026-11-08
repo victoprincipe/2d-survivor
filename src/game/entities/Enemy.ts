@@ -149,7 +149,8 @@ export class Enemy {
         this.xpValue = 800;
         this.isBoss = true;
         this.knockbackResistance = 0.04;
-        this.novaRadius = 185;
+        // Double the slam's circular area (area scales with radius squared).
+        this.novaRadius = 185 * Math.SQRT2;
         this.skillCooldown = 2;
         break;
       case 'bat':
