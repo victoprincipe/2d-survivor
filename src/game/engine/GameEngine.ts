@@ -370,6 +370,13 @@ export class GameEngine {
     this.beginAmazonTurn(0);
 
     this.player = new Player(withEquipment(character, savedData.inventories?.[character.id] ?? emptyInventory()), savedData.powerUps);
+    // Randomize the hero spawn on the Amazon Forest and snap the camera to it
+    // before the first frame, so the view/minimap never start at the old centre.
+    const spawn = this.worldProps.getRandomPlayerSpawn(this.player.radius);
+    this.player.x = spawn.x;
+    this.player.y = spawn.y;
+    this.camera.x = spawn.x;
+    this.camera.y = spawn.y;
     this.player.levelUpHealFraction = this.difficulty.levelUpHealFraction;
     this.player.setCollisionResolver((fromX, fromY, dx, dy, radius, airborne) =>
       this.worldProps.resolvePlayerMovement(fromX, fromY, dx, dy, radius, airborne)

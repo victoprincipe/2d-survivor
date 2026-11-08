@@ -308,6 +308,40 @@ export class WorldSystem {
     this.loadFloorTexture();
   }
 
+  /**
+   * Picks a random valid land position for the hero. The Amazon Forest map is
+   * finite, so the point stays away from the dense border tree wall, the
+   * river/lake water, the plateaus and any solid tree trunk.
+   */
+  public getRandomPlayerSpawn(radius: number = 18): { x: number; y: number } {
+    if (this.mapId !== 'amazon_forest') return { x: 0, y: 0 };
+
+    const limit = FOREST_HALF_SIZE - 420;
+    const isSafe = (x: number, y: number): boolean => {
+      if (this.isWaterSurface(x, y)) return false;
+      if (this.isOverPlateau(x, y, radius + 40)) return false;
+      if (this.isOnPlateauRamp(x, y, radius + 40)) return false;
+      if (this.collidesWithTree(x, y, radius + 24)) return false;
+      return true;
+    };
+
+    for (let attempt = 0; attempt < 400; attempt++) {
+      const x = (Math.random() * 2 - 1) * limit;
+      const y = (Math.random() * 2 - 1) * limit;
+      if (isSafe(x, y)) return { x, y };
+    }
+
+    // Extremely unlikely fallback: scan inland from the corners until a dry,
+    // obstacle-free patch is found.
+    for (let y = -limit; y <= limit; y += 240) {
+      for (let x = -limit; x <= limit; x += 240) {
+        if (isSafe(x, y)) return { x, y };
+      }
+    }
+
+    return { x: 0, y: -limit };
+  }
+
   private spawnInitialFruitTrees(): void {
     // One tree of each fruit starts at a fully random land position.
     const kinds: FruitTreeKind[] = [
