@@ -100,6 +100,10 @@ const RIVER_BANK = 260;
 const RIVER_HALF_WIDTH = RIVER_WIDTH / 2;
 // Muddy strip that oozes out of the water margins onto the sand and forest.
 const MUD_BAND = 130;
+// Second channel carved through the upper-lake sandbar. It sits on the left
+// flank of the lake, where the lake beach and the river beach used to touch
+// but a thin strip of land still interrupted the flow between both waters.
+const SECOND_RIVER_MOUTH_OFFSET = -900;
 
 // Movement penalties applied while wading through water or trudging in mud.
 export const WATER_SPEED_MULTIPLIER = 0.7;
@@ -241,6 +245,14 @@ interface LakeProp {
   rotation: number;
 }
 
+interface RiverMouthGeometry {
+  lake: LakeProp;
+  anchorX: number;
+  startY: number;
+  endY: number;
+  baseHalfWidth: number;
+}
+
 interface BankPlantProp {
   x: number;
   y: number;
@@ -347,6 +359,7 @@ export class WorldSystem {
   private readonly treeSpriteBudget = 16 * 1024 * 1024;
   private floorPatches: FloorPatch[] = [];
   private lakes: LakeProp[] = [];
+  private riverMouths: RiverMouthGeometry[] | null = null;
   private lakeOutlinePoints = new WeakMap<LakeProp, Float64Array>();
   private lilies: LilyProp[] = [];
   private palms: PalmProp[] = [];
@@ -1066,6 +1079,7 @@ export class WorldSystem {
       { x: -4000, y: -3600, rx: 1650, ry: 1050, rotation: -0.22 },
       { x: 4100, y: 3500, rx: 1400, ry: 950, rotation: 0.35 },
     ];
+    this.riverMouths = null;
 
     // Trees are scattered before the water bodies exist; clear any trunk that
     // would otherwise stand on the new open river mouth.
@@ -1394,38 +1408,56 @@ export class WorldSystem {
   }
 
   /**
-   * Natural mouth where the lower lake empties into the river. It starts well
-   * inside the lake and ends on the river centreline, so both ends are hidden
-   * under the existing water and only the open channel between them is drawn.
+   * Natural mouths where the upper lake empties into the river. Each mouth
+   * starts well inside the lake and ends on the river centreline, so both ends
+   * stay hidden under the existing water and only the open channels between
+   * them are drawn. The second mouth removes the sandbar that used to block the
+   * lake's left connection.
    */
-  private getRiverMouthGeometry(): { lake: LakeProp; startY: number; endY: number } | null {
-    if (this.lakes.length === 0) return null;
+  private getRiverMouthGeometries(): RiverMouthGeometry[] {
+    if (this.riverMouths) return this.riverMouths;
+    if (this.lakes.length === 0) return [];
 
     const lake = this.lakes[0];
     const startY = lake.y + lake.ry * 0.58;
-    const endY = this.riverCenterY(lake.x);
-    if (startY >= endY - 40) return null;
+    const offsets = [0, SECOND_RIVER_MOUTH_OFFSET];
+    const mouths: RiverMouthGeometry[] = [];
 
-    return { lake, startY, endY };
+    for (let i = 0; i < offsets.length; i++) {
+      const anchorX = lake.x + offsets[i];
+      const endY = this.riverCenterY(anchorX);
+      if (startY >= endY - 40) continue;
+
+      mouths.push({
+        lake,
+        anchorX,
+        startY,
+        endY,
+        baseHalfWidth: i === 0 ? 470 : 380,
+      });
+    }
+
+    this.riverMouths = mouths;
+    return mouths;
   }
 
   /**
-   * Meandering centreline and organic half-width of the river mouth. The same
+   * Meandering centreline and organic half-width of a river mouth. The same
    * profile feeds the painted foz, the water checks and the animal navigation,
    * keeping visuals and physics perfectly aligned.
    */
   private getRiverMouthProfile(
     t: number,
-    lake: LakeProp
+    mouth: RiverMouthGeometry
   ): { centerX: number; halfWidth: number } {
     const clamped = Math.max(0, Math.min(1, t));
-    const phase = lake.x * 0.0031 + lake.y * 0.0047;
+    const phase = mouth.anchorX * 0.0031 + mouth.lake.y * 0.0047;
     const centerX =
-      lake.x +
+      mouth.anchorX +
       Math.sin(clamped * Math.PI * 1.7 + phase) * 145 +
       Math.sin(clamped * Math.PI * 4.3 - phase * 0.6) * 52;
     const halfWidth =
-      470 *
+      mouth.baseHalfWidth *
       (1 +
         Math.sin(clamped * 5.2 + phase) * 0.16 +
         Math.sin(clamped * 10.4 - phase * 1.3) * 0.07 +
@@ -1434,31 +1466,40 @@ export class WorldSystem {
     return { centerX, halfWidth: Math.max(180, halfWidth) };
   }
 
-  /** True when the point lies inside the river mouth, optionally inset. */
+  /** True when the point lies inside a river mouth, optionally inset. */
   private isRiverMouthWater(x: number, y: number, inset: number = 0): boolean {
-    const mouth = this.getRiverMouthGeometry();
-    if (!mouth) return false;
-    if (y < mouth.startY || y > mouth.endY) return false;
+    const mouths = this.getRiverMouthGeometries();
+    for (let i = 0; i < mouths.length; i++) {
+      const mouth = mouths[i];
+      if (y < mouth.startY || y > mouth.endY) continue;
 
-    const t = (y - mouth.startY) / Math.max(1, mouth.endY - mouth.startY);
-    const profile = this.getRiverMouthProfile(t, mouth.lake);
-    return Math.abs(x - profile.centerX) <= profile.halfWidth - inset;
+      const t = (y - mouth.startY) / Math.max(1, mouth.endY - mouth.startY);
+      const profile = this.getRiverMouthProfile(t, mouth);
+      if (Math.abs(x - profile.centerX) <= profile.halfWidth - inset) return true;
+    }
+    return false;
   }
 
-  /** Muddy rim hugging the open river mouth. */
+  /** Muddy rim hugging the open river mouths. */
   private isRiverMouthMud(x: number, y: number): boolean {
-    const mouth = this.getRiverMouthGeometry();
-    if (!mouth) return false;
-    if (y < mouth.startY || y > mouth.endY) return false;
     if (this.isNavigableWater(x, y, 0)) return false;
 
-    const t = (y - mouth.startY) / Math.max(1, mouth.endY - mouth.startY);
-    const profile = this.getRiverMouthProfile(t, mouth.lake);
-    const offset = Math.abs(x - profile.centerX);
-    return (
-      offset > profile.halfWidth &&
-      offset <= profile.halfWidth + this.getMudBandThickness(profile.centerX)
-    );
+    const mouths = this.getRiverMouthGeometries();
+    for (let i = 0; i < mouths.length; i++) {
+      const mouth = mouths[i];
+      if (y < mouth.startY || y > mouth.endY) continue;
+
+      const t = (y - mouth.startY) / Math.max(1, mouth.endY - mouth.startY);
+      const profile = this.getRiverMouthProfile(t, mouth);
+      const offset = Math.abs(x - profile.centerX);
+      if (
+        offset > profile.halfWidth &&
+        offset <= profile.halfWidth + this.getMudBandThickness(profile.centerX)
+      ) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /** Traces an organic lake/beach outline in the lake's local space. */
@@ -1489,16 +1530,17 @@ export class WorldSystem {
     ctx.closePath();
   }
 
-  /** Traces the irregular, smoothly widening outline of the river mouth. */
-  private traceRiverMouth(ctx: CanvasRenderingContext2D, extraWidth: number = 0): void {
-    const mouth = this.getRiverMouthGeometry();
-    if (!mouth) return;
-
-    const steps = 48;
+  /** Traces the irregular, smoothly widening outline of a river mouth. */
+  private traceRiverMouth(
+    ctx: CanvasRenderingContext2D,
+    mouth: RiverMouthGeometry,
+    extraWidth: number = 0
+  ): void {
+    const steps = 64;
     for (let i = 0; i <= steps; i++) {
       const t = i / steps;
       const y = mouth.startY + (mouth.endY - mouth.startY) * t;
-      const profile = this.getRiverMouthProfile(t, mouth.lake);
+      const profile = this.getRiverMouthProfile(t, mouth);
       const half = Math.max(0, profile.halfWidth + extraWidth);
       if (i === 0) ctx.moveTo(profile.centerX - half, y);
       else ctx.lineTo(profile.centerX - half, y);
@@ -1506,27 +1548,25 @@ export class WorldSystem {
     for (let i = steps; i >= 0; i--) {
       const t = i / steps;
       const y = mouth.startY + (mouth.endY - mouth.startY) * t;
-      const profile = this.getRiverMouthProfile(t, mouth.lake);
+      const profile = this.getRiverMouthProfile(t, mouth);
       const half = Math.max(0, profile.halfWidth + extraWidth);
       ctx.lineTo(profile.centerX + half, y);
     }
     ctx.closePath();
   }
 
-  /** Traces one meandering bank of the river mouth. */
+  /** Traces one meandering bank of a river mouth. */
   private traceRiverMouthEdge(
     ctx: CanvasRenderingContext2D,
+    mouth: RiverMouthGeometry,
     extraWidth: number,
     side: -1 | 1
   ): void {
-    const mouth = this.getRiverMouthGeometry();
-    if (!mouth) return;
-
-    const steps = 48;
+    const steps = 64;
     for (let i = 0; i <= steps; i++) {
       const t = i / steps;
       const y = mouth.startY + (mouth.endY - mouth.startY) * t;
-      const profile = this.getRiverMouthProfile(t, mouth.lake);
+      const profile = this.getRiverMouthProfile(t, mouth);
       const half = Math.max(0, profile.halfWidth + extraWidth);
       const x = profile.centerX + side * half;
       if (i === 0) ctx.moveTo(x, y);
@@ -1617,7 +1657,7 @@ export class WorldSystem {
     const riverHalf = this.getRiverHalfWidth(x, RIVER_HALF_WIDTH);
     if (Math.abs(y - this.riverCenterY(x)) < riverHalf) return true;
 
-    // Open mouth joining the lower lake to the river.
+    // Open mouths joining the upper lake to the river.
     if (this.isRiverMouthWater(x, y)) return true;
 
     // Lakes (rotated organic ellipses).
@@ -2083,21 +2123,24 @@ export class WorldSystem {
       ctx.restore();
     }
 
-    // Continuous mouth between the lower lake and the river.
-    if (this.getRiverMouthGeometry()) {
+    // Continuous mouths between the upper lake and the river.
+    const mouths = this.getRiverMouthGeometries();
+    if (mouths.length > 0) {
       ctx.save();
       ctx.translate(toX(0), toY(0));
       ctx.scale(scale, scale);
 
-      ctx.fillStyle = 'rgba(216, 188, 130, 0.65)';
-      ctx.beginPath();
-      this.traceRiverMouth(ctx, 20);
-      ctx.fill();
+      for (let i = 0; i < mouths.length; i++) {
+        ctx.fillStyle = 'rgba(216, 188, 130, 0.65)';
+        ctx.beginPath();
+        this.traceRiverMouth(ctx, mouths[i], 20);
+        ctx.fill();
 
-      ctx.fillStyle = 'rgba(43, 139, 161, 0.95)';
-      ctx.beginPath();
-      this.traceRiverMouth(ctx);
-      ctx.fill();
+        ctx.fillStyle = 'rgba(43, 139, 161, 0.95)';
+        ctx.beginPath();
+        this.traceRiverMouth(ctx, mouths[i]);
+        ctx.fill();
+      }
 
       ctx.restore();
     }
@@ -5534,8 +5577,8 @@ export class WorldSystem {
       ctx.restore();
     }
 
-    // Open mouth where the lower lake flows straight into the river. Painting
-    // it after both banks removes the sand strip between the two water bodies.
+    // Open mouths where the upper lake flows straight into the river. Painting
+    // them after both banks removes every sand strip between the water bodies.
     this.renderRiverMouth(ctx);
 
     // Floating water lilies.
@@ -5581,58 +5624,64 @@ export class WorldSystem {
   }
 
   /**
-   * Paints the natural river mouth after both shorelines. The water covers the
-   * old sand/grass divider, while the muddy rim follows the same meandering
+   * Paints the natural river mouths after both shorelines. The water covers the
+   * old sand/grass dividers, while the muddy rims follow the same meandering
    * profile used by the terrain checks.
    */
   private renderRiverMouth(ctx: CanvasRenderingContext2D): void {
-    if (!this.getRiverMouthGeometry()) return;
+    const mouths = this.getRiverMouthGeometries();
+    if (mouths.length === 0) return;
 
-    // Irregular clay lips blending the mouth into the existing beach. They are
-    // stroked (rather than filled wider) so they only ooze outwards and never
-    // cover the water that joins both bodies.
     ctx.lineCap = 'butt';
     ctx.lineJoin = 'round';
-    ctx.strokeStyle = '#3a2718';
-    ctx.lineWidth = 30;
-    for (const side of [-1, 1] as const) {
+
+    for (let m = 0; m < mouths.length; m++) {
+      const mouth = mouths[m];
+
+      // Irregular clay lips blending the mouth into the existing beach. They are
+      // stroked (rather than filled wider) so they only ooze outwards and never
+      // cover the water that joins both bodies.
+      ctx.strokeStyle = '#3a2718';
+      ctx.lineWidth = 30;
+      for (const side of [-1, 1] as const) {
+        ctx.beginPath();
+        this.traceRiverMouthEdge(ctx, mouth, 0, side);
+        ctx.stroke();
+      }
+
+      ctx.strokeStyle = '#4a3322';
+      ctx.lineWidth = 14;
+      for (const side of [-1, 1] as const) {
+        ctx.beginPath();
+        this.traceRiverMouthEdge(ctx, mouth, 0, side);
+        ctx.stroke();
+      }
+
+      // Flowing water, layered exactly like the river and lakes.
+      ctx.fillStyle = '#145466';
       ctx.beginPath();
-      this.traceRiverMouthEdge(ctx, 0, side);
-      ctx.stroke();
-    }
-
-    ctx.strokeStyle = '#4a3322';
-    ctx.lineWidth = 14;
-    for (const side of [-1, 1] as const) {
-      ctx.beginPath();
-      this.traceRiverMouthEdge(ctx, 0, side);
-      ctx.stroke();
-    }
-
-    // Flowing water, layered exactly like the river and lakes.
-    ctx.fillStyle = '#145466';
-    ctx.beginPath();
-    this.traceRiverMouth(ctx);
-    ctx.fill();
-
-    ctx.fillStyle = '#1b6b82';
-    ctx.beginPath();
-    this.traceRiverMouth(ctx, -14);
-    ctx.fill();
-
-    ctx.fillStyle = '#2b8ba1';
-    ctx.beginPath();
-    this.traceRiverMouth(ctx, -62);
-    ctx.fill();
-
-    const shimmer = this.getWaterShimmerPattern(ctx);
-    if (shimmer) {
-      ctx.fillStyle = shimmer;
-      ctx.globalAlpha = 0.55;
-      ctx.beginPath();
-      this.traceRiverMouth(ctx, -20);
+      this.traceRiverMouth(ctx, mouth);
       ctx.fill();
-      ctx.globalAlpha = 1;
+
+      ctx.fillStyle = '#1b6b82';
+      ctx.beginPath();
+      this.traceRiverMouth(ctx, mouth, -14);
+      ctx.fill();
+
+      ctx.fillStyle = '#2b8ba1';
+      ctx.beginPath();
+      this.traceRiverMouth(ctx, mouth, -62);
+      ctx.fill();
+
+      const shimmer = this.getWaterShimmerPattern(ctx);
+      if (shimmer) {
+        ctx.fillStyle = shimmer;
+        ctx.globalAlpha = 0.55;
+        ctx.beginPath();
+        this.traceRiverMouth(ctx, mouth, -20);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
     }
   }
 
@@ -5665,14 +5714,15 @@ export class WorldSystem {
       }
     }
 
-    // Ripples carried through the open river mouth.
-    const mouth = this.getRiverMouthGeometry();
-    if (mouth) {
+    // Ripples carried through the open river mouths.
+    const mouths = this.getRiverMouthGeometries();
+    for (let m = 0; m < mouths.length; m++) {
+      const mouth = mouths[m];
       for (let i = 1; i <= 4; i++) {
         const t = i / 5;
         const y = mouth.startY + (mouth.endY - mouth.startY) * t;
-        const profile = this.getRiverMouthProfile(t, mouth.lake);
-        const drift = Math.sin(time * 0.8 + i * 1.7) * 26;
+        const profile = this.getRiverMouthProfile(t, mouth);
+        const drift = Math.sin(time * 0.8 + i * 1.7 + m) * 26;
         ctx.globalAlpha = 0.12 + 0.07 * Math.sin(time * 0.9 + i * 1.3);
         ctx.beginPath();
         ctx.ellipse(
