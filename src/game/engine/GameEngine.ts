@@ -98,6 +98,10 @@ const ECOLOGY_RIVER_PREDATOR_RANGE = 320;
 const ECOLOGY_JAGUAR_RANGE = 360;
 const ECOLOGY_FRUIT_FEED_COOLDOWN = 8;
 
+// The Sucuri ignores the usual water/mud penalties and is faster on wet ground.
+const SUCURI_WATER_SPEED_MULTIPLIER = 1.5;
+const SUCURI_SHORE_SPEED_MULTIPLIER = 1.3;
+
 // Amazon thorn bushes: immediate damage, a 40% slow and a 10s bleeding wound.
 const THORN_BUSH_DAMAGE = 7;
 const THORN_BUSH_BLEED_DPS = 2;
@@ -263,6 +267,16 @@ const JAGUAR_PREY: EnemyType[] = [
   'sloth',
   'toucan',
   'poison_dart_frog',
+];
+
+const SUCURI_PREY: EnemyType[] = [
+  'capybara',
+  'toucan',
+  'poison_dart_frog',
+  'rhino_beetle',
+  'sawyer_beetle',
+  'bullet_ant',
+  'leafcutter_ant',
 ];
 
 export class GameEngine {
@@ -617,10 +631,17 @@ export class GameEngine {
       e.isAmazonNight = amazonNight;
       // Terrain physics for land animals: the river slows them by 30% and the
       // muddy margins by 20%. River predators ignore the mud penalty and get a
-      // +30% boost there; the Ariranha gets +20% instead.
+      // +30% boost there; the Ariranha gets +20% instead. The Sucuri is
+      // amphibious and instead earns +50% in water and +30% on banks/mud.
       const enemyInWater = this.worldProps.isWaterSurface(e.x, e.y);
       const enemyInMud = !enemyInWater && this.worldProps.isMud(e.x, e.y);
-      if (e.isRiverPredator) {
+      if (e.type === 'sucuri') {
+        e.terrainSpeedMultiplier = enemyInWater
+          ? SUCURI_WATER_SPEED_MULTIPLIER
+          : enemyInMud || this.worldProps.isRiverBankTerrain(e.x, e.y, e.radius)
+            ? SUCURI_SHORE_SPEED_MULTIPLIER
+            : 1.0;
+      } else if (e.isRiverPredator) {
         e.terrainSpeedMultiplier = enemyInMud
           ? MUD_RIVER_PREDATOR_SPEED_MULTIPLIER
           : playerInWater
@@ -1505,7 +1526,11 @@ export class GameEngine {
       if (predator.ecologyHuntTimer > 0) continue;
 
       const isJaguar = predator.isJaguarPredator;
-      const preyTypes = isJaguar ? JAGUAR_PREY : RIVER_PREDATOR_PREY;
+      const preyTypes = isJaguar
+        ? JAGUAR_PREY
+        : predator.type === 'sucuri'
+          ? SUCURI_PREY
+          : RIVER_PREDATOR_PREY;
       const range = isJaguar ? ECOLOGY_JAGUAR_RANGE : ECOLOGY_RIVER_PREDATOR_RANGE;
       const rangeSq = range * range;
 
@@ -1883,6 +1908,7 @@ export class GameEngine {
 
     if (enemy.isElite) {
       const isAmazonElite =
+        enemy.type === 'sucuri' ||
         enemy.type === 'elite_jaguar' ||
         enemy.type === 'elite_tapir' ||
         enemy.type === 'elite_goliath_spider' ||

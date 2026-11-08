@@ -48,6 +48,7 @@ const AMAZON_DEV_MONSTERS: { type: EnemyType; label: string }[] = [
   { type: 'rhino_beetle', label: '🪲 Besouro-rinoceronte' },
   { type: 'sawyer_beetle', label: '🪲 Besouro-serra-pau' },
   { type: 'giant_centipede', label: '🐛 Lacraia-gigante' },
+  { type: 'sucuri', label: '🐍 Sucuri' },
   { type: 'elite_jaguar', label: '🐆 Onça-pintada' },
   { type: 'elite_tapir', label: '🐗 Anta' },
   { type: 'elite_goliath_spider', label: '🕷️ Aranha-golias' },

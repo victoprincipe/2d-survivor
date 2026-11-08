@@ -30,6 +30,7 @@ const AMAZON_RESISTANT_ENEMIES: EnemyType[] = [
 // Rare Amazon Forest elites. Spawned on a slow independent timer so they stay
 // uncommon even when the regular spawn rate is very high.
 const AMAZON_ELITE_ENEMIES: EnemyType[] = [
+  'sucuri',
   'elite_jaguar',
   'elite_tapir',
   'elite_goliath_spider',

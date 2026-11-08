@@ -255,6 +255,19 @@ export class Enemy {
         this.xpValue = 14;
         this.knockbackResistance = 1.05;
         break;
+      // Amazon constrictor. It is an elite-class predator of the riverbanks,
+      // but unlike the aquatic fauna it is free to roam land, water and mud.
+      case 'sucuri':
+        this.name = 'Sucuri';
+        this.radius = 22;
+        this.maxHp = Math.round(420 * hpMultiplier);
+        this.speed = 76;
+        this.damage = 22;
+        this.xpValue = 160;
+        this.isElite = true;
+        this.knockbackResistance = 0.28;
+        this.skillCooldown = 4.5 + Math.random() * 1.5;
+        break;
       // Amazon Forest resistant fauna: slow, heavy and hard to put down.
       case 'capybara':
         this.name = 'Capivara';
@@ -527,7 +540,11 @@ export class Enemy {
     }
 
     // Predators start their hunt cycle with the requested delay.
-    if (this.type === 'elite_black_caiman' || this.type === 'boss_cobra_grande') {
+    if (
+      this.type === 'elite_black_caiman' ||
+      this.type === 'boss_cobra_grande' ||
+      this.type === 'sucuri'
+    ) {
       this.ecologyHuntTimer = 10 + Math.random() * 2;
     } else if (this.type === 'elite_jaguar') {
       this.ecologyHuntTimer = 15;
@@ -537,9 +554,9 @@ export class Enemy {
   }
 
   /**
-   * Jacaré-açu and the giant river serpent (Sucuri / Cobra-Grande) are tied to
-   * the river: they flee on dry forest ground, attack in the water and never
-   * leave the river and its beach.
+   * The Jacaré-açu and the Cobra-Grande (Boiúna) boss are tied to the river:
+   * they flee on dry forest ground, attack in the water and never leave the
+   * river and its beach. The regular Sucuri is not restricted this way.
    */
   public get isRiverPredator(): boolean {
     return this.type === 'elite_black_caiman' || this.type === 'boss_cobra_grande';
@@ -557,10 +574,12 @@ export class Enemy {
   /**
    * Native water creatures (aquatic fauna and the river bosses) already swim
    * at their natural level, so the river must not visually cut their sprites.
+   * The Sucuri is amphibious and also swims freely.
    */
   public get isWaterDweller(): boolean {
     return (
       this.isAquatic ||
+      this.type === 'sucuri' ||
       this.type === 'boss_boto' ||
       this.type === 'boss_iara' ||
       this.type === 'boss_vitoria_regia' ||
@@ -590,7 +609,8 @@ export class Enemy {
     return (
       this.type === 'elite_black_caiman' ||
       this.type === 'boss_cobra_grande' ||
-      this.type === 'elite_jaguar'
+      this.type === 'elite_jaguar' ||
+      this.type === 'sucuri'
     );
   }
 
@@ -1995,6 +2015,57 @@ export class Enemy {
       }
 
       ctx.restore();
+    } else if (this.type === 'sucuri') {
+      // Sucuri: long olive-green constrictor with dark blotches and yellow eyes.
+      const slither = Math.sin(this.animTimer * 3.2) * 3;
+
+      ctx.strokeStyle = isFlashing ? '#ffffff' : '#556b2f';
+      ctx.lineWidth = 9;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-10, 3);
+      ctx.quadraticCurveTo(-25, -7 + slither, -42, 5 + slither);
+      ctx.stroke();
+      ctx.lineCap = 'butt';
+
+      if (!isFlashing) ctx.fillStyle = '#6b8e23';
+      ctx.beginPath();
+      ctx.ellipse(-2, 0, 20, 10, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Dark dorsal blotches in a simple pixel-art pattern.
+      if (!isFlashing) ctx.fillStyle = '#3f4a1a';
+      ctx.beginPath();
+      ctx.ellipse(-10, -2, 4.5, 3, -0.2, 0, Math.PI * 2);
+      ctx.ellipse(0, 2, 4, 3, 0.2, 0, Math.PI * 2);
+      ctx.ellipse(-18, 1, 3.5, 2.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#6b8e23';
+      ctx.beginPath();
+      ctx.ellipse(16, -1, 11, 8, -0.08, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) ctx.fillStyle = '#facc15';
+      ctx.beginPath();
+      ctx.arc(20, -4, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+      if (!isFlashing) ctx.fillStyle = '#111827';
+      ctx.beginPath();
+      ctx.arc(20.5, -4, 0.8, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!isFlashing) {
+        const tongue = Math.sin(this.animTimer * 6) * 1.5;
+        ctx.strokeStyle = '#f43f5e';
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(27, 0);
+        ctx.lineTo(36, -2 + tongue);
+        ctx.moveTo(27, 0);
+        ctx.lineTo(36, 3 + tongue);
+        ctx.stroke();
+      }
     } else if (this.type === 'boss_curupira') {
       // Curupira: fire hair, green forest body and backwards feet.
       const flicker = Math.sin(this.animTimer * 5) * 4;

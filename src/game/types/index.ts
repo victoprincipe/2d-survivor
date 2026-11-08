@@ -226,6 +226,8 @@ export type EnemyType =
   | 'praying_mantis'
   | 'stick_bug'
   | 'toucan'
+  // Amazon constrictor: an elite/medium predator that roams land, river and mud.
+  | 'sucuri'
   // Resistant threats exclusive to the Amazon Forest map: high HP and slow.
   | 'capybara'
   | 'sloth'

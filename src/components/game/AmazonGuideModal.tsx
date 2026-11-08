@@ -14,12 +14,12 @@ type GuideTab = 'fruits' | 'fauna' | 'bosses';
 
 const TABS: { id: GuideTab; label: string; icon: React.ReactNode }[] = [
   { id: 'fruits', label: '1. Frutas & Regras', icon: <Leaf className="h-4 w-4" /> },
-  { id: 'fauna', label: '2. Fauna (20 Animais)', icon: <PawPrint className="h-4 w-4" /> },
+  { id: 'fauna', label: '2. Fauna (21 Animais)', icon: <PawPrint className="h-4 w-4" /> },
   { id: 'bosses', label: '3. Chefes (10 Guardiões)', icon: <Crown className="h-4 w-4" /> },
 ];
 
 type FaunaRank = 'Básico' | 'Médio' | 'Resistente' | 'Elite';
-type FaunaHabitat = 'Terra' | 'Água';
+type FaunaHabitat = 'Terra' | 'Água' | 'Terra e Água';
 
 interface FaunaEntry {
   type: EnemyType;
@@ -75,6 +75,10 @@ const FAUNA_HABITAT_STYLES: Record<FaunaHabitat, { badge: string; icon: React.Re
   },
   'Água': {
     badge: 'border-cyan-700/60 bg-cyan-950/40 text-cyan-300',
+    icon: <Droplets className="h-3 w-3" />,
+  },
+  'Terra e Água': {
+    badge: 'border-emerald-700/60 bg-gradient-to-r from-lime-950/40 to-cyan-950/40 text-emerald-200',
     icon: <Droplets className="h-3 w-3" />,
   },
 };
@@ -221,6 +225,15 @@ const FAUNA: FaunaEntry[] = [
     rank: 'Elite',
     habitat: 'Água',
     behavior: 'Foge em terra; ataca com +50% de velocidade na água (+30% na praia) e cresce sem limite ao caçar, como a Sucuri.',
+    nightFrenzy: true,
+  },
+  {
+    type: 'sucuri',
+    name: 'Sucuri',
+    rank: 'Elite',
+    habitat: 'Terra e Água',
+    behavior:
+      'Serpente constritora verde-oliva com manchas escuras. Surge e se move livremente na terra, no rio e na lama: ganha +50% de velocidade na água e +30% na praia e na lama, ignorando as lentidões do terreno. A cada 10–12s devora presas menores e cresce sem limite (+15% de vida máxima e +12% de ataque por refeição).',
     nightFrenzy: true,
   },
 ];
@@ -524,7 +537,7 @@ const RULES: { title: string; icon: React.ReactNode; accent: string; text: strin
     title: 'Jacaré-açu & Sucuri',
     icon: <Skull className="h-4 w-4" />,
     accent: 'text-orange-300',
-    text: 'Fogem em terra, mas atacam com +50% de velocidade na água (+30% na praia). Crescem sem limite ao devorar outros bichos, ficando cada vez mais fortes.',
+    text: 'O Jacaré-açu foge em terra, mas ataca com +50% de velocidade na água (+30% na praia). A Sucuri surge e se move livremente pela terra, pelo rio e pela lama, com +50% de velocidade na água e +30% na praia e na lama. Ambos crescem sem limite ao devorar outros bichos, ficando cada vez mais fortes.',
   },
   {
     title: 'Onça-pintada',
