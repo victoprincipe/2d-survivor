@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import { WeaponId, PassiveId } from '@/game/types';
 import {
   Flame,
@@ -36,6 +37,8 @@ import {
 
 export function renderWeaponIcon(id: WeaponId, sizeClass: string = 'w-4 h-4'): React.ReactNode {
   switch (id) {
+    case 'bottle_51':
+      return renderNamedIcon('Bottle51', sizeClass);
     case 'whip':
       return <Flame className={`${sizeClass} text-orange-400`} />;
     case 'wand':
@@ -101,6 +104,8 @@ export function renderNamedIcon(
 ): React.ReactNode {
   const c = (defaultColor: string) => `${sizeClass} ${overrideColorClass ?? defaultColor}`;
   switch (iconName) {
+    case 'Bottle51':
+      return <Image src="/bottle-51.svg" alt="Garrafa de 51" width={64} height={96} unoptimized className={`${sizeClass} object-contain`} />;
     case 'Flame':
       return <Flame className={c('text-orange-400')} />;
     case 'Wand2':

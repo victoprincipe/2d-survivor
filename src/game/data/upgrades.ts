@@ -24,6 +24,27 @@ export interface PassiveMeta {
 }
 
 export const WEAPON_REGISTRY: Record<WeaponId, WeaponMeta> = {
+  bottle_51: {
+    id: 'bottle_51',
+    name: 'Garrafa de 51',
+    description: 'Arremessa garrafas de 51 que se quebram em estilhaços, causando dano em área.',
+    maxLevel: 8,
+    iconName: 'Bottle51',
+    synergyPassive: 'duplicator',
+    evolvedId: 'rain_51',
+    evolvedName: 'Chuva de 51',
+    evolvedDescription: 'Uma chuva de 7 garrafas por ataque, com impactos mais fortes, área maior e recarga acelerada!',
+    levelDescriptions: [
+      'Lança 1 garrafa de 51 no inimigo mais próximo: 25 de dano em área.',
+      'Dano dos estilhaços aumentado para 32.',
+      'Lança +1 garrafa por ataque (base 2).',
+      'Dano aumentado para 40 e raio de impacto para 55.',
+      'Dano aumentado para 48 e recarga reduzida para 2,1s.',
+      'Lança +1 garrafa por ataque (base 3).',
+      'Dano aumentado para 58 e raio de impacto para 65.',
+      'Lança 4 garrafas, com 68 de dano e recarga de 1,8s!',
+    ],
+  },
   whip: {
     id: 'whip',
     name: 'Chicote Caça-Vampiros',

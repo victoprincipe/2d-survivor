@@ -8,6 +8,7 @@ import { SoundEngine } from '../engine/SoundEngine';
 import { VFXManager } from '../entities/VFX';
 
 export type ProjectileVisualType =
+  | 'bottle_51'
   | 'wand'
   | 'knife'
   | 'bow'
@@ -85,6 +86,14 @@ export interface Projectile {
     zoneDuration: number;
     zoneTickDamage: number;
   };
+  bottleFlight?: {
+    startX: number;
+    startY: number;
+    targetX: number;
+    targetY: number;
+    elapsed: number;
+    duration: number;
+  };
 }
 
 export interface WhipSlashEffect {
@@ -148,6 +157,7 @@ interface PendingStrike {
 }
 
 const ALL_WEAPON_IDS: WeaponId[] = [
+  'bottle_51',
   'whip',
   'wand',
   'knife',
@@ -205,8 +215,13 @@ export class WeaponSystem {
 
   private nextProjId: number = 1;
   private nextZoneId: number = 1;
+  private bottleImage: HTMLImageElement | null = null;
 
   constructor(startingWeapon: WeaponId) {
+    if (typeof Image !== 'undefined') {
+      this.bottleImage = new Image();
+      this.bottleImage.src = '/bottle-51.svg';
+    }
     this.addWeapon(startingWeapon);
   }
 
@@ -637,6 +652,12 @@ export class WeaponSystem {
     const cdFactor = Math.max(0.45, 1 - player.cooldownReduction) * attackSpeedFactor;
 
     switch (w.id) {
+      case 'bottle_51': {
+        const baseCd = w.evolved ? 1.5 : w.level >= 8 ? 1.8 : w.level >= 5 ? 2.1 : 2.4;
+        w.cooldownTimer = baseCd * cdFactor;
+        this.triggerBottle51(w, player, enemies, camera, sound);
+        break;
+      }
       case 'whip': {
         const baseCd = w.evolved ? 0.92 : w.level >= 4 ? 1.02 : 1.28;
         w.cooldownTimer = baseCd * cdFactor;
@@ -1276,6 +1297,47 @@ export class WeaponSystem {
     }
 
     sound.playKnife();
+  }
+
+  private triggerBottle51(
+    w: WeaponInstance,
+    player: Player,
+    enemies: Enemy[],
+    camera: Camera,
+    sound: SoundEngine
+  ): void {
+    const targets = enemies
+      .filter((enemy) => enemy.hp > 0 && camera.isInView(enemy.x, enemy.y, 0))
+      .sort((a, b) =>
+        (a.x - player.x) ** 2 + (a.y - player.y) ** 2 -
+        ((b.x - player.x) ** 2 + (b.y - player.y) ** 2)
+      );
+    if (targets.length === 0) return;
+
+    const counts = [0, 1, 1, 2, 2, 2, 3, 3, 4];
+    const damages = [0, 25, 32, 32, 40, 48, 48, 58, 68];
+    const count = (w.evolved ? 7 : counts[w.level]) + player.bonusAmount;
+    const damage = (w.evolved ? 80 : damages[w.level]) * player.might;
+    const radius = (w.evolved ? 80 : w.level >= 7 ? 65 : w.level >= 4 ? 55 : 45) * player.areaMultiplier;
+    const duration = 0.5 / player.projectileSpeedMultiplier;
+
+    for (let i = 0; i < count; i++) {
+      const target = targets[i % targets.length];
+      this.projectiles.push({
+        id: this.nextProjId++, type: 'bottle_51', weaponId: 'bottle_51',
+        x: player.x, y: player.y, vx: 0, vy: 0,
+        radius: 12, damage, explosionRadius: radius, pierce: 1,
+        life: duration, maxLife: duration,
+        spinAngle: -0.3, spinSpeed: 9,
+        isEvolved: w.evolved, hitEnemyIds: new Set(),
+        bottleFlight: {
+          startX: player.x, startY: player.y,
+          targetX: target.x, targetY: target.y,
+          elapsed: 0, duration,
+        },
+      });
+    }
+    sound.playShoot();
   }
 
   private triggerFireFlask(
@@ -1925,6 +1987,26 @@ export class WeaponSystem {
         p.spinAngle = (p.spinAngle || 0) + p.spinSpeed * dt;
       }
 
+      // Bottles hit once at their fixed landing point, never during flight.
+      if (p.bottleFlight) {
+        const flight = p.bottleFlight;
+        flight.elapsed += dt;
+        const t = Math.min(1, flight.elapsed / flight.duration);
+        p.x = flight.startX + (flight.targetX - flight.startX) * t;
+        p.y = flight.startY + (flight.targetY - flight.startY) * t - Math.sin(t * Math.PI) * 75;
+        if (t >= 1) {
+          this.triggerSplashExplosion(
+            this.weapons.get(p.weaponId), flight.targetX, flight.targetY,
+            p.explosionRadius ?? 45, p.damage, '#e2f6ef',
+            player, grid, vfx, onEnemyKilled
+          );
+          vfx.addSparks(flight.targetX, flight.targetY, '#facc15', 8);
+          sound.playHit();
+          this.projectiles.splice(i, 1);
+        }
+        continue;
+      }
+
       // 1. Lobbed Flask Movement (immune mid-air, spawns ground fire zone on landing!)
       if (p.lob) {
         p.lob.elapsed += dt;
@@ -2479,24 +2561,50 @@ export class WeaponSystem {
         ctx.arc(0, -p.radius * 0.65, 2.4, 0, Math.PI * 2);
         ctx.fill();
       } else if (p.type === 'flying_tray') {
-        // Spinning Diner Tray
-        ctx.fillStyle = p.isEvolved ? '#f59e0b' : '#94a3b8';
+        // Rounded serving tray, drawn in the projectile's rotating local space.
+        const r = p.radius;
+        const metal = ctx.createLinearGradient(-r, -r, r, r);
+        metal.addColorStop(0, p.isEvolved ? '#92400e' : '#475569');
+        metal.addColorStop(0.3, p.isEvolved ? '#fde68a' : '#f8fafc');
+        metal.addColorStop(0.55, p.isEvolved ? '#d97706' : '#94a3b8');
+        metal.addColorStop(0.8, p.isEvolved ? '#fef3c7' : '#e2e8f0');
+        metal.addColorStop(1, p.isEvolved ? '#92400e' : '#475569');
+
+        // Open handles extend from each end of the tray.
+        ctx.strokeStyle = p.isEvolved ? '#fde68a' : '#e2e8f0';
+        ctx.lineWidth = Math.max(1.5, r * 0.12);
         ctx.beginPath();
-        ctx.arc(0, 0, p.radius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = p.isEvolved ? '#fef08a' : '#f8fafc';
-        ctx.lineWidth = 2.2;
+        ctx.roundRect(-r, -r * 0.3, r * 2, r * 0.6, r * 0.18);
         ctx.stroke();
-        ctx.fillStyle = p.isEvolved ? '#fef3c7' : '#cbd5e1';
+
+        ctx.fillStyle = metal;
         ctx.beginPath();
-        ctx.arc(0, 0, p.radius * 0.58, 0, Math.PI * 2);
+        ctx.roundRect(-r * 0.8, -r * 0.68, r * 1.6, r * 1.36, r * 0.24);
         ctx.fill();
-        ctx.strokeStyle = p.isEvolved ? '#b45309' : '#475569';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(-p.radius * 0.4, 0);
-        ctx.lineTo(p.radius * 0.4, 0);
+        ctx.strokeStyle = p.isEvolved ? '#78350f' : '#334155';
+        ctx.lineWidth = Math.max(1, r * 0.07);
         ctx.stroke();
+
+        // Recessed serving surface and raised, reflective rim.
+        ctx.fillStyle = p.isEvolved ? '#eab308' : '#a8b7c7';
+        ctx.beginPath();
+        ctx.roundRect(-r * 0.63, -r * 0.51, r * 1.26, r * 1.02, r * 0.16);
+        ctx.fill();
+        ctx.strokeStyle = p.isEvolved ? '#fef3c7' : '#f8fafc';
+        ctx.lineWidth = Math.max(1, r * 0.06);
+        ctx.stroke();
+
+        ctx.strokeStyle = p.isEvolved ? '#fef9c3' : '#e2e8f0';
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.4, r * 0.22);
+        ctx.lineTo(r * 0.05, -r * 0.23);
+        ctx.moveTo(-r * 0.15, r * 0.28);
+        ctx.lineTo(r * 0.35, -r * 0.22);
+        ctx.stroke();
+      } else if (p.type === 'bottle_51') {
+        if (this.bottleImage?.complete && this.bottleImage.naturalWidth > 0) {
+          ctx.drawImage(this.bottleImage, -12, -18, 24, 36);
+        }
       } else if (p.type === 'fire_flask_lob') {
         ctx.fillStyle = p.isEvolved ? '#38bdf8' : '#f97316';
         ctx.beginPath();
@@ -2600,7 +2708,7 @@ export class WeaponSystem {
   }
 
   public resolveChestUpgrade(): UpgradeOption | undefined {
-    // 1. Priority 1: Guaranteed Evolution if any owned weapon is Lv5+ with its Synergy Passive!
+    // 1. Priority 1: Evolution at the weapon's maximum level with its synergy passive.
     const readyEvolutions: UpgradeOption[] = [];
     for (const [wId, w] of this.weapons.entries()) {
       if (w.level >= w.maxLevel && !w.evolved) {

@@ -1,4 +1,5 @@
 export type WeaponId =
+  | 'bottle_51'
   | 'wand'
   | 'whip'
   | 'knife'
@@ -14,6 +15,7 @@ export type WeaponId =
   | 'lula_power';
 
 export type EvolvedWeaponId =
+  | 'rain_51'
   | 'holy_wand'
   | 'bloody_tear'
   | 'thousand_edge'
