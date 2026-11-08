@@ -279,6 +279,37 @@ export class WorldSystem {
     return tree ? this.collectFruitTree(tree) : null;
   }
 
+  /** Nearest active fruit tree, used by the Anta when it forages alone. */
+  public getNearestActiveFruitTree(x: number, y: number): FruitTreeProp | null {
+    if (this.mapId !== 'amazon_forest') return null;
+
+    let closest: FruitTreeProp | null = null;
+    let closestDistance = Infinity;
+
+    for (let i = 0; i < this.fruitTrees.length; i++) {
+      const tree = this.fruitTrees[i];
+      if (!tree.active) continue;
+
+      const dx = x - tree.x;
+      const dy = y - tree.y;
+      const distance = dx * dx + dy * dy;
+      if (distance < closestDistance) {
+        closest = tree;
+        closestDistance = distance;
+      }
+    }
+
+    return closest;
+  }
+
+  /** Consumes a fruit tree for an animal, starting its 45s respawn timer. */
+  public consumeFruitTreeById(id: number): boolean {
+    const tree = this.fruitTrees.find((candidate) => candidate.id === id && candidate.active);
+    if (!tree) return false;
+    this.collectFruitTree(tree);
+    return true;
+  }
+
   /**
    * Handles a tap/click on the floating prompt. Returns the harvested fruit
    * when the pointer lands on the prompt of a tree that is in reach.
@@ -614,6 +645,65 @@ export class WorldSystem {
     }
 
     return false;
+  }
+
+  /**
+   * Nearest sandy bank point where terrestrial herbivores can graze when the
+   * hero is far away. The point sits between the water and the forest.
+   */
+  public getBeachGrazingTarget(x: number, y: number): { x: number; y: number } | null {
+    if (this.mapId !== 'amazon_forest') return null;
+
+    const limit = FOREST_HALF_SIZE - 220;
+    const bankOffset = RIVER_HALF_WIDTH + RIVER_BANK * 0.55;
+    let best: { x: number; y: number } | null = null;
+    let bestDistance = Infinity;
+
+    // River bank: keep the creature on the side it currently occupies.
+    const riverX = Math.max(-limit, Math.min(limit, x));
+    const riverCenterY = this.riverCenterY(riverX);
+    const side = y >= riverCenterY ? 1 : -1;
+    const riverY = riverCenterY + side * bankOffset;
+    if (Math.abs(riverY) <= limit) {
+      const dx = riverX - x;
+      const dy = riverY - y;
+      best = { x: riverX, y: riverY };
+      bestDistance = dx * dx + dy * dy;
+    }
+
+    // Lake banks follow the ellipse rim, expanded past the water surface.
+    for (let i = 0; i < this.lakes.length; i++) {
+      const lake = this.lakes[i];
+      const cos = Math.cos(-lake.rotation);
+      const sin = Math.sin(-lake.rotation);
+      const dx = x - lake.x;
+      const dy = y - lake.y;
+      const lx = dx * cos - dy * sin;
+      const ly = dx * sin + dy * cos;
+
+      const rx = lake.rx + RIVER_BANK * 0.55;
+      const ry = lake.ry + RIVER_BANK * 0.55;
+      const angle = Math.atan2(ly / Math.max(1, ry), lx / Math.max(1, rx));
+      const localX = Math.cos(angle) * rx;
+      const localY = Math.sin(angle) * ry;
+
+      const cosR = Math.cos(lake.rotation);
+      const sinR = Math.sin(lake.rotation);
+      const targetX = lake.x + localX * cosR - localY * sinR;
+      const targetY = lake.y + localX * sinR + localY * cosR;
+
+      if (Math.abs(targetX) > limit || Math.abs(targetY) > limit) continue;
+
+      const tdx = targetX - x;
+      const tdy = targetY - y;
+      const distance = tdx * tdx + tdy * tdy;
+      if (distance < bestDistance) {
+        best = { x: targetX, y: targetY };
+        bestDistance = distance;
+      }
+    }
+
+    return best;
   }
 
   /**

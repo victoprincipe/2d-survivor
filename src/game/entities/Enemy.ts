@@ -37,6 +37,18 @@ export class Enemy {
   public name: string = '';
   private spriteImage: HTMLImageElement | null = null;
 
+  // Dynamic food-chain ecology (Amazon Forest). The engine assigns a target
+  // when the hero is far away so herbivores can graze and tapirs can forage.
+  public ecologyTargetX: number | null = null;
+  public ecologyTargetY: number | null = null;
+  public ecologyTargetTreeId: number | null = null;
+  public ecologyHuntTimer: number = 0;
+  public ecologyActionCooldown: number = 0;
+  public ecologyGrazingTimer: number = 0;
+  public growthScale: number = 1;
+  public ecologyFedCount: number = 0;
+  public shieldHp: number = 0;
+
   // Combat Status & Debuffs
   public slowTimer: number = 0;
   public slowFactor: number = 0;
@@ -467,6 +479,13 @@ export class Enemy {
         break;
     }
 
+    // Predators start their hunt cycle with the requested delay.
+    if (this.type === 'elite_black_caiman' || this.type === 'boss_cobra_grande') {
+      this.ecologyHuntTimer = 10 + Math.random() * 2;
+    } else if (this.type === 'elite_jaguar') {
+      this.ecologyHuntTimer = 15;
+    }
+
     this.hp = this.maxHp;
   }
 
@@ -486,6 +505,62 @@ export class Enemy {
       this.type === 'pink_river_dolphin' ||
       this.type === 'giant_otter'
     );
+  }
+
+  /** Herbivores that leave the hunt to graze on the riverbank crops. */
+  public get isGrazingHerbivore(): boolean {
+    return (
+      this.type === 'capybara' ||
+      this.type === 'sloth' ||
+      this.type === 'rhino_beetle' ||
+      this.type === 'sawyer_beetle' ||
+      this.type === 'bullet_ant' ||
+      this.type === 'leafcutter_ant'
+    );
+  }
+
+  /** Only the Anta (elite tapir) searches for fruit trees on its own. */
+  public get isFruitForager(): boolean {
+    return this.type === 'elite_tapir';
+  }
+
+  /** Jacaré-açu, Sucuri and Onça-pintada grow by devouring other animals. */
+  public get isEcologyPredator(): boolean {
+    return (
+      this.type === 'elite_black_caiman' ||
+      this.type === 'boss_cobra_grande' ||
+      this.type === 'elite_jaguar'
+    );
+  }
+
+  public get isJaguarPredator(): boolean {
+    return this.type === 'elite_jaguar';
+  }
+
+  /** The Anta restores health and raises a damage-absorbing shield. */
+  public feedOnFruit(): void {
+    const heal = Math.max(1, Math.round(this.maxHp * 0.2));
+    this.hp = Math.min(this.maxHp, this.hp + heal);
+    this.shieldHp = Math.max(this.shieldHp, Math.round(this.maxHp * 0.3));
+  }
+
+  /**
+   * Grows after devouring prey. Jacaré-açu/Sucuri gain +15% max HP and +12%
+   * damage per meal; the Onça also becomes faster. There is no growth cap.
+   */
+  public growFromPrey(): void {
+    const oldMaxHp = this.maxHp;
+    if (this.isJaguarPredator) {
+      this.maxHp = Math.round(this.maxHp * 1.12);
+      this.speed *= 1.06;
+      this.damage = Math.max(1, Math.round(this.damage * 1.1));
+    } else {
+      this.maxHp = Math.round(this.maxHp * 1.15);
+      this.damage = Math.max(1, Math.round(this.damage * 1.12));
+    }
+    this.hp = Math.min(this.maxHp, this.hp + Math.max(1, this.maxHp - oldMaxHp));
+    this.growthScale *= 1.07;
+    this.ecologyFedCount += 1;
   }
 
   public isDebuffed(): boolean {
@@ -573,6 +648,11 @@ export class Enemy {
     const dx = player.x - this.x;
     const dy = player.y - this.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
+    // Ecology target (beach or fruit tree) only replaces the standard walk;
+    // combat skills still aim at the hero.
+    const moveDx = (this.ecologyTargetX ?? player.x) - this.x;
+    const moveDy = (this.ecologyTargetY ?? player.y) - this.y;
+    const moveDist = Math.sqrt(moveDx * moveDx + moveDy * moveDy);
     const terrainMult =
       this.isRiverPredator && this.playerInWater ? this.terrainSpeedMultiplier : 1.0;
     const speedMult =
@@ -625,11 +705,11 @@ export class Enemy {
       return this.hp > 0;
     }
 
-    // Standard movement towards player
-    if (dist > 0) {
+    // Standard movement towards the current walk target (player by default).
+    if (moveDist > 0) {
       const currentSpeed = this.speed * speedMult;
-      let vx = (dx / dist) * currentSpeed;
-      let vy = (dy / dist) * currentSpeed;
+      let vx = (moveDx / moveDist) * currentSpeed;
+      let vy = (moveDy / moveDist) * currentSpeed;
 
       // Add separation force from flocking
       vx += separation.vx * currentSpeed * 0.8;
@@ -637,8 +717,9 @@ export class Enemy {
 
       // Special ghost waving movement
       if (this.type === 'ghost') {
-        const perpX = -dy / dist;
-        const perpY = dx / dist;
+        const norm = dist > 0 ? dist : 1;
+        const perpX = -dy / norm;
+        const perpY = dx / norm;
         const wave = Math.sin(this.animTimer * 1.5) * 44 * speedMult;
         vx += perpX * wave;
         vy += perpY * wave;
@@ -870,6 +951,12 @@ export class Enemy {
   }
 
   takeDamage(amount: number, knockX: number = 0, knockY: number = 0, knockForce: number = 200): boolean {
+    if (this.shieldHp > 0) {
+      const absorbed = Math.min(this.shieldHp, amount);
+      this.shieldHp -= absorbed;
+      amount -= absorbed;
+    }
+
     this.hp -= amount;
     this.hitFlashTimer = 0.12;
 
@@ -928,6 +1015,10 @@ export class Enemy {
 
     ctx.save();
     ctx.translate(screen.x, screen.y);
+    // Predators grow without limit as they devour other animals.
+    if (this.growthScale !== 1) {
+      ctx.scale(this.growthScale, this.growthScale);
+    }
 
     const isFlashing = this.hitFlashTimer > 0;
 
@@ -936,6 +1027,15 @@ export class Enemy {
     ctx.beginPath();
     ctx.ellipse(0, this.radius * 0.9, this.radius, this.radius * 0.45, 0, 0, Math.PI * 2);
     ctx.fill();
+
+    // Fruit-fed tapir shield.
+    if (this.shieldHp > 0) {
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.8)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(0, this.radius * 0.85, this.radius + 6, this.radius * 0.62, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
 
     // Subtle Status Ring Indicators
     if (this.vulnerableTimer > 0 || this.poisonTimer > 0 || this.slowTimer > 0) {

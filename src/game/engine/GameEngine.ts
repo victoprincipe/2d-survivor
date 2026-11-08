@@ -61,6 +61,31 @@ interface BossHazard {
   windStrength: number;
 }
 
+// Amazon food-chain tuning. Animals only leave the player alone outside this
+// radius; predators hunt on the requested 10-12s / 15s cycles.
+const ECOLOGY_PLAYER_SAFE_RADIUS = 420;
+const ECOLOGY_GRAZING_ARRIVAL = 52;
+const ECOLOGY_FRUIT_EAT_RADIUS = 54;
+const ECOLOGY_RIVER_PREDATOR_RANGE = 320;
+const ECOLOGY_JAGUAR_RANGE = 360;
+const ECOLOGY_FRUIT_FEED_COOLDOWN = 8;
+
+const RIVER_PREDATOR_PREY: EnemyType[] = [
+  'capybara',
+  'elite_tapir',
+  'pink_river_dolphin',
+  'piranha',
+  'poison_dart_frog',
+];
+
+const JAGUAR_PREY: EnemyType[] = [
+  'capybara',
+  'elite_tapir',
+  'sloth',
+  'toucan',
+  'poison_dart_frog',
+];
+
 export class GameEngine {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
@@ -261,6 +286,9 @@ export class GameEngine {
     for (let i = 0; i < this.enemies.length; i++) {
       this.spatialGrid.insert(this.enemies[i]);
     }
+
+    // 3.5. Food-chain target selection (grazing / fruit foraging).
+    this.prepareAmazonEcology(dt);
 
     // 4. Update Enemies + Boss Special Attacks
     const playerInWater = this.worldProps.isWaterSurface(this.player.x, this.player.y);
@@ -713,6 +741,9 @@ export class GameEngine {
       (enemy) => this.onEnemyKilled(enemy)
     );
 
+    // 6.2. Resolve fruit foraging and predator feeds.
+    this.resolveAmazonEcology();
+
     // 6.5. Periodic Supply Drop on Map (every 75s)
     this.itemSpawnTimer += dt;
     if (this.itemSpawnTimer >= 75) {
@@ -755,6 +786,169 @@ export class GameEngine {
     if (this.hudThrottleTimer >= 0.1) {
       this.hudThrottleTimer = 0;
       this.syncHUD();
+    }
+  }
+
+  /**
+   * Assigns food-chain walk targets while the hero is far enough away:
+   * herbivores head to the riverbank and the Anta heads to a fruit tree.
+   */
+  private prepareAmazonEcology(dt: number): void {
+    if (!this.waveDirector.isAmazonForest) return;
+
+    const safeRadiusSq = ECOLOGY_PLAYER_SAFE_RADIUS * ECOLOGY_PLAYER_SAFE_RADIUS;
+    const grazingArrivalSq = ECOLOGY_GRAZING_ARRIVAL * ECOLOGY_GRAZING_ARRIVAL;
+
+    for (let i = 0; i < this.enemies.length; i++) {
+      const enemy = this.enemies[i];
+      if (enemy.hp <= 0) continue;
+
+      if (enemy.ecologyActionCooldown > 0) {
+        enemy.ecologyActionCooldown -= dt;
+      }
+
+      if (enemy.isEcologyPredator) {
+        if (enemy.ecologyHuntTimer > 0) {
+          enemy.ecologyHuntTimer -= dt;
+        }
+        continue;
+      }
+
+      if (!enemy.isGrazingHerbivore && !enemy.isFruitForager) continue;
+
+      const playerDx = this.player.x - enemy.x;
+      const playerDy = this.player.y - enemy.y;
+      if (playerDx * playerDx + playerDy * playerDy < safeRadiusSq) {
+        // The hero is close: drop the peaceful task and resume the chase.
+        enemy.ecologyTargetX = null;
+        enemy.ecologyTargetY = null;
+        enemy.ecologyTargetTreeId = null;
+        continue;
+      }
+
+      if (enemy.isFruitForager) {
+        if (enemy.ecologyTargetTreeId !== null) {
+          const tree = this.worldProps.fruitTrees.find(
+            (candidate) => candidate.id === enemy.ecologyTargetTreeId
+          );
+          if (!tree || !tree.active) {
+            enemy.ecologyTargetX = null;
+            enemy.ecologyTargetY = null;
+            enemy.ecologyTargetTreeId = null;
+          }
+        }
+
+        if (enemy.ecologyTargetX === null && enemy.ecologyActionCooldown <= 0) {
+          const tree = this.worldProps.getNearestActiveFruitTree(enemy.x, enemy.y);
+          if (tree) {
+            enemy.ecologyTargetTreeId = tree.id;
+            enemy.ecologyTargetX = tree.x;
+            enemy.ecologyTargetY = tree.y;
+          }
+        }
+        continue;
+      }
+
+      if (enemy.ecologyTargetX === null) {
+        const beach = this.worldProps.getBeachGrazingTarget(enemy.x, enemy.y);
+        if (beach) {
+          enemy.ecologyTargetX = beach.x;
+          enemy.ecologyTargetY = beach.y;
+        }
+      }
+
+      if (enemy.ecologyTargetX !== null && enemy.ecologyTargetY !== null) {
+        const targetDx = enemy.ecologyTargetX - enemy.x;
+        const targetDy = enemy.ecologyTargetY - enemy.y;
+        if (targetDx * targetDx + targetDy * targetDy <= grazingArrivalSq) {
+          enemy.ecologyGrazingTimer -= dt;
+          if (enemy.ecologyGrazingTimer <= 0) {
+            enemy.ecologyGrazingTimer = 1.4 + Math.random() * 0.9;
+            this.vfx.addSparks(enemy.x, enemy.y, '#84cc16', 3);
+          }
+        }
+      }
+    }
+  }
+
+  private resolveAmazonEcology(): void {
+    if (!this.waveDirector.isAmazonForest) return;
+
+    // Antas eat active fruit trees, then heal and gain a shield.
+    for (let i = 0; i < this.enemies.length; i++) {
+      const enemy = this.enemies[i];
+      if (!enemy.isFruitForager || enemy.ecologyTargetTreeId === null) continue;
+
+      const tree = this.worldProps.fruitTrees.find(
+        (candidate) => candidate.id === enemy.ecologyTargetTreeId
+      );
+      if (!tree || !tree.active) {
+        enemy.ecologyTargetX = null;
+        enemy.ecologyTargetY = null;
+        enemy.ecologyTargetTreeId = null;
+        continue;
+      }
+
+      const dx = tree.x - enemy.x;
+      const dy = tree.y - enemy.y;
+      if (dx * dx + dy * dy > ECOLOGY_FRUIT_EAT_RADIUS * ECOLOGY_FRUIT_EAT_RADIUS) continue;
+
+      this.worldProps.consumeFruitTreeById(tree.id);
+      enemy.feedOnFruit();
+      enemy.ecologyActionCooldown = ECOLOGY_FRUIT_FEED_COOLDOWN;
+      enemy.ecologyTargetX = null;
+      enemy.ecologyTargetY = null;
+      enemy.ecologyTargetTreeId = null;
+      this.vfx.addSparks(tree.x, tree.y, '#84cc16', 12);
+      this.vfx.addSparks(enemy.x, enemy.y, '#38bdf8', 8);
+    }
+
+    // Jacaré-açu, Sucuri and Onça-pintada devour nearby prey on their cycles.
+    const devoured = new Set<Enemy>();
+    for (let i = 0; i < this.enemies.length; i++) {
+      const predator = this.enemies[i];
+      if (!predator.isEcologyPredator || predator.hp <= 0) continue;
+      if (predator.ecologyHuntTimer > 0) continue;
+
+      const isJaguar = predator.isJaguarPredator;
+      const preyTypes = isJaguar ? JAGUAR_PREY : RIVER_PREDATOR_PREY;
+      const range = isJaguar ? ECOLOGY_JAGUAR_RANGE : ECOLOGY_RIVER_PREDATOR_RANGE;
+      const rangeSq = range * range;
+
+      let prey: Enemy | null = null;
+      let closestDistance = rangeSq;
+      for (let j = 0; j < this.enemies.length; j++) {
+        const candidate = this.enemies[j];
+        if (candidate === predator || candidate.hp <= 0 || devoured.has(candidate)) continue;
+        if (!preyTypes.includes(candidate.type)) continue;
+
+        const dx = candidate.x - predator.x;
+        const dy = candidate.y - predator.y;
+        const distance = dx * dx + dy * dy;
+        if (distance <= closestDistance) {
+          closestDistance = distance;
+          prey = candidate;
+        }
+      }
+
+      if (prey) {
+        devoured.add(prey);
+        predator.growFromPrey();
+        this.vfx.addDeathBurst(prey.x, prey.y, '#ef4444', 10);
+        this.vfx.addSparks(predator.x, predator.y, '#f97316', 8);
+        predator.ecologyHuntTimer = isJaguar ? 15 : 10 + Math.random() * 2;
+      } else {
+        // Nothing in reach: retry soon instead of waiting a full cycle.
+        predator.ecologyHuntTimer = 2;
+      }
+    }
+
+    if (devoured.size > 0) {
+      for (let i = this.enemies.length - 1; i >= 0; i--) {
+        if (devoured.has(this.enemies[i])) {
+          this.enemies.splice(i, 1);
+        }
+      }
     }
   }
 
