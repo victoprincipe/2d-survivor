@@ -77,6 +77,11 @@ const ARACA_SPRITE_SCALE = 2;
 const ACAI_MINIMAP_ICON_SIZE = 16;
 const ACAI_MINIMAP_ICON_DRAW_SIZE = 16;
 
+// Purely decorative Amazon vegetation. These trees are scattered once with the
+// deterministic forest seed, never move, block the body through their trunk and
+// fade their canopy over characters walking behind them.
+const DECOR_TREE_COUNT = 720;
+
 // Amazon water. For the player the river and lakes are purely visual, but
 // aquatic enemies use the stricter isNavigableWater check below to stay wet.
 const RIVER_WIDTH = 980;
@@ -249,6 +254,32 @@ interface PlateauProp {
   rampLength: number;
 }
 
+type DecorTreeKind = 'samauma' | 'castanheira' | 'palmeira';
+
+interface DecorTreeProp {
+  kind: DecorTreeKind;
+  x: number;
+  y: number;
+  scale: number;
+  tone: number;
+}
+
+interface DecorTreeMetrics {
+  trunkHeight: number;
+  trunkHalfWidth: number;
+  canopyX: number;
+  canopyY: number;
+  canopyRx: number;
+  canopyRy: number;
+  margin: number;
+}
+
+interface CanopyEntity {
+  x: number;
+  y: number;
+  radius: number;
+}
+
 const PLATEAU_RIM_WIDTH = 22;
 const PLATEAU_RAMP_INSET = 120;
 
@@ -281,6 +312,7 @@ export class WorldSystem {
   private beachStones: BeachStoneProp[] = [];
   private beachBranches: BeachBranchProp[] = [];
   private plateaus: PlateauProp[] = [];
+  private decorTrees: DecorTreeProp[] = [];
 
   private floorImage: HTMLImageElement | null = null;
   private floorPattern: CanvasPattern | null = null;
@@ -1023,6 +1055,91 @@ export class WorldSystem {
     this.rocks = this.rocks.filter((rock) =>
       clearOfPlateaus(rock.x, rock.y, rock.size)
     );
+
+    this.generateDecorTrees(random);
+  }
+
+  /**
+   * Scatters the fixed decorative canopy trees. Placement is rejection-sampled
+   * with the deterministic forest seed, so the forest looks identical on every
+   * run, and refuses water, hills/ramps and other trunks.
+   */
+  private generateDecorTrees(random: () => number): void {
+    const limit = FOREST_HALF_SIZE - 320;
+
+    for (let i = 0; i < DECOR_TREE_COUNT; i++) {
+      for (let attempt = 0; attempt < 8; attempt++) {
+        const x = (random() * 2 - 1) * limit;
+        const y = (random() * 2 - 1) * limit;
+
+        // Keep the initial spawn clearing readable.
+        if (Math.abs(x) < 280 && Math.abs(y) < 280) continue;
+        if (this.isInWater(x, y)) continue;
+        if (this.isOverPlateau(x, y, 130) || this.isOnPlateauRamp(x, y, 130)) continue;
+        if (this.collidesWithTree(x, y, 54)) continue;
+
+        const kindRoll = random();
+        const kind: DecorTreeKind =
+          kindRoll < 0.26 ? 'samauma' : kindRoll < 0.68 ? 'castanheira' : 'palmeira';
+        const scale =
+          kind === 'samauma'
+            ? 0.9 + random() * 0.5
+            : kind === 'castanheira'
+              ? 0.82 + random() * 0.42
+              : 0.88 + random() * 0.46;
+
+        this.decorTrees.push({ kind, x, y, scale, tone: random() });
+        break;
+      }
+    }
+  }
+
+  private getDecorTreeMetrics(tree: DecorTreeProp): DecorTreeMetrics {
+    switch (tree.kind) {
+      case 'samauma':
+        return {
+          trunkHeight: 152 * tree.scale,
+          trunkHalfWidth: 19 * tree.scale,
+          canopyX: 0,
+          canopyY: -176 * tree.scale,
+          canopyRx: 98 * tree.scale,
+          canopyRy: 64 * tree.scale,
+          margin: 310 * tree.scale,
+        };
+      case 'castanheira':
+        return {
+          trunkHeight: 98 * tree.scale,
+          trunkHalfWidth: 11 * tree.scale,
+          canopyX: 0,
+          canopyY: -114 * tree.scale,
+          canopyRx: 64 * tree.scale,
+          canopyRy: 43 * tree.scale,
+          margin: 200 * tree.scale,
+        };
+      case 'palmeira':
+      default:
+        return {
+          trunkHeight: 140 * tree.scale,
+          trunkHalfWidth: 7 * tree.scale,
+          canopyX: (tree.tone - 0.5) * 30 * tree.scale,
+          canopyY: -148 * tree.scale,
+          canopyRx: 58 * tree.scale,
+          canopyRy: 34 * tree.scale,
+          margin: 220 * tree.scale,
+        };
+    }
+  }
+
+  private getDecorTreeCollisionRadius(tree: DecorTreeProp): number {
+    switch (tree.kind) {
+      case 'samauma':
+        return 17 * tree.scale;
+      case 'castanheira':
+        return 10 * tree.scale;
+      case 'palmeira':
+      default:
+        return 7 * tree.scale;
+    }
   }
 
   private riverCenterY(x: number): number {
@@ -1622,6 +1739,16 @@ export class WorldSystem {
         Math.PI * 2
       );
       ctx.fill();
+    }
+
+    // Subtle dark-green specks for the decorative canopy trees.
+    ctx.fillStyle = 'rgba(20, 83, 45, 0.52)';
+    for (let i = 0; i < this.decorTrees.length; i++) {
+      const tree = this.decorTrees[i];
+      if (Math.abs(tree.x - centerX) > viewRadius) continue;
+      if (Math.abs(tree.y - centerY) > viewRadius) continue;
+      const dot = tree.kind === 'samauma' ? 2 : 1.4;
+      ctx.fillRect(toX(tree.x) - dot / 2, toY(tree.y) - dot / 2, dot, dot);
     }
 
     // Dense wall of trees around the map limit.
@@ -4019,13 +4146,26 @@ export class WorldSystem {
     const stepY = dy / steps;
     let x = fromX;
     let y = fromY;
+    // If the animal already spawned inside a trunk, let it walk out instead of
+    // trapping it forever against the tree it overlaps.
+    const startedInsideTree = this.collidesWithDecorTree(fromX, fromY, radius);
 
     for (let i = 0; i < steps; i++) {
       const nextX = x + stepX;
-      if (!this.blocksOnPlateauRim(x, y, nextX, y, false, radius)) x = nextX;
+      if (
+        !this.blocksOnPlateauRim(x, y, nextX, y, false, radius) &&
+        (startedInsideTree || !this.collidesWithDecorTree(nextX, y, radius))
+      ) {
+        x = nextX;
+      }
 
       const nextY = y + stepY;
-      if (!this.blocksOnPlateauRim(x, y, x, nextY, false, radius)) y = nextY;
+      if (
+        !this.blocksOnPlateauRim(x, y, x, nextY, false, radius) &&
+        (startedInsideTree || !this.collidesWithDecorTree(x, nextY, radius))
+      ) {
+        y = nextY;
+      }
     }
 
     return { x, y };
@@ -4036,6 +4176,17 @@ export class WorldSystem {
       const tree = this.trees[i];
       const treeRadius = tree.size * 0.32;
       const minDist = radius + treeRadius;
+      const dx = x - tree.x;
+      const dy = y - tree.y;
+      if (dx * dx + dy * dy < minDist * minDist) return true;
+    }
+    return this.collidesWithDecorTree(x, y, radius);
+  }
+
+  private collidesWithDecorTree(x: number, y: number, radius: number): boolean {
+    for (let i = 0; i < this.decorTrees.length; i++) {
+      const tree = this.decorTrees[i];
+      const minDist = radius + this.getDecorTreeCollisionRadius(tree);
       const dx = x - tree.x;
       const dy = y - tree.y;
       if (dx * dx + dy * dy < minDist * minDist) return true;
@@ -5296,6 +5447,505 @@ export class WorldSystem {
       ctx.fill();
 
       ctx.restore();
+    }
+  }
+
+  /**
+   * Draws the fixed decorative canopy trees. Trees with someone behind them are
+   * drawn without their canopy here; the translucent canopy is then painted by
+   * renderDecorCanopyOverlay on top of the characters.
+   */
+  public renderDecorTrees(
+    ctx: CanvasRenderingContext2D,
+    camera: Camera,
+    player: CanopyEntity,
+    enemies: ReadonlyArray<CanopyEntity>
+  ): void {
+    if (this.mapId !== 'amazon_forest') return;
+
+    for (let i = 0; i < this.decorTrees.length; i++) {
+      const tree = this.decorTrees[i];
+      const metrics = this.getDecorTreeMetrics(tree);
+      if (!camera.isInView(tree.x, tree.y, metrics.margin)) continue;
+
+      const screen = camera.worldToScreen(tree.x, tree.y);
+      const behind = this.isAnyEntityBehindDecorCanopy(tree, metrics, player, enemies);
+      ctx.save();
+      ctx.translate(screen.x, screen.y);
+      this.drawDecorTreeShadow(ctx, tree, metrics);
+      this.drawDecorTreeTrunk(ctx, tree, metrics);
+      if (!behind) this.drawDecorTreeCanopy(ctx, tree, metrics, 1);
+      ctx.restore();
+    }
+  }
+
+  /**
+   * Re-draws the canopy of every decorative tree that the hero or an animal is
+   * standing behind. At 30% opacity the leaves still sell the depth without
+   * hiding the combat underneath.
+   */
+  public renderDecorCanopyOverlay(
+    ctx: CanvasRenderingContext2D,
+    camera: Camera,
+    player: CanopyEntity,
+    enemies: ReadonlyArray<CanopyEntity>
+  ): void {
+    if (this.mapId !== 'amazon_forest') return;
+
+    for (let i = 0; i < this.decorTrees.length; i++) {
+      const tree = this.decorTrees[i];
+      const metrics = this.getDecorTreeMetrics(tree);
+      if (!camera.isInView(tree.x, tree.y, metrics.margin)) continue;
+      if (!this.isAnyEntityBehindDecorCanopy(tree, metrics, player, enemies)) continue;
+
+      const screen = camera.worldToScreen(tree.x, tree.y);
+      ctx.save();
+      ctx.translate(screen.x, screen.y);
+      this.drawDecorTreeCanopy(ctx, tree, metrics, 0.3);
+      ctx.restore();
+    }
+  }
+
+  private isAnyEntityBehindDecorCanopy(
+    tree: DecorTreeProp,
+    metrics: DecorTreeMetrics,
+    player: CanopyEntity,
+    enemies: ReadonlyArray<CanopyEntity>
+  ): boolean {
+    if (this.isBehindDecorCanopy(tree, metrics, player)) return true;
+    for (let e = 0; e < enemies.length; e++) {
+      if (this.isBehindDecorCanopy(tree, metrics, enemies[e])) return true;
+    }
+    return false;
+  }
+
+  private isBehindDecorCanopy(
+    tree: DecorTreeProp,
+    metrics: DecorTreeMetrics,
+    entity: CanopyEntity
+  ): boolean {
+    if (entity.y >= tree.y) return false;
+
+    const dx = Math.abs(entity.x - tree.x);
+    if (dx > metrics.canopyRx + entity.radius) return false;
+
+    const canopyCenterY = tree.y + metrics.canopyY;
+    const top = canopyCenterY - metrics.canopyRy - entity.radius;
+    const bottom = canopyCenterY + metrics.canopyRy + entity.radius;
+    return entity.y >= top && entity.y <= bottom;
+  }
+
+  private drawDecorTreeShadow(
+    ctx: CanvasRenderingContext2D,
+    tree: DecorTreeProp,
+    metrics: DecorTreeMetrics
+  ): void {
+    const hw = metrics.trunkHalfWidth;
+    ctx.fillStyle = 'rgba(3, 8, 5, 0.5)';
+    ctx.beginPath();
+    ctx.ellipse(0, 3, hw * (tree.kind === 'samauma' ? 4.2 : 3.5), hw * 1.35, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = 'rgba(2, 5, 3, 0.34)';
+    ctx.beginPath();
+    ctx.ellipse(0, 1, hw * 2.35, hw * 0.72, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  private drawDecorTreeTrunk(
+    ctx: CanvasRenderingContext2D,
+    tree: DecorTreeProp,
+    metrics: DecorTreeMetrics
+  ): void {
+    if (tree.kind === 'palmeira') {
+      this.drawPalmTrunk(ctx, tree, metrics);
+    } else {
+      this.drawBroadleafTrunk(ctx, tree, metrics);
+    }
+  }
+
+  private drawBroadleafTrunk(
+    ctx: CanvasRenderingContext2D,
+    tree: DecorTreeProp,
+    metrics: DecorTreeMetrics
+  ): void {
+    const height = metrics.trunkHeight;
+    const hw = metrics.trunkHalfWidth;
+    const outline = '#170f08';
+    const bark = tree.tone > 0.5 ? '#68482a' : '#5a3c23';
+    const light = tree.tone > 0.5 ? '#8f6538' : '#7d5732';
+    const shade = '#35230f';
+
+    // Buttress / surface roots over the oval shadow.
+    ctx.fillStyle = outline;
+    ctx.beginPath();
+    ctx.moveTo(-hw * 0.8, -height * 0.04);
+    ctx.quadraticCurveTo(-hw * 1.8, -2, -hw * 2.9, hw * 0.6);
+    ctx.lineTo(-hw * 1.0, hw * 0.55);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(hw * 0.8, -height * 0.04);
+    ctx.quadraticCurveTo(hw * 1.8, -2, hw * 2.9, hw * 0.6);
+    ctx.lineTo(hw * 1.0, hw * 0.55);
+    ctx.closePath();
+    ctx.fill();
+
+    // Tapered pixel-art trunk silhouette.
+    ctx.fillStyle = outline;
+    ctx.beginPath();
+    ctx.moveTo(-hw * 1.25, 1);
+    ctx.lineTo(-hw * 0.68, -height);
+    ctx.lineTo(hw * 0.68, -height);
+    ctx.lineTo(hw * 1.25, 1);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = bark;
+    ctx.beginPath();
+    ctx.moveTo(-hw * 0.92, 0);
+    ctx.lineTo(-hw * 0.42, -height + 1);
+    ctx.lineTo(hw * 0.42, -height + 1);
+    ctx.lineTo(hw * 0.92, 0);
+    ctx.closePath();
+    ctx.fill();
+
+    // Sunlit bark strip and dark grooves.
+    ctx.fillStyle = light;
+    ctx.fillRect(-hw * 0.8, -height * 0.82, Math.max(1, hw * 0.3), height * 0.78);
+    ctx.strokeStyle = shade;
+    ctx.lineWidth = Math.max(1, tree.scale);
+    for (let i = 0; i < 4; i++) {
+      const offset = (i - 1.5) * hw * 0.32;
+      ctx.beginPath();
+      ctx.moveTo(offset, -height * 0.08);
+      ctx.quadraticCurveTo(offset + hw * 0.25, -height * 0.5, offset, -height * 0.94);
+      ctx.stroke();
+    }
+
+    if (tree.kind === 'samauma') {
+      // Broken limbs make the giant trunk silhouette less uniform.
+      ctx.strokeStyle = outline;
+      ctx.lineWidth = Math.max(1.2, hw * 0.18);
+      ctx.beginPath();
+      ctx.moveTo(-hw * 0.4, -height * 0.62);
+      ctx.lineTo(-hw * 1.5, -height * 0.76);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(hw * 0.35, -height * 0.78);
+      ctx.lineTo(hw * 1.35, -height * 0.9);
+      ctx.stroke();
+    }
+  }
+
+  private drawPalmTrunk(
+    ctx: CanvasRenderingContext2D,
+    tree: DecorTreeProp,
+    metrics: DecorTreeMetrics
+  ): void {
+    const height = metrics.trunkHeight;
+    const hw = metrics.trunkHalfWidth;
+    const lean = metrics.canopyX * 0.5;
+    const outline = '#17130c';
+    const bark = tree.tone > 0.5 ? '#9c8a68' : '#8c7b5d';
+    const light = '#c3b494';
+    const ring = '#5c4e38';
+
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = outline;
+    ctx.lineWidth = hw * 2.8;
+    ctx.beginPath();
+    ctx.moveTo(0, 2);
+    ctx.quadraticCurveTo(lean * 0.55, -height * 0.55, metrics.canopyX, -height);
+    ctx.stroke();
+
+    ctx.strokeStyle = bark;
+    ctx.lineWidth = hw * 1.9;
+    ctx.beginPath();
+    ctx.moveTo(0, 2);
+    ctx.quadraticCurveTo(lean * 0.55, -height * 0.55, metrics.canopyX, -height);
+    ctx.stroke();
+
+    // Segmented rings along the curved trunk.
+    ctx.strokeStyle = ring;
+    ctx.lineWidth = Math.max(1, hw * 0.4);
+    for (let i = 1; i < 9; i++) {
+      const t = i / 9;
+      const u = 1 - t;
+      const x = 2 * u * t * lean * 0.55 + t * t * metrics.canopyX;
+      const y = u * u * 2 + 2 * u * t * (-height * 0.55) + t * t * (-height);
+      const width = hw * (1.1 + Math.sin(Math.PI * t) * 0.25);
+      ctx.beginPath();
+      ctx.moveTo(x - width, y);
+      ctx.lineTo(x + width, y);
+      ctx.stroke();
+    }
+
+    // Slim lit edge.
+    ctx.strokeStyle = light;
+    ctx.lineWidth = Math.max(1, hw * 0.45);
+    ctx.beginPath();
+    ctx.moveTo(-hw * 0.5, -height * 0.15);
+    ctx.quadraticCurveTo(
+      lean * 0.55 - hw * 0.45,
+      -height * 0.58,
+      metrics.canopyX - hw * 0.5,
+      -height * 0.96
+    );
+    ctx.stroke();
+    ctx.lineCap = 'butt';
+  }
+
+  private drawDecorTreeCanopy(
+    ctx: CanvasRenderingContext2D,
+    tree: DecorTreeProp,
+    metrics: DecorTreeMetrics,
+    alpha: number
+  ): void {
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    if (tree.kind === 'palmeira') {
+      this.drawPalmCanopy(ctx, tree, metrics);
+    } else {
+      this.drawBroadleafCanopy(ctx, tree, metrics);
+    }
+    ctx.restore();
+  }
+
+  private drawBroadleafCanopy(
+    ctx: CanvasRenderingContext2D,
+    tree: DecorTreeProp,
+    metrics: DecorTreeMetrics
+  ): void {
+    const cx = metrics.canopyX;
+    const cy = metrics.canopyY;
+    const rx = metrics.canopyRx;
+    const ry = metrics.canopyRy;
+    const giant = tree.kind === 'samauma';
+
+    const blobs: [number, number, number, number][] = giant
+      ? [
+          [0, 0.05, 0.95, 0.78],
+          [-0.62, 0.1, 0.56, 0.55],
+          [0.62, 0.08, 0.58, 0.56],
+          [-0.34, -0.5, 0.56, 0.48],
+          [0.36, -0.48, 0.58, 0.5],
+          [0, -0.18, 0.78, 0.6],
+          [-0.5, 0.45, 0.42, 0.38],
+          [0.52, 0.46, 0.44, 0.4],
+          [0.02, 0.5, 0.52, 0.4],
+        ]
+      : [
+          [0, 0, 0.9, 0.76],
+          [-0.58, 0.08, 0.5, 0.48],
+          [0.58, 0.06, 0.52, 0.5],
+          [-0.3, -0.48, 0.52, 0.45],
+          [0.32, -0.46, 0.54, 0.46],
+          [0, 0.38, 0.56, 0.4],
+          [0, -0.12, 0.68, 0.55],
+        ];
+
+    // Dark contour around the full crown.
+    ctx.fillStyle = '#05180c';
+    ctx.beginPath();
+    for (let i = 0; i < blobs.length; i++) {
+      const blob = blobs[i];
+      ctx.ellipse(
+        cx + blob[0] * rx,
+        cy + blob[1] * ry,
+        blob[2] * rx + 1.5,
+        blob[3] * ry + 1.5,
+        0,
+        0,
+        Math.PI * 2
+      );
+    }
+    ctx.fill();
+
+    // Deep shadowed foliage.
+    ctx.fillStyle = giant ? '#0b2c17' : '#0f3a20';
+    ctx.beginPath();
+    for (let i = 0; i < blobs.length; i++) {
+      const blob = blobs[i];
+      ctx.ellipse(
+        cx + blob[0] * rx,
+        cy + blob[1] * ry,
+        blob[2] * rx,
+        blob[3] * ry,
+        0,
+        0,
+        Math.PI * 2
+      );
+    }
+    ctx.fill();
+
+    // Mid-tone mass, nudged up-left to leave a shaded rim.
+    ctx.fillStyle = tree.tone > 0.55 ? '#1d6a35' : '#185c2d';
+    ctx.beginPath();
+    for (let i = 0; i < blobs.length; i++) {
+      const blob = blobs[i];
+      ctx.ellipse(
+        cx + blob[0] * rx - rx * 0.03,
+        cy + blob[1] * ry - ry * 0.05,
+        blob[2] * rx * 0.84,
+        blob[3] * ry * 0.84,
+        0,
+        0,
+        Math.PI * 2
+      );
+    }
+    ctx.fill();
+
+    // Sunlit leaf clumps concentrated on the upper-left of the crown.
+    const litBlobs: [number, number, number, number][] = giant
+      ? [
+          [-0.3, -0.28, 0.55, 0.44],
+          [-0.62, 0.05, 0.3, 0.3],
+          [0.05, -0.48, 0.42, 0.34],
+          [-0.1, 0.2, 0.36, 0.3],
+        ]
+      : [
+          [-0.25, -0.25, 0.48, 0.38],
+          [-0.55, 0.06, 0.3, 0.3],
+          [0.05, -0.44, 0.36, 0.3],
+          [-0.05, 0.18, 0.3, 0.26],
+        ];
+
+    ctx.fillStyle = tree.tone > 0.5 ? '#359447' : '#2e8440';
+    ctx.beginPath();
+    for (let i = 0; i < litBlobs.length; i++) {
+      const blob = litBlobs[i];
+      ctx.ellipse(
+        cx + blob[0] * rx,
+        cy + blob[1] * ry,
+        blob[2] * rx,
+        blob[3] * ry,
+        0,
+        0,
+        Math.PI * 2
+      );
+    }
+    ctx.fill();
+
+    ctx.fillStyle = '#55b45e';
+    ctx.beginPath();
+    for (let i = 0; i < litBlobs.length; i++) {
+      const blob = litBlobs[i];
+      ctx.ellipse(
+        cx + blob[0] * rx - rx * 0.04,
+        cy + blob[1] * ry - ry * 0.06,
+        blob[2] * rx * 0.46,
+        blob[3] * ry * 0.46,
+        0,
+        0,
+        Math.PI * 2
+      );
+    }
+    ctx.fill();
+
+    if (tree.kind === 'samauma') {
+      // Hanging vines dangle below the huge canopy.
+      ctx.strokeStyle = 'rgba(38, 86, 39, 0.95)';
+      ctx.lineWidth = Math.max(1, 1.2 * tree.scale);
+      ctx.lineCap = 'round';
+      for (let v = 0; v < 5; v++) {
+        const vx = cx + (v - 2) * rx * 0.33;
+        const startY = cy + ry * (0.32 + (v % 2) * 0.18);
+        const length = ry * (0.65 + (v % 3) * 0.18);
+        ctx.beginPath();
+        ctx.moveTo(vx, startY);
+        ctx.quadraticCurveTo(
+          vx + 7 * tree.scale,
+          startY + length * 0.5,
+          vx - 5 * tree.scale,
+          startY + length
+        );
+        ctx.stroke();
+
+        ctx.fillStyle = '#2e7338';
+        ctx.beginPath();
+        ctx.ellipse(
+          vx - 5 * tree.scale,
+          startY + length,
+          3.4 * tree.scale,
+          1.6 * tree.scale,
+          -0.45,
+          0,
+          Math.PI * 2
+        );
+        ctx.fill();
+      }
+      ctx.lineCap = 'butt';
+    }
+  }
+
+  private drawPalmCanopy(
+    ctx: CanvasRenderingContext2D,
+    tree: DecorTreeProp,
+    metrics: DecorTreeMetrics
+  ): void {
+    const crownX = metrics.canopyX;
+    const crownY = metrics.canopyY;
+    const length = metrics.canopyRx * 1.25;
+    const tint = tree.tone;
+
+    const drawFronds = (fill: string, lengthScale: number, widthScale: number): void => {
+      ctx.fillStyle = fill;
+      for (let f = 0; f < 9; f++) {
+        const angle = -Math.PI + (f / 8) * Math.PI + (tint - 0.5) * 0.34;
+        const dirX = Math.cos(angle);
+        const dirY = Math.sin(angle);
+        const bladeLength = length * lengthScale * (0.82 + (f % 2) * 0.2);
+        const tipX = crownX + dirX * bladeLength;
+        const tipY = crownY + dirY * bladeLength * 0.58;
+        const midX =
+          crownX + dirX * bladeLength * 0.55 - dirY * bladeLength * 0.16 * widthScale;
+        const midY =
+          crownY + dirY * bladeLength * 0.55 + dirX * bladeLength * 0.16 * widthScale;
+        const innerX = crownX + dirX * bladeLength * 0.4;
+        const innerY = crownY + dirY * bladeLength * 0.24;
+
+        ctx.beginPath();
+        ctx.moveTo(crownX, crownY);
+        ctx.quadraticCurveTo(midX, midY, tipX, tipY);
+        ctx.quadraticCurveTo(innerX, innerY, crownX, crownY);
+        ctx.fill();
+      }
+    };
+
+    drawFronds('#061a0c', 1.08, 1.15);
+    drawFronds(tree.tone > 0.5 ? '#14532d' : '#0f4a27', 1.0, 1.0);
+    drawFronds(tree.tone > 0.5 ? '#2f8a45' : '#277a3d', 0.82, 0.7);
+
+    // Crown knob and a small hanging fruit bunch.
+    ctx.fillStyle = '#0d2a17';
+    ctx.beginPath();
+    ctx.ellipse(crownX, crownY + 3 * tree.scale, 6 * tree.scale, 3.5 * tree.scale, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#3f7a35';
+    ctx.beginPath();
+    ctx.ellipse(
+      crownX - 1.2 * tree.scale,
+      crownY + 2.4 * tree.scale,
+      3 * tree.scale,
+      1.6 * tree.scale,
+      0,
+      0,
+      Math.PI * 2
+    );
+    ctx.fill();
+
+    ctx.fillStyle = tree.tone > 0.5 ? '#b45309' : '#7c3a12';
+    for (let i = 0; i < 4; i++) {
+      ctx.beginPath();
+      ctx.arc(
+        crownX + (i - 1.5) * 2.2 * tree.scale,
+        crownY + (10 + (i % 2) * 2) * tree.scale,
+        1.6 * tree.scale,
+        0,
+        Math.PI * 2
+      );
+      ctx.fill();
     }
   }
 

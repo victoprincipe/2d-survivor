@@ -2096,6 +2096,7 @@ export class GameEngine {
     }
 
     this.worldProps.renderTrees(ctx, camera);
+    this.worldProps.renderDecorTrees(ctx, camera, this.player, this.enemies);
     this.worldProps.renderFruitTrees(ctx, camera, this.player);
 
     // 2. Render Torches & Props
@@ -2138,6 +2139,10 @@ export class GameEngine {
     if (this.gorillaAvailable && this.gorillaNpc && this.player.y < this.gorillaNpc.y) {
       this.gorillaNpc.render(ctx, camera);
     }
+
+    // Decorative canopies become translucent over anyone walking behind them.
+    this.worldProps.renderDecorCanopyOverlay(ctx, camera, this.player, this.enemies);
+
     this.renderBossProjectiles();
 
     // 6. Render Aerial Projectiles, Slashes, Orbitals & Lightning
