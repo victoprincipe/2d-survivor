@@ -27,9 +27,9 @@ const ACAI_SPRITE_WIDTH = 32;
 const ACAI_SPRITE_HEIGHT = 40;
 const ACAI_SPRITE_SCALE = 3;
 
-// Açaí minimap marker: a hand-drawn 16x16 pixel-art bunch, rasterized once
-// into an offscreen canvas and blitted at 16x16 with smoothing disabled so
-// every pixel of the reference-style art is preserved.
+// Fruit tree minimap markers: hand-drawn 16x16 pixel-art icons, rasterized
+// once into offscreen canvases and blitted at 16x16 with smoothing disabled
+// so every pixel of the art is preserved.
 const ACAI_MINIMAP_ICON_SIZE = 16;
 const ACAI_MINIMAP_ICON_DRAW_SIZE = 16;
 
@@ -80,17 +80,6 @@ const FRUIT_TREE_BENEFITS: Record<FruitTreeKind, string> = {
   buriti: 'Frenesi: +Velocidade e Ataque (10s)',
   pupunha: 'Proteção: Escudo temporário (10s)',
   araca: 'Explosão: Dano em área nos inimigos',
-};
-
-// Distinct minimap colors so each fruit can be told apart at a glance.
-// Açaí always uses its pixel-art bunch icon and never falls back to a dot.
-const FRUIT_TREE_MINIMAP_COLORS: Record<FruitTreeKind, string> = {
-  acai: '#3a1050',
-  cupuacu: '#d4a017',
-  castanha: '#8b5a2b',
-  buriti: '#f97316',
-  pupunha: '#ef4444',
-  araca: '#a3e635',
 };
 
 interface TreeProp {
@@ -182,6 +171,7 @@ export class WorldSystem {
   private floorPattern: CanvasPattern | null = null;
   private acaiPixelSprite: HTMLCanvasElement | null = null;
   private acaiMinimapIcon: HTMLCanvasElement | null = null;
+  private fruitMinimapIcons: Partial<Record<FruitTreeKind, HTMLCanvasElement>> = {};
   private waterAnimTimer: number = 0;
 
   constructor(mapId: MapId = 'night_plain') {
@@ -1035,53 +1025,27 @@ export class WorldSystem {
       ctx.fillRect(toX(tree.x) - dotSize / 2, toY(tree.y) - dotSize / 2, dotSize, dotSize);
     }
 
-    // Active fruit trees use a small icon colored by fruit kind.
+    // Active fruit trees use their own 16x16 pixel-art fruit icon.
     for (let i = 0; i < this.fruitTrees.length; i++) {
       const tree = this.fruitTrees[i];
       if (!tree.active) continue;
       if (Math.abs(tree.x - centerX) > viewRadius) continue;
       if (Math.abs(tree.y - centerY) > viewRadius) continue;
 
-      const treeX = toX(tree.x);
-      const treeY = toY(tree.y);
+      const icon = this.getFruitMinimapIcon(tree.kind);
+      if (!icon) continue;
 
-      // The açaí gets a dedicated pixel-art bunch icon so it stands out from
-      // the other fruit dots on the minimap.
-      if (tree.kind === 'acai') {
-        const icon = this.getAcaiMinimapIcon();
-        if (icon) {
-          const drawSize = ACAI_MINIMAP_ICON_DRAW_SIZE;
-          ctx.save();
-          ctx.imageSmoothingEnabled = false;
-          ctx.drawImage(
-            icon,
-            Math.round(treeX - drawSize / 2),
-            Math.round(treeY - drawSize / 2),
-            drawSize,
-            drawSize
-          );
-          ctx.restore();
-        }
-        // The açaí never falls back to the generic purple dot.
-        continue;
-      }
-
-      // Dark backing keeps the icon readable over water and tree wall.
-      ctx.fillStyle = 'rgba(8, 15, 20, 0.75)';
-      ctx.beginPath();
-      ctx.arc(treeX, treeY, 3.6, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = FRUIT_TREE_MINIMAP_COLORS[tree.kind];
-      ctx.beginPath();
-      ctx.arc(treeX, treeY, 2.8, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Tiny highlight to read as a fruit rather than a generic dot.
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
-      ctx.beginPath();
-      ctx.arc(treeX - 0.9, treeY - 0.9, 0.9, 0, Math.PI * 2);
-      ctx.fill();
+      const drawSize = ACAI_MINIMAP_ICON_DRAW_SIZE;
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(
+        icon,
+        Math.round(toX(tree.x) - drawSize / 2),
+        Math.round(toY(tree.y) - drawSize / 2),
+        drawSize,
+        drawSize
+      );
+      ctx.restore();
     }
   }
 
@@ -1305,6 +1269,240 @@ export class WorldSystem {
   }
 
   /**
+   * Builds (once) the 16x16 pixel-art minimap icon for a fruit tree kind.
+   * Each fruit is plotted pixel by pixel with a thin dark contour and then
+   * blitted with smoothing disabled, so the radar stays crisp and readable.
+   */
+  private getFruitMinimapIcon(kind: FruitTreeKind): HTMLCanvasElement | null {
+    if (kind === 'acai') return this.getAcaiMinimapIcon();
+
+    const cached = this.fruitMinimapIcons[kind];
+    if (cached) return cached;
+    if (typeof document === 'undefined') return null;
+
+    const size = ACAI_MINIMAP_ICON_SIZE;
+    const pixels: (string | null)[] = new Array(size * size).fill(null);
+
+    const setPixel = (x: number, y: number, color: string): void => {
+      const px = Math.round(x);
+      const py = Math.round(y);
+      if (px < 0 || px >= size || py < 0 || py >= size) return;
+      pixels[py * size + px] = color;
+    };
+
+    const fillCircle = (cx: number, cy: number, radius: number, color: string): void => {
+      const minX = Math.floor(cx - radius);
+      const maxX = Math.ceil(cx + radius);
+      const minY = Math.floor(cy - radius);
+      const maxY = Math.ceil(cy + radius);
+      for (let y = minY; y <= maxY; y++) {
+        for (let x = minX; x <= maxX; x++) {
+          const dx = x - cx;
+          const dy = y - cy;
+          if (dx * dx + dy * dy <= radius * radius + 0.2) setPixel(x, y, color);
+        }
+      }
+    };
+
+    const fillEllipse = (
+      cx: number,
+      cy: number,
+      rx: number,
+      ry: number,
+      color: string
+    ): void => {
+      const minX = Math.floor(cx - rx);
+      const maxX = Math.ceil(cx + rx);
+      const minY = Math.floor(cy - ry);
+      const maxY = Math.ceil(cy + ry);
+      for (let y = minY; y <= maxY; y++) {
+        for (let x = minX; x <= maxX; x++) {
+          const dx = (x - cx) / rx;
+          const dy = (y - cy) / ry;
+          if (dx * dx + dy * dy <= 1.05) setPixel(x, y, color);
+        }
+      }
+    };
+
+    const drawLine = (
+      x0: number,
+      y0: number,
+      x1: number,
+      y1: number,
+      color: string
+    ): void => {
+      const steps = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+      for (let i = 0; i <= steps; i++) {
+        const t = steps === 0 ? 0 : i / steps;
+        setPixel(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, color);
+      }
+    };
+
+    const outline = '#140a06';
+
+    switch (kind) {
+      case 'cupuacu': {
+        // Short stem and one little leaf above the capsule.
+        drawLine(8, 2, 8, 5, '#5a3a1c');
+        fillEllipse(10.8, 2.4, 2.4, 1.2, outline);
+        fillEllipse(10.8, 2.4, 1.9, 0.8, '#1d6b34');
+        fillEllipse(10.5, 2.1, 1.3, 0.5, '#4fb867');
+
+        // Large velvety brown capsule with darker bottom-right shading.
+        fillEllipse(8, 9.2, 4.9, 5.9, outline);
+        fillEllipse(8, 9.2, 4.2, 5.2, '#7a4a2b');
+        fillEllipse(6.5, 7.2, 1.4, 1.8, '#a06a3d');
+        fillEllipse(9.4, 10, 1.4, 2.4, '#4f2c18');
+        drawLine(6, 6, 6.4, 12, '#5b3520');
+        drawLine(10, 6, 9.6, 12, '#5b3520');
+        setPixel(6.2, 6.5, '#c08a58');
+        setPixel(7, 5.8, '#c08a58');
+        break;
+      }
+      case 'castanha': {
+        // Rounded dark-brown shell with a lighter rim.
+        fillCircle(8, 8.2, 6.4, outline);
+        fillCircle(8, 8.2, 5.7, '#5c341b');
+        fillCircle(8, 8.2, 5.0, '#7a4a27');
+
+        // Cracked opening showing three pale Brazil nuts.
+        fillEllipse(8, 8.6, 4.3, 3.0, '#3a1d0e');
+        fillEllipse(8, 8.6, 3.7, 2.5, '#241108');
+        const nuts = [5.6, 8, 10.4];
+        for (let i = 0; i < nuts.length; i++) {
+          const nutX = nuts[i];
+          fillCircle(nutX, 8.6, 1.45, outline);
+          fillCircle(nutX, 8.6, 1.05, '#e9cf9a');
+          fillCircle(nutX - 0.2, 8.3, 0.55, '#f7e8c4');
+          setPixel(nutX - 0.6, 8.2, '#fff6de');
+        }
+
+        // Shell grain and highlights.
+        drawLine(3.6, 5.4, 5.2, 3.8, '#9b6538');
+        drawLine(10.5, 3.9, 12.2, 5.7, '#9b6538');
+        setPixel(4.2, 11.2, '#9b6538');
+        setPixel(11.8, 11, '#9b6538');
+        break;
+      }
+      case 'buriti': {
+        // Small stem at the top of the elongated fruit.
+        drawLine(8, 1.8, 8, 4, '#4a2a12');
+
+        // Oval brown-red fruit with warm shading.
+        fillEllipse(8, 8.7, 4.2, 5.6, outline);
+        fillEllipse(8, 8.7, 3.5, 4.9, '#8b3a24');
+        fillEllipse(9.2, 10.4, 1.5, 2.4, '#6b2418');
+        fillEllipse(6.5, 7.0, 1.3, 2.0, '#b4582e');
+        setPixel(5.6, 6.0, '#f0a44a');
+        setPixel(6.4, 5.4, '#f0a44a');
+
+        // Overlapping scale texture with golden-orange glints.
+        for (let y = 5; y <= 12; y += 2) {
+          const offset = y % 4 === 1 ? 0 : 1;
+          for (let x = 5 + offset; x <= 9; x += 2) {
+            setPixel(x, y, '#5c1f12');
+            setPixel(x + 1, y + 1, '#c86a32');
+          }
+        }
+        break;
+      }
+      case 'pupunha': {
+        // Stems fanning out from the crown, drawn behind the fruits.
+        drawLine(8, 2, 5.2, 4.2, '#4a5a1c');
+        drawLine(8, 2, 10.8, 4.2, '#4a5a1c');
+        drawLine(8, 2, 5.6, 8.8, '#4a5a1c');
+        drawLine(8, 2, 10.4, 8.8, '#4a5a1c');
+
+        const fruits = [
+          { x: 5.2, y: 6.4 },
+          { x: 10.8, y: 6.4 },
+          { x: 5.6, y: 11.2 },
+          { x: 10.4, y: 11.2 },
+        ];
+        for (let i = 0; i < fruits.length; i++) {
+          const fruit = fruits[i];
+          // Red top fading into an orange-yellow base.
+          fillEllipse(fruit.x, fruit.y, 2.2, 2.9, outline);
+          fillEllipse(fruit.x, fruit.y + 0.2, 1.6, 2.35, '#d92b1f');
+          fillEllipse(fruit.x, fruit.y - 0.2, 1.4, 1.5, '#f05a22');
+          fillEllipse(fruit.x, fruit.y + 1.0, 1.1, 1.0, '#f7b32b');
+          setPixel(fruit.x - 0.6, fruit.y - 1.0, '#ffe08a');
+          setPixel(fruit.x - 0.2, fruit.y - 1.4, '#ffe08a');
+        }
+
+        // Small green crown leaf on top.
+        fillEllipse(8, 2.0, 2.2, 1.0, outline);
+        fillEllipse(8, 2.0, 1.7, 0.6, '#2f6b25');
+        setPixel(7.6, 1.7, '#67a83e');
+        break;
+      }
+      case 'araca': {
+        const sepalDark = '#2f4d1c';
+        const sepalLight = '#5d7f2c';
+
+        // Thin stem and small leaf at the top.
+        drawLine(8, 2.4, 8, 4.2, '#4a3420');
+        fillEllipse(10.2, 2.3, 2.3, 1.1, outline);
+        fillEllipse(10.2, 2.3, 1.8, 0.7, '#2f6b25');
+        fillEllipse(9.9, 2.0, 1.2, 0.45, '#67a83e');
+
+        // Small round green-yellow fruit.
+        fillCircle(8, 8.8, 5.4, outline);
+        fillCircle(8, 8.8, 4.7, '#a8bf3e');
+        fillCircle(9.2, 9.8, 3.2, '#8da52f');
+        fillCircle(6.4, 7.1, 1.7, '#d5e36a');
+        setPixel(5.8, 6.4, '#f0f7a0');
+        setPixel(6.6, 5.8, '#f0f7a0');
+
+        // Crown of sepals around the base of the fruit.
+        drawLine(8, 12.8, 5.2, 14.4, sepalDark);
+        drawLine(8, 12.8, 6.6, 14.8, sepalDark);
+        drawLine(8, 12.8, 9.4, 14.8, sepalDark);
+        drawLine(8, 12.8, 10.8, 14.4, sepalDark);
+        setPixel(6.0, 14.0, sepalLight);
+        setPixel(7.0, 14.4, sepalLight);
+        setPixel(9.0, 14.4, sepalLight);
+        setPixel(10.0, 14.0, sepalLight);
+        break;
+      }
+    }
+
+    // One-pixel dark contour around the whole shape so every fruit keeps a
+    // crisp silhouette on the dark minimap panel.
+    const filled = pixels.slice();
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        if (filled[y * size + x]) continue;
+        const nearFilled =
+          (y > 0 && Boolean(filled[(y - 1) * size + x])) ||
+          (y < size - 1 && Boolean(filled[(y + 1) * size + x])) ||
+          (x > 0 && Boolean(filled[y * size + (x - 1)])) ||
+          (x < size - 1 && Boolean(filled[y * size + (x + 1)]));
+        if (nearFilled) pixels[y * size + x] = outline;
+      }
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    ctx.imageSmoothingEnabled = false;
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const color = pixels[y * size + x];
+        if (!color) continue;
+        ctx.fillStyle = color;
+        ctx.fillRect(x, y, 1, 1);
+      }
+    }
+
+    this.fruitMinimapIcons[kind] = canvas;
+    return canvas;
+  }
+
+  /**
    * Builds (once) the 16x16 pixel-art açaí bunch used by the minimap. The
    * reference art shows dark purple berries with lilac glints under a small
    * green crown, so the icon is plotted pixel by pixel, wrapped in a dark
@@ -1401,13 +1599,11 @@ export class WorldSystem {
       { x: 5.0, y: 6.9 },
       { x: 7.9, y: 6.5 },
       { x: 10.7, y: 7.4 },
-      { x: 3.9, y: 9.3 },
-      { x: 6.6, y: 9.2 },
-      { x: 9.4, y: 9.4 },
-      { x: 12.0, y: 9.9 },
-      { x: 5.3, y: 11.4 },
-      { x: 8.2, y: 11.7 },
-      { x: 10.7, y: 12.0 },
+      { x: 4.0, y: 9.4 },
+      { x: 6.7, y: 9.2 },
+      { x: 9.6, y: 9.5 },
+      { x: 5.6, y: 11.5 },
+      { x: 8.6, y: 11.8 },
     ];
 
     for (let i = 0; i < berries.length; i++) {
