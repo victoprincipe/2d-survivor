@@ -238,22 +238,26 @@ export type DropType =
   | 'chest'
   | 'coin';
 
+export type AmazonMissionMetric =
+  | 'fruits'
+  | 'level'
+  | 'waterKills'
+  | 'evolvedPredators'
+  | 'gold'
+  | 'bosses';
+
+export interface MissionHUDItem {
+  id: string;
+  title: string;
+  progress: number;
+  target: number;
+  complete: boolean;
+}
+
 export interface MissionObjectivesHUD {
-  currentAct: 1 | 2 | 3;
-  fruitsCollected: number;
-  fruitsRequired: number;
-  level: number;
-  levelRequired: number;
-  act1Complete: boolean;
-  folkloreBossesDefeated: number;
-  folkloreBossesRequired: number;
-  evolvedPredatorsDefeated: number;
-  evolvedPredatorsRequired: number;
-  act2Complete: boolean;
-  cobraGrandeDefeated: boolean;
-  boitataDefeated: boolean;
-  survivedToEnd: boolean;
-  act3Complete: boolean;
+  turn: 1 | 2 | 3;
+  turnLabel: string;
+  missions: MissionHUDItem[];
 }
 
 export interface HUDState {

@@ -33,13 +33,6 @@ export const HUD: React.FC<HUDProps> = ({ hud, onPause, isMuted, onToggleMute, d
   const staminaPercent = Math.min(100, Math.max(0, (hud.stamina / Math.max(1, hud.maxStamina)) * 100));
   const objectives = hud.objectives;
 
-  const objectiveCardClass = (complete: boolean, active: boolean) =>
-    complete
-      ? 'border-emerald-500/60 bg-emerald-950/50 text-emerald-200'
-      : active
-        ? 'border-amber-400/70 bg-slate-900/90 text-slate-100'
-        : 'border-slate-700/70 bg-slate-900/60 text-slate-400';
-
   return (
     <div className="pointer-events-none absolute inset-0 select-none flex flex-col justify-between p-3 font-sans text-white">
       {/* Difficulty Badge */}
@@ -52,75 +45,6 @@ export const HUD: React.FC<HUDProps> = ({ hud, onPause, isMuted, onToggleMute, d
 
       {/* Top Section */}
       <div className="flex flex-col gap-2 pt-24">
-        {/* Amazon Forest Mission Objectives */}
-        {objectives && (
-          <div className="w-full max-w-2xl mx-auto rounded-xl border border-emerald-800/60 bg-slate-950/80 px-3 py-2 shadow-lg backdrop-blur-sm">
-            <div className="mb-1.5 flex items-center justify-between gap-2 text-[10px] font-bold uppercase tracking-widest">
-              <span className="text-emerald-300">Objetivos da Missão</span>
-              <span className="text-slate-400">Floresta Amazônica</span>
-            </div>
-            <div className="grid gap-1.5 sm:grid-cols-3">
-              <div
-                className={`rounded-lg border px-2 py-1 text-[10px] ${objectiveCardClass(
-                  objectives.act1Complete,
-                  objectives.currentAct === 1
-                )}`}
-              >
-                <div className="flex items-center justify-between gap-1 font-black uppercase tracking-wide">
-                  <span>Ato 1 · Início</span>
-                  <span>{objectives.act1Complete ? '✓' : ''}</span>
-                </div>
-                <p>
-                  Frutas {objectives.fruitsCollected}/{objectives.fruitsRequired} · Nível{' '}
-                  {objectives.level}/{objectives.levelRequired}
-                </p>
-                <p className="text-emerald-400/80">+10% velocidade</p>
-              </div>
-
-              <div
-                className={`rounded-lg border px-2 py-1 text-[10px] ${objectiveCardClass(
-                  objectives.act2Complete,
-                  objectives.currentAct === 2
-                )}`}
-              >
-                <div className="flex items-center justify-between gap-1 font-black uppercase tracking-wide">
-                  <span>Ato 2 · Meio</span>
-                  <span>{objectives.act2Complete ? '✓' : ''}</span>
-                </div>
-                <p>
-                  Chefes {objectives.folkloreBossesDefeated}/
-                  {objectives.folkloreBossesRequired} · Predadores{' '}
-                  {objectives.evolvedPredatorsDefeated}/{objectives.evolvedPredatorsRequired}
-                </p>
-                <p className="text-emerald-400/80">+20% dano · regeneração</p>
-              </div>
-
-              <div
-                className={`rounded-lg border px-2 py-1 text-[10px] ${objectiveCardClass(
-                  objectives.act3Complete,
-                  objectives.currentAct === 3
-                )}`}
-              >
-                <div className="flex items-center justify-between gap-1 font-black uppercase tracking-wide">
-                  <span>Ato 3 · Fim</span>
-                  <span>{objectives.act3Complete ? '✓' : ''}</span>
-                </div>
-                <p className="flex flex-wrap gap-x-2">
-                  <span className={objectives.cobraGrandeDefeated ? 'text-emerald-400' : ''}>
-                    {objectives.cobraGrandeDefeated ? '✓' : '○'} Cobra-Grande
-                  </span>
-                  <span className={objectives.boitataDefeated ? 'text-emerald-400' : ''}>
-                    {objectives.boitataDefeated ? '✓' : '○'} Boitatá
-                  </span>
-                </p>
-                <p className={objectives.survivedToEnd ? 'text-emerald-400/80' : ''}>
-                  {objectives.survivedToEnd ? '✓' : '○'} Sobreviver até 20:00
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Boss Health Bar (if active) */}
         {hud.activeBoss && (
           <div className="w-full max-w-lg mx-auto bg-slate-950/90 border-2 border-red-700 rounded-xl p-2 shadow-2xl backdrop-blur-md">
@@ -148,8 +72,39 @@ export const HUD: React.FC<HUDProps> = ({ hud, onPause, isMuted, onToggleMute, d
 
         {/* Middle Stats Bar: HP, Kills, Gold, Timer, Audio/Pause Controls */}
         <div className="flex justify-between items-start sm:items-center gap-2">
-          {/* Left: Player HP & Inventory */}
+          {/* Left: Mission Objectives, HP & Inventory */}
           <div className="flex flex-col gap-1.5 max-w-[46%] sm:max-w-none">
+            {/* Amazon Forest Mission Objectives (compact, current turn only) */}
+            {objectives && (
+              <div className="w-56 max-w-full rounded-lg border border-emerald-800/60 bg-slate-950/85 px-2 py-1.5 shadow-lg backdrop-blur-sm">
+                <div className="mb-1 flex min-w-0 items-center justify-between gap-2 text-[9px] font-bold uppercase tracking-widest">
+                  <span className="shrink-0 text-emerald-300">Missão</span>
+                  <span className="truncate text-right text-slate-400">{objectives.turnLabel}</span>
+                </div>
+                <div className="flex flex-col gap-1">
+                  {objectives.missions.map((mission) => (
+                    <div
+                      key={mission.id}
+                      className={`rounded border px-1.5 py-1 text-[10px] ${
+                        mission.complete
+                          ? 'border-emerald-500/60 bg-emerald-950/50 text-emerald-200'
+                          : 'border-slate-700/70 bg-slate-900/70 text-slate-100'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="truncate">
+                          {mission.complete ? '✓' : '○'} {mission.title}
+                        </span>
+                        <span className="shrink-0 font-mono text-[9px] text-slate-300">
+                          {mission.progress}/{mission.target}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* HP Bar */}
             <div className="flex items-center gap-2 bg-slate-900/80 border border-slate-700/80 rounded-lg px-2.5 py-1 backdrop-blur-sm shadow">
               <Heart className="w-4 h-4 text-red-500 fill-red-500 animate-pulse shrink-0" />

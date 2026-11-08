@@ -6,6 +6,7 @@ import {
   HUDState,
   MapId,
   MissionObjectivesHUD,
+  AmazonMissionMetric,
   UpgradeOption,
   SavedGameData,
   WeaponId,
@@ -77,11 +78,105 @@ const OBJECTIVE_ACT1_LEVEL = 10;
 const OBJECTIVE_ACT2_BOSSES = 5;
 const OBJECTIVE_ACT2_PREDATORS = 2;
 const OBJECTIVE_ACT2_START = 300;
-const OBJECTIVE_ACT3_START = 900;
 const OBJECTIVE_MAP_END = 1200;
+
+// Random Amazon Forest missions: five options per phase, drawn before the run.
+const AMAZON_TURN_ENDS = [300, 900, 1200] as const;
+const AMAZON_TURN_LABELS: Record<1 | 2 | 3, string> = {
+  1: 'Fase 1 · 00:00–05:00',
+  2: 'Fase 2 · 05:00–15:00',
+  3: 'Fase 3 · 15:00–20:00',
+};
+
+interface AmazonMissionTemplate {
+  id: string;
+  title: string;
+  metric: AmazonMissionMetric;
+  target: number;
+}
+
+const AMAZON_MISSION_BANK: Record<1 | 2 | 3, AmazonMissionTemplate[]> = {
+  1: [
+    { id: 'a1_fruits', title: 'Coletar frutas', metric: 'fruits', target: 5 },
+    { id: 'a1_level', title: 'Alcançar nível', metric: 'level', target: 10 },
+    {
+      id: 'a1_water',
+      title: 'Bichos na água/praia',
+      metric: 'waterKills',
+      target: 15,
+    },
+    { id: 'a1_gold', title: 'Juntar ouro', metric: 'gold', target: 300 },
+    {
+      id: 'a1_predators',
+      title: 'Abater predadores',
+      metric: 'evolvedPredators',
+      target: 1,
+    },
+  ],
+  2: [
+    { id: 'a2_fruits', title: 'Coletar frutas', metric: 'fruits', target: 10 },
+    { id: 'a2_level', title: 'Alcançar nível', metric: 'level', target: 20 },
+    {
+      id: 'a2_water',
+      title: 'Bichos na água/praia',
+      metric: 'waterKills',
+      target: 30,
+    },
+    {
+      id: 'a2_predators',
+      title: 'Abater predadores',
+      metric: 'evolvedPredators',
+      target: 3,
+    },
+    {
+      id: 'a2_bosses',
+      title: 'Derrotar chefes',
+      metric: 'bosses',
+      target: 5,
+    },
+  ],
+  3: [
+    { id: 'a3_level', title: 'Alcançar nível', metric: 'level', target: 30 },
+    {
+      id: 'a3_water',
+      title: 'Bichos na água/praia',
+      metric: 'waterKills',
+      target: 50,
+    },
+    {
+      id: 'a3_predators',
+      title: 'Abater predadores',
+      metric: 'evolvedPredators',
+      target: 5,
+    },
+    { id: 'a3_gold', title: 'Juntar ouro', metric: 'gold', target: 1500 },
+    {
+      id: 'a3_bosses',
+      title: 'Derrotar chefes',
+      metric: 'bosses',
+      target: 8,
+    },
+  ],
+};
+
+interface AmazonMissionBaseline {
+  fruits: number;
+  waterKills: number;
+  evolvedPredators: number;
+  bosses: number;
+  gold: number;
+}
+
+interface AmazonTurnState {
+  turn: 1 | 2 | 3;
+  endTime: number;
+  missions: AmazonMissionTemplate[];
+  baseline: AmazonMissionBaseline;
+}
 
 interface AmazonObjectivesState {
   fruitsCollected: number;
+  waterKills: number;
   folkloreBossesDefeated: number;
   evolvedPredatorsDefeated: number;
   cobraGrandeDefeated: boolean;
@@ -162,6 +257,7 @@ export class GameEngine {
   private missionSnapshot = { kills: 0, survivalSeconds: 0, goldCollected: 0, bossesDefeated: 0 };
   private amazonObjectives: AmazonObjectivesState = {
     fruitsCollected: 0,
+    waterKills: 0,
     folkloreBossesDefeated: 0,
     evolvedPredatorsDefeated: 0,
     cobraGrandeDefeated: false,
@@ -172,6 +268,8 @@ export class GameEngine {
     act1RewardApplied: false,
     act2RewardApplied: false,
   };
+  private amazonTurns: AmazonTurnState[] = [];
+  private amazonCurrentTurn: number = 0;
 
   private callbacks: GameEngineCallbacks;
 
@@ -197,6 +295,8 @@ export class GameEngine {
     this.worldProps = new WorldSystem(mapId);
     this.difficulty = getDifficulty(difficultyId);
     this.waveDirector = new WaveDirector(this.difficulty, mapId, this.worldProps);
+    this.amazonTurns = this.createAmazonMissionTurns();
+    this.beginAmazonTurn(0);
 
     this.player = new Player(character, savedData.powerUps);
     this.player.setCollisionResolver((fromX, fromY, dx, dy, radius) =>
@@ -990,8 +1090,96 @@ export class GameEngine {
     }
   }
 
+  private createAmazonMissionTurns(): AmazonTurnState[] {
+    let count = 1;
+    if (this.difficulty.id === 'hard') {
+      count = 2;
+    } else if (this.difficulty.id === 'nightmare' || this.difficulty.id === 'infernal') {
+      count = 3;
+    }
+
+    return ([1, 2, 3] as const).map((turn) => {
+      const options = [...AMAZON_MISSION_BANK[turn]];
+      for (let i = options.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [options[i], options[j]] = [options[j], options[i]];
+      }
+      return {
+        turn,
+        endTime: AMAZON_TURN_ENDS[turn - 1],
+        missions: options.slice(0, count),
+        baseline: {
+          fruits: 0,
+          waterKills: 0,
+          evolvedPredators: 0,
+          bosses: 0,
+          gold: 0,
+        },
+      };
+    });
+  }
+
+  private beginAmazonTurn(index: number): void {
+    this.amazonCurrentTurn = index;
+    const turn = this.amazonTurns[index];
+    if (!turn) return;
+    turn.baseline = {
+      fruits: this.amazonObjectives.fruitsCollected,
+      waterKills: this.amazonObjectives.waterKills,
+      evolvedPredators: this.amazonObjectives.evolvedPredatorsDefeated,
+      bosses: this.amazonObjectives.folkloreBossesDefeated,
+      gold: this.goldCollected,
+    };
+  }
+
+  private getAmazonMissionProgress(
+    turn: AmazonTurnState,
+    mission: AmazonMissionTemplate
+  ): number {
+    switch (mission.metric) {
+      case 'level':
+        return this.player.level;
+      case 'fruits':
+        return this.amazonObjectives.fruitsCollected - turn.baseline.fruits;
+      case 'waterKills':
+        return this.amazonObjectives.waterKills - turn.baseline.waterKills;
+      case 'evolvedPredators':
+        return (
+          this.amazonObjectives.evolvedPredatorsDefeated - turn.baseline.evolvedPredators
+        );
+      case 'bosses':
+        return this.amazonObjectives.folkloreBossesDefeated - turn.baseline.bosses;
+      case 'gold':
+        return this.goldCollected - turn.baseline.gold;
+      default:
+        return 0;
+    }
+  }
+
+  private updateAmazonMissionTurn(): void {
+    if (!this.waveDirector.isAmazonForest) return;
+    const turn = this.amazonTurns[this.amazonCurrentTurn];
+    if (!turn) return;
+
+    const missionsDone = turn.missions.every(
+      (mission) => this.getAmazonMissionProgress(turn, mission) >= mission.target
+    );
+    const timeUp = this.waveDirector.survivalTime >= turn.endTime;
+    if (!missionsDone && !timeUp) return;
+
+    if (this.amazonCurrentTurn < this.amazonTurns.length - 1) {
+      this.beginAmazonTurn(this.amazonCurrentTurn + 1);
+    }
+  }
+
   private trackAmazonObjectiveKill(enemy: Enemy): void {
     if (!this.waveDirector.isAmazonForest) return;
+    if (enemy.isAquatic) {
+      this.amazonObjectives.waterKills += 1;
+    }
+    if (enemy.isEcologyPredator && enemy.ecologyFedCount > 0) {
+      this.amazonObjectives.evolvedPredatorsDefeated += 1;
+    }
     if (this.waveDirector.survivalTime < OBJECTIVE_ACT2_START) return;
 
     if (enemy.type === 'boss_cobra_grande') {
@@ -1001,14 +1189,12 @@ export class GameEngine {
     } else if (enemy.isBoss) {
       this.amazonObjectives.folkloreBossesDefeated += 1;
     }
-
-    if (enemy.isEcologyPredator && enemy.ecologyFedCount > 0) {
-      this.amazonObjectives.evolvedPredatorsDefeated += 1;
-    }
   }
 
   private updateAmazonObjectives(): boolean {
     if (!this.waveDirector.isAmazonForest) return false;
+
+    this.updateAmazonMissionTurn();
 
     const objectives = this.amazonObjectives;
 
@@ -1056,37 +1242,31 @@ export class GameEngine {
   }
 
   private buildObjectivesHUD(): MissionObjectivesHUD {
-    const objectives = this.amazonObjectives;
-    const survivalTime = this.waveDirector.survivalTime;
-    let currentAct: 1 | 2 | 3 = 1;
-    if (objectives.act2Complete || survivalTime >= OBJECTIVE_ACT3_START) {
-      currentAct = 3;
-    } else if (objectives.act1Complete || survivalTime >= OBJECTIVE_ACT2_START) {
-      currentAct = 2;
+    const turn = this.amazonTurns[this.amazonCurrentTurn];
+    if (!turn) {
+      return {
+        turn: 1,
+        turnLabel: AMAZON_TURN_LABELS[1],
+        missions: [],
+      };
     }
 
     return {
-      currentAct,
-      fruitsCollected: Math.min(OBJECTIVE_ACT1_FRUITS, objectives.fruitsCollected),
-      fruitsRequired: OBJECTIVE_ACT1_FRUITS,
-      level: this.player.level,
-      levelRequired: OBJECTIVE_ACT1_LEVEL,
-      act1Complete: objectives.act1Complete,
-      folkloreBossesDefeated: Math.min(
-        OBJECTIVE_ACT2_BOSSES,
-        objectives.folkloreBossesDefeated
-      ),
-      folkloreBossesRequired: OBJECTIVE_ACT2_BOSSES,
-      evolvedPredatorsDefeated: Math.min(
-        OBJECTIVE_ACT2_PREDATORS,
-        objectives.evolvedPredatorsDefeated
-      ),
-      evolvedPredatorsRequired: OBJECTIVE_ACT2_PREDATORS,
-      act2Complete: objectives.act2Complete,
-      cobraGrandeDefeated: objectives.cobraGrandeDefeated,
-      boitataDefeated: objectives.boitataDefeated,
-      survivedToEnd: survivalTime >= OBJECTIVE_MAP_END,
-      act3Complete: objectives.act3Complete,
+      turn: turn.turn,
+      turnLabel: AMAZON_TURN_LABELS[turn.turn],
+      missions: turn.missions.map((mission) => {
+        const progress = Math.min(
+          mission.target,
+          Math.max(0, this.getAmazonMissionProgress(turn, mission))
+        );
+        return {
+          id: mission.id,
+          title: mission.title,
+          progress,
+          target: mission.target,
+          complete: progress >= mission.target,
+        };
+      }),
     };
   }
 
