@@ -210,8 +210,14 @@ export class WorldSystem {
   public fruitTrees: FruitTreeProp[] = [];
   private nextFruitTreeId: number = 1;
   private trees: TreeProp[] = [];
+  // LRU cache: rasterize only visible trees, with a 16 MiB RGBA budget.
+  private treeSprites = new Map<TreeProp, HTMLCanvasElement>();
+  private treeSpriteBytes = 0;
+  private treeSpriteScale = 1;
+  private readonly treeSpriteBudget = 16 * 1024 * 1024;
   private floorPatches: FloorPatch[] = [];
   private lakes: LakeProp[] = [];
+  private lakeOutlinePoints = new WeakMap<LakeProp, Float64Array>();
   private lilies: LilyProp[] = [];
   private palms: PalmProp[] = [];
   private ferns: FernProp[] = [];
@@ -984,11 +990,20 @@ export class WorldSystem {
     ry: number
   ): void {
     const steps = 80;
+    let points = this.lakeOutlinePoints.get(lake);
+    if (!points) {
+      points = new Float64Array((steps + 1) * 2);
+      for (let i = 0; i <= steps; i++) {
+        const angle = (i / steps) * Math.PI * 2;
+        const scale = this.getLakeEdgeScale(lake, angle);
+        points[i * 2] = Math.cos(angle) * scale;
+        points[i * 2 + 1] = Math.sin(angle) * scale;
+      }
+      this.lakeOutlinePoints.set(lake, points);
+    }
     for (let i = 0; i <= steps; i++) {
-      const angle = (i / steps) * Math.PI * 2;
-      const scale = this.getLakeEdgeScale(lake, angle);
-      const x = Math.cos(angle) * rx * scale;
-      const y = Math.sin(angle) * ry * scale;
+      const x = points[i * 2] * rx;
+      const y = points[i * 2 + 1] * ry;
       if (i === 0) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
     }
@@ -3518,59 +3533,106 @@ export class WorldSystem {
 
     this.renderAmazonDecorations(ctx, camera);
 
+    const pixelRatio = Math.max(1, Math.abs(ctx.getTransform().a));
     for (let i = 0; i < this.trees.length; i++) {
       const tree = this.trees[i];
       if (!camera.isInView(tree.x, tree.y, tree.size + 30)) continue;
 
       const screen = camera.worldToScreen(tree.x, tree.y);
-      const size = tree.size;
-
-      ctx.save();
-      ctx.translate(screen.x, screen.y);
-
-      // Ground shadow
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
-      ctx.beginPath();
-      ctx.ellipse(0, 4, size * 0.55, size * 0.2, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Trunk
-      ctx.fillStyle = '#4a2f1b';
-      ctx.fillRect(-size * 0.08, -size * 0.5, size * 0.16, size * 0.6);
-
-      // Surface roots crawling out over the forest floor.
-      ctx.strokeStyle = tree.tone > 0.5 ? '#3f2a16' : '#4a2f1b';
-      ctx.lineWidth = Math.max(1.5, size * 0.045);
-      ctx.lineCap = 'round';
-      for (let r = 0; r < 5; r++) {
-        const spread = -1.15 + (r / 4) * 2.3;
-        const length = size * (0.2 + (r % 2) * 0.08);
-        ctx.beginPath();
-        ctx.moveTo(0, size * 0.02);
-        ctx.quadraticCurveTo(
-          spread * length * 0.5,
-          size * 0.075,
-          spread * length,
-          size * 0.12
-        );
-        ctx.stroke();
+      const sprite = this.getTreeSprite(tree, pixelRatio);
+      if (sprite) {
+        const width = sprite.width / pixelRatio;
+        const height = sprite.height / pixelRatio;
+        ctx.drawImage(sprite, screen.x - width / 2,
+          screen.y - Math.ceil(tree.size * 1.1 + 3), width, height);
+      } else {
+        ctx.save();
+        ctx.translate(screen.x, screen.y);
+        this.drawTree(ctx, tree);
+        ctx.restore();
       }
-      ctx.lineCap = 'butt';
-
-      // Canopy
-      ctx.fillStyle = tree.tone > 0.5 ? '#14532d' : '#166534';
-      ctx.beginPath();
-      ctx.arc(0, -size * 0.62, size * 0.48, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = '#15803d';
-      ctx.beginPath();
-      ctx.arc(-size * 0.22, -size * 0.72, size * 0.34, 0, Math.PI * 2);
-      ctx.arc(size * 0.24, -size * 0.7, size * 0.32, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.restore();
     }
+  }
+
+  private getTreeSprite(tree: TreeProp, pixelRatio: number): HTMLCanvasElement | null {
+    // Rebuild at the canvas resolution after moving between displays.
+    if (pixelRatio !== this.treeSpriteScale) {
+      for (const sprite of this.treeSprites.values()) sprite.width = sprite.height = 0;
+      this.treeSprites.clear();
+      this.treeSpriteBytes = 0;
+      this.treeSpriteScale = pixelRatio;
+    }
+    const cached = this.treeSprites.get(tree);
+    if (cached) {
+      this.treeSprites.delete(tree);
+      this.treeSprites.set(tree, cached);
+      return cached;
+    }
+    const sprite = document.createElement('canvas');
+    sprite.width = Math.ceil(Math.ceil(tree.size * 1.2 + 6) * pixelRatio);
+    sprite.height = Math.ceil((Math.ceil(tree.size * 1.1 + 3) + Math.ceil(tree.size * 0.25 + 3)) * pixelRatio);
+    const bytes = sprite.width * sprite.height * 4;
+    if (bytes > this.treeSpriteBudget) return null;
+    const context = sprite.getContext('2d');
+    if (!context) return null;
+    context.scale(pixelRatio, pixelRatio);
+    context.translate(sprite.width / pixelRatio / 2, Math.ceil(tree.size * 1.1 + 3));
+    this.drawTree(context, tree);
+    while (this.treeSpriteBytes + bytes > this.treeSpriteBudget) {
+      const oldest = this.treeSprites.keys().next().value;
+      if (!oldest) break;
+      const evicted = this.treeSprites.get(oldest)!;
+      this.treeSpriteBytes -= evicted.width * evicted.height * 4;
+      this.treeSprites.delete(oldest);
+      evicted.width = evicted.height = 0;
+    }
+    this.treeSprites.set(tree, sprite);
+    this.treeSpriteBytes += bytes;
+    return sprite;
+  }
+
+  private drawTree(ctx: CanvasRenderingContext2D, tree: TreeProp): void {
+    const size = tree.size;
+    // Ground shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
+    ctx.beginPath();
+    ctx.ellipse(0, 4, size * 0.55, size * 0.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Trunk
+    ctx.fillStyle = '#4a2f1b';
+    ctx.fillRect(-size * 0.08, -size * 0.5, size * 0.16, size * 0.6);
+
+    // Surface roots crawling out over the forest floor.
+    ctx.strokeStyle = tree.tone > 0.5 ? '#3f2a16' : '#4a2f1b';
+    ctx.lineWidth = Math.max(1.5, size * 0.045);
+    ctx.lineCap = 'round';
+    for (let r = 0; r < 5; r++) {
+      const spread = -1.15 + (r / 4) * 2.3;
+      const length = size * (0.2 + (r % 2) * 0.08);
+      ctx.beginPath();
+      ctx.moveTo(0, size * 0.02);
+      ctx.quadraticCurveTo(
+        spread * length * 0.5,
+        size * 0.075,
+        spread * length,
+        size * 0.12
+      );
+      ctx.stroke();
+    }
+    ctx.lineCap = 'butt';
+
+    // Canopy
+    ctx.fillStyle = tree.tone > 0.5 ? '#14532d' : '#166534';
+    ctx.beginPath();
+    ctx.arc(0, -size * 0.62, size * 0.48, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#15803d';
+    ctx.beginPath();
+    ctx.arc(-size * 0.22, -size * 0.72, size * 0.34, 0, Math.PI * 2);
+    ctx.arc(size * 0.24, -size * 0.7, size * 0.32, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   renderFruitTrees(ctx: CanvasRenderingContext2D, camera: Camera, player?: Player): void {

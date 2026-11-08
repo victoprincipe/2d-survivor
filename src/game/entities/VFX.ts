@@ -93,28 +93,29 @@ export class VFXManager {
     }
 
     // Update damage numbers
-    for (let i = this.damageNumbers.length - 1; i >= 0; i--) {
+    let liveNumbers = 0;
+    for (let i = 0; i < this.damageNumbers.length; i++) {
       const dn = this.damageNumbers[i];
       dn.life -= dt;
       dn.y += dn.vy * dt;
       dn.vy += 60 * dt; // gravity
-      if (dn.life <= 0) {
-        this.damageNumbers.splice(i, 1);
-      }
+      if (dn.life > 0) this.damageNumbers[liveNumbers++] = dn;
     }
+    this.damageNumbers.length = liveNumbers;
 
     // Update particles
-    for (let i = this.particles.length - 1; i >= 0; i--) {
+    const drag = Math.pow(0.1, dt);
+    let liveParticles = 0;
+    for (let i = 0; i < this.particles.length; i++) {
       const p = this.particles[i];
       p.life -= dt;
       p.x += p.vx * dt;
       p.y += p.vy * dt;
-      p.vx *= Math.pow(0.1, dt);
-      p.vy *= Math.pow(0.1, dt);
-      if (p.life <= 0) {
-        this.particles.splice(i, 1);
-      }
+      p.vx *= drag;
+      p.vy *= drag;
+      if (p.life > 0) this.particles[liveParticles++] = p;
     }
+    this.particles.length = liveParticles;
   }
 
   render(ctx: CanvasRenderingContext2D, camera: Camera): void {
