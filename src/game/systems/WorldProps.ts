@@ -830,10 +830,9 @@ export class WorldSystem {
     const height = camera.viewportHeight;
 
     if (phase === 'day') {
-      // Clear jungle daylight: only the soft, wind-blown leaves move.
+      // Clear jungle daylight, free of ambient leaf particles.
       ctx.fillStyle = 'rgba(255, 247, 214, 0.05)';
       ctx.fillRect(0, 0, width, height);
-      this.renderFallingLeaves(ctx, camera, player, survivalTime);
       return;
     }
 
@@ -844,7 +843,6 @@ export class WorldSystem {
       sunset.addColorStop(1, 'rgba(120, 53, 15, 0.2)');
       ctx.fillStyle = sunset;
       ctx.fillRect(0, 0, width, height);
-      this.renderFallingLeaves(ctx, camera, player, survivalTime);
       return;
     }
 
@@ -904,45 +902,6 @@ export class WorldSystem {
       ctx.fillStyle = `rgba(253, 230, 138, ${blink})`;
       ctx.beginPath();
       ctx.arc(screen.x, screen.y, 1.7, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    }
-  }
-
-  private renderFallingLeaves(
-    ctx: CanvasRenderingContext2D,
-    camera: Camera,
-    player: Player,
-    survivalTime: number
-  ): void {
-    const count = 20;
-    const colors = ['#84cc16', '#65a30d', '#facc15', '#a3e635'];
-
-    for (let i = 0; i < count; i++) {
-      const fallSpeed = 16 + (i % 4) * 7;
-      const worldX =
-        player.x + (((i * 173 + survivalTime * 18) % 1180) - 590) +
-        Math.sin(survivalTime * 0.8 + i) * 34;
-      const worldY =
-        player.y + (((i * 71 + survivalTime * fallSpeed) % 860) - 430);
-      const screen = camera.worldToScreen(worldX, worldY);
-
-      if (
-        screen.x < -20 ||
-        screen.x > camera.viewportWidth + 20 ||
-        screen.y < -20 ||
-        screen.y > camera.viewportHeight + 20
-      ) {
-        continue;
-      }
-
-      ctx.save();
-      ctx.translate(screen.x, screen.y);
-      ctx.rotate(survivalTime * 1.3 + i);
-      ctx.globalAlpha = 0.62;
-      ctx.fillStyle = colors[i % colors.length];
-      ctx.beginPath();
-      ctx.ellipse(0, 0, 4.8, 2.1, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
     }
