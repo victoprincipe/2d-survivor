@@ -131,6 +131,66 @@ export const HUD: React.FC<HUDProps> = ({
               </div>
             )}
 
+            {/* Amazon Forest restricted inventory: 4 attack + 4 buff squares */}
+            {hud.mapId === 'amazon_forest' && (
+              <div className="w-56 max-w-full rounded-lg border border-slate-700/80 bg-slate-950/85 px-2 py-1.5 shadow-lg backdrop-blur-sm">
+                <div className="mb-1 flex items-center justify-between text-[9px] font-bold uppercase tracking-widest">
+                  <span className="text-amber-300">Ataques</span>
+                  <span className="text-slate-500">{Math.min(4, hud.weapons.length)}/4</span>
+                </div>
+                <div className="grid grid-cols-4 gap-1">
+                  {Array.from({ length: 4 }).map((_, index) => {
+                    const weapon = hud.weapons[index];
+                    return weapon ? (
+                      <div
+                        key={weapon.id}
+                        title={`${weapon.name} (Nv.${weapon.level})`}
+                        className={`relative flex h-8 items-center justify-center rounded border bg-slate-900/85 ${
+                          weapon.evolved ? 'border-amber-400 shadow shadow-amber-500/30' : 'border-amber-700/60'
+                        }`}
+                      >
+                        {renderWeaponIcon(weapon.id, 'h-4 w-4')}
+                        <span className="absolute -bottom-1.5 -right-1 rounded border border-slate-700 bg-slate-950 px-0.5 text-[8px] font-black text-yellow-300">
+                          Nv.{weapon.level}
+                        </span>
+                      </div>
+                    ) : (
+                      <div
+                        key={`empty-weapon-${index}`}
+                        className="h-8 rounded border border-dashed border-slate-700/80 bg-slate-900/40"
+                      />
+                    );
+                  })}
+                </div>
+                <div className="mb-1 mt-1.5 flex items-center justify-between text-[9px] font-bold uppercase tracking-widest">
+                  <span className="text-emerald-300">Buffs</span>
+                  <span className="text-slate-500">{Math.min(4, hud.passives.length)}/4</span>
+                </div>
+                <div className="grid grid-cols-4 gap-1">
+                  {Array.from({ length: 4 }).map((_, index) => {
+                    const passive = hud.passives[index];
+                    return passive ? (
+                      <div
+                        key={passive.id}
+                        title={`${passive.name} (Nv.${passive.level})`}
+                        className="relative flex h-8 items-center justify-center rounded border border-emerald-700/60 bg-slate-900/85"
+                      >
+                        {renderPassiveIcon(passive.id, 'h-4 w-4')}
+                        <span className="absolute -bottom-1.5 -right-1 rounded border border-slate-700 bg-slate-950 px-0.5 text-[8px] font-black text-emerald-300">
+                          Nv.{passive.level}
+                        </span>
+                      </div>
+                    ) : (
+                      <div
+                        key={`empty-passive-${index}`}
+                        className="h-8 rounded border border-dashed border-slate-700/80 bg-slate-900/40"
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* HP Bar */}
             <div className="flex items-center gap-2 bg-slate-900/80 border border-slate-700/80 rounded-lg px-2.5 py-1 backdrop-blur-sm shadow">
               <Heart className="w-4 h-4 text-red-500 fill-red-500 animate-pulse shrink-0" />
@@ -163,7 +223,8 @@ export const HUD: React.FC<HUDProps> = ({
               </span>
             </div>
 
-            {/* Weapons & Passives Slots */}
+            {/* Weapons & Passives Slots (night plain keeps the free inventory) */}
+            {hud.mapId !== 'amazon_forest' && (
             <div className="flex flex-wrap gap-1">
               {hud.weapons.map((w) => (
                 <div
@@ -192,6 +253,7 @@ export const HUD: React.FC<HUDProps> = ({
                 </div>
               ))}
             </div>
+            )}
           </div>
 
           {/* Center: Clock */}

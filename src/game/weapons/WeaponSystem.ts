@@ -192,6 +192,11 @@ export class WeaponSystem {
   public weapons: Map<WeaponId, WeaponInstance> = new Map();
   public passives: Map<PassiveId, PassiveInstance> = new Map();
 
+  /** Amazon Forest runs use 4 active / 4 passive slots and level 10 items. */
+  public readonly maxWeaponSlots: number;
+  public readonly maxPassiveSlots: number;
+  public readonly maxItemLevel: number;
+
   public projectiles: Projectile[] = [];
   public whipSlashes: WhipSlashEffect[] = [];
   public lightningStrikes: LightningStrikeEffect[] = [];
@@ -217,7 +222,13 @@ export class WeaponSystem {
   private nextZoneId: number = 1;
   private bottleImage: HTMLImageElement | null = null;
 
-  constructor(startingWeapon: WeaponId) {
+  constructor(
+    startingWeapon: WeaponId,
+    options: { maxWeaponSlots?: number; maxPassiveSlots?: number; maxItemLevel?: number } = {}
+  ) {
+    this.maxWeaponSlots = options.maxWeaponSlots ?? 6;
+    this.maxPassiveSlots = options.maxPassiveSlots ?? 6;
+    this.maxItemLevel = options.maxItemLevel ?? 0;
     if (typeof Image !== 'undefined') {
       this.bottleImage = new Image();
       this.bottleImage.src = '/bottle-51.svg';
@@ -225,12 +236,35 @@ export class WeaponSystem {
     this.addWeapon(startingWeapon);
   }
 
+  private weaponMaxLevel(id: WeaponId): number {
+    return this.maxItemLevel || WEAPON_REGISTRY[id].maxLevel;
+  }
+
+  private passiveMaxLevel(id: PassiveId): number {
+    return this.maxItemLevel || PASSIVE_REGISTRY[id].maxLevel;
+  }
+
+  /** Clamp table lookups so level 10 never falls back to the level 1 value. */
+  private tableValue(table: number[], level: number, fallback: number): number {
+    return table[Math.min(Math.max(0, level), table.length - 1)] || fallback;
+  }
+
+  /**
+   * Levels above the original registry cap are extra Amazon upgrades. They
+   * keep the strongest table value and scale that item's damage further.
+   */
+  private weaponPowerMultiplier(weapon: WeaponInstance | undefined): number {
+    if (!weapon || !this.maxItemLevel) return 1;
+    const baseMax = WEAPON_REGISTRY[weapon.id].maxLevel;
+    return weapon.level > baseMax ? 1 + (weapon.level - baseMax) * 0.1 : 1;
+  }
+
   addWeapon(id: WeaponId): void {
     if (!this.weapons.has(id)) {
       this.weapons.set(id, {
         id,
         level: 1,
-        maxLevel: WEAPON_REGISTRY[id].maxLevel,
+        maxLevel: this.weaponMaxLevel(id),
         evolved: false,
         cooldownTimer: 0,
         totalDamageDealt: 0,
@@ -246,7 +280,7 @@ export class WeaponSystem {
       this.passives.set(id, {
         id,
         level: 1,
-        maxLevel: PASSIVE_REGISTRY[id].maxLevel,
+        maxLevel: this.passiveMaxLevel(id),
       });
     } else {
       existing.level = Math.min(existing.maxLevel, existing.level + 1);
@@ -285,7 +319,7 @@ export class WeaponSystem {
       this.addWeapon(id);
       w = this.weapons.get(id)!;
     }
-    w.level = Math.max(1, Math.min(WEAPON_REGISTRY[id].maxLevel, level));
+    w.level = Math.max(1, Math.min(this.weaponMaxLevel(id), level));
     if (evolved !== undefined) {
       w.evolved = evolved;
       w.evolvedId = evolved ? WEAPON_REGISTRY[id].evolvedId : undefined;
@@ -310,8 +344,8 @@ export class WeaponSystem {
       if (!p) {
         this.passives.set(id, {
           id,
-          level: Math.min(PASSIVE_REGISTRY[id].maxLevel, level),
-          maxLevel: PASSIVE_REGISTRY[id].maxLevel,
+          level: Math.min(this.passiveMaxLevel(id), level),
+          maxLevel: this.passiveMaxLevel(id),
         });
       } else {
         p.level = Math.min(p.maxLevel, level);
@@ -397,6 +431,11 @@ export class WeaponSystem {
     if (duplicator) {
       player.bonusAmount += (duplicator.level >= 1 ? 1 : 0) + (duplicator.level >= 3 ? 1 : 0);
       if (duplicator.level >= 2) player.might += 0.1;
+      if (this.maxItemLevel) {
+        const extraLevels = Math.max(0, duplicator.level - 3);
+        player.bonusAmount += Math.floor(extraLevels / 3);
+        player.might += extraLevels * 0.05;
+      }
     }
 
     const hunterMark = this.passives.get('hunter_mark');
@@ -514,7 +553,8 @@ export class WeaponSystem {
     const totalCritChance = Math.min(0.9, player.critChance + bonusCritChance);
     const isCrit = Math.random() < totalCritChance;
     const critMult = isCrit ? player.critMultiplier + bonusCritMult : 1.0;
-    const amplified = enemy.computeDamageTaken(rawBaseDamage * critMult, player.debuffDamageBonus);
+    const levelDamage = rawBaseDamage * this.weaponPowerMultiplier(w);
+    const amplified = enemy.computeDamageTaken(levelDamage * critMult, player.debuffDamageBonus);
 
     if (w) {
       w.totalDamageDealt += amplified;
@@ -745,7 +785,7 @@ export class WeaponSystem {
     sound.playWhip();
     const facing = player.facingX < 0 ? -1 : 1;
     const dmgTable = [0, 22, 29, 34, 40, 44];
-    const baseDamage = (w.evolved ? 46 : dmgTable[w.level] || 22) * player.might * damageScale;
+    const baseDamage = (w.evolved ? 46 : this.tableValue(dmgTable, w.level, 22)) * player.might * damageScale;
     const slashWidth =
       (w.evolved ? 172 : 115 + w.level * 12) * player.areaMultiplier * widthScale;
     const slashHeight = (w.evolved ? 76 : 52 + w.level * 3) * player.areaMultiplier;
@@ -891,7 +931,7 @@ export class WeaponSystem {
     const projectileCount = baseCount + player.bonusAmount;
     const speed = (w.evolved ? 470 : 370) * player.projectileSpeedMultiplier;
     const dmgTable = [0, 16, 18, 22, 26, 31];
-    const baseDamage = (w.evolved ? 24 : dmgTable[w.level] || 16) * player.might;
+    const baseDamage = (w.evolved ? 24 : this.tableValue(dmgTable, w.level, 16)) * player.might;
     const bounces =
       (w.evolved ? 2 : w.level >= 5 ? 2 : w.level >= 3 ? 1 : 0) +
       Math.floor(player.bonusPierce / 2);
@@ -929,10 +969,10 @@ export class WeaponSystem {
 
   private triggerKnife(w: WeaponInstance, player: Player, sound: SoundEngine): void {
     const countTable = [0, 1, 2, 2, 3, 4];
-    const projectileCount = (w.evolved ? 3 : countTable[w.level] || 1) + player.bonusAmount;
+    const projectileCount = (w.evolved ? 3 : this.tableValue(countTable, w.level, 1)) + player.bonusAmount;
     const speed = (w.evolved ? 600 : 460) * player.projectileSpeedMultiplier;
     const dmgTable = [0, 14, 16, 19, 23, 27];
-    const baseDamage = (w.evolved ? 21 : dmgTable[w.level] || 14) * player.might;
+    const baseDamage = (w.evolved ? 21 : this.tableValue(dmgTable, w.level, 14)) * player.might;
     const baseAngle = Math.atan2(player.facingY, player.facingX);
     const perpX = -Math.sin(baseAngle);
     const perpY = Math.cos(baseAngle);
@@ -987,7 +1027,7 @@ export class WeaponSystem {
     const projectileCount = (w.evolved ? 3 : 1 + (w.level >= 4 ? 1 : 0)) + player.bonusAmount;
     const speed = (w.evolved ? 780 : 620) * player.projectileSpeedMultiplier;
     const dmgTable = [0, 30, 41, 48, 54, 64];
-    const baseDamage = (w.evolved ? 58 : dmgTable[w.level] || 30) * player.might;
+    const baseDamage = (w.evolved ? 58 : this.tableValue(dmgTable, w.level, 30)) * player.might;
     const pierce =
       (w.evolved ? 99 : w.level >= 5 ? 14 : w.level >= 3 ? 7 : 4) + player.bonusPierce;
     const fallbackAngle = Math.atan2(player.facingY, player.facingX);
@@ -1053,7 +1093,7 @@ export class WeaponSystem {
     const projectileCount = baseCount + player.bonusAmount;
     const speed = (w.evolved ? 600 : 470) * player.projectileSpeedMultiplier;
     const dmgTable = [0, 13, 15, 19, 22, 26];
-    const baseDamage = (w.evolved ? 23 : dmgTable[w.level] || 13) * player.might;
+    const baseDamage = (w.evolved ? 23 : this.tableValue(dmgTable, w.level, 13)) * player.might;
     const pierce =
       (w.evolved ? 5 : 1 + (w.level >= 3 ? 1 : 0) + (w.level >= 5 ? 1 : 0)) + player.bonusPierce;
     const fallbackAngle = nearby[0]
@@ -1134,7 +1174,7 @@ export class WeaponSystem {
       const count = (w.evolved ? 4 : w.level >= 4 ? 4 : 3) + player.bonusAmount;
       const speed = (w.evolved ? 680 : 580) * player.projectileSpeedMultiplier;
       const dmgTable = [0, 14, 18, 21, 24, 28];
-      const baseDamage = (w.evolved ? 29 : dmgTable[w.level] || 14) * player.might;
+      const baseDamage = (w.evolved ? 29 : this.tableValue(dmgTable, w.level, 14)) * player.might;
       const bounces = w.evolved ? 2 : w.level >= 2 ? 2 : 1;
       const life = 1.35 * player.durationMultiplier;
 
@@ -1164,7 +1204,7 @@ export class WeaponSystem {
     if (fireCoffee) {
       const cupCount = 1 + Math.min(1, player.bonusAmount);
       const dmgTable = [0, 18, 23, 27, 32, 37];
-      const baseDamage = (w.evolved ? 36 : dmgTable[w.level] || 18) * player.might;
+      const baseDamage = (w.evolved ? 36 : this.tableValue(dmgTable, w.level, 18)) * player.might;
       const pierce =
         (w.evolved ? 9 : w.level >= 3 ? 6 : 4) + player.bonusPierce;
       const radialSpeed = (w.evolved ? 115 : 95) * player.projectileSpeedMultiplier;
@@ -1206,7 +1246,7 @@ export class WeaponSystem {
       const spread = w.evolved ? 0.22 : 0.18;
       const speed = (w.evolved ? 520 : 450) * player.projectileSpeedMultiplier;
       const dmgTable = [0, 15, 19, 22, 26, 31];
-      const baseDamage = (w.evolved ? 32 : dmgTable[w.level] || 15) * player.might;
+      const baseDamage = (w.evolved ? 32 : this.tableValue(dmgTable, w.level, 15)) * player.might;
       const splashRadius =
         (w.evolved ? 46 : w.level >= 4 ? 40 : 28) * player.areaMultiplier;
       const life = 1.3 * player.durationMultiplier;
@@ -1257,10 +1297,10 @@ export class WeaponSystem {
       : Math.atan2(player.facingY, player.facingX);
 
     const countTable = [0, 1, 2, 2, 2, 3];
-    const count = (w.evolved ? 3 : countTable[w.level] || 1) + player.bonusAmount;
+    const count = (w.evolved ? 3 : this.tableValue(countTable, w.level, 1)) + player.bonusAmount;
     const maxSpeed = (w.evolved ? 600 : 520) * player.projectileSpeedMultiplier;
     const dmgTable = [0, 18, 21, 25, 29, 34];
-    const baseDamage = (w.evolved ? 34 : dmgTable[w.level] || 18) * player.might;
+    const baseDamage = (w.evolved ? 34 : this.tableValue(dmgTable, w.level, 18)) * player.might;
     const radius = (w.evolved ? 18 : w.level >= 3 ? 15 : 12) * player.areaMultiplier;
     const hoverDur = (w.evolved ? 0.45 : w.level >= 3 ? 0.4 : 0.26) * player.durationMultiplier;
     const totalLife = 2.6 * player.durationMultiplier;
@@ -1321,8 +1361,8 @@ export class WeaponSystem {
 
     const counts = [0, 1, 1, 2, 2, 2, 3, 3, 4];
     const damages = [0, 25, 32, 32, 40, 48, 48, 58, 68];
-    const count = (w.evolved ? 7 : counts[w.level]) + player.bonusAmount;
-    const damage = (w.evolved ? 80 : damages[w.level]) * player.might;
+    const count = (w.evolved ? 7 : this.tableValue(counts, w.level, 4)) + player.bonusAmount;
+    const damage = (w.evolved ? 80 : this.tableValue(damages, w.level, 68)) * player.might;
     const radius = (w.evolved ? 80 : w.level >= 7 ? 65 : w.level >= 4 ? 55 : 45) * player.areaMultiplier;
     const duration = 1.0 / player.projectileSpeedMultiplier;
 
@@ -1360,7 +1400,7 @@ export class WeaponSystem {
     const poolDuration =
       (w.evolved ? 4.4 : w.level >= 4 ? 4.0 : 3.0) * player.durationMultiplier;
     const dmgTable = [0, 9, 11, 13, 16, 19];
-    const tickDamage = (w.evolved ? 19 : dmgTable[w.level] || 9) * player.might;
+    const tickDamage = (w.evolved ? 19 : this.tableValue(dmgTable, w.level, 9)) * player.might;
 
     for (let i = 0; i < count; i++) {
       let targetX: number;
@@ -1462,9 +1502,9 @@ export class WeaponSystem {
 
     // Parabolic high-crit gravity cleavers!
     const countTable = [0, 1, 2, 2, 3, 3];
-    const count = (countTable[w.level] || 1) + player.bonusAmount;
+    const count = this.tableValue(countTable, w.level, 1) + player.bonusAmount;
     const dmgTable = [0, 32, 36, 42, 50, 60];
-    const baseDamage = (dmgTable[w.level] || 32) * player.might;
+    const baseDamage = this.tableValue(dmgTable, w.level, 32) * player.might;
     const pierce = (w.level >= 5 ? 8 : w.level >= 3 ? 5 : 3) + player.bonusPierce;
     const radius = (w.level >= 3 ? 16 : 13) * player.areaMultiplier;
 
@@ -1518,9 +1558,9 @@ export class WeaponSystem {
     const dmgTable = [0, LULA_SKILL.damage, 45, 55, 68, 82];
     const radiusTable = [0, LULA_SKILL.radius, 165, 180, 200, 225];
     const baseDamage =
-      (w.evolved ? 110 : dmgTable[w.level] || LULA_SKILL.damage) * player.might;
+      (w.evolved ? 110 : this.tableValue(dmgTable, w.level, LULA_SKILL.damage)) * player.might;
     const radius =
-      (w.evolved ? 280 : radiusTable[w.level] || LULA_SKILL.radius) *
+      (w.evolved ? 280 : this.tableValue(radiusTable, w.level, LULA_SKILL.radius)) *
       player.areaMultiplier;
 
     player.triggerAttackAnimation(LULA_SKILL.animationDuration / 1000);
@@ -1680,9 +1720,9 @@ export class WeaponSystem {
     const pool = inView.length > 0 ? inView : alive;
 
     const countTable = [0, 1, 2, 2, 3, 3];
-    const count = (w.evolved ? 4 : countTable[w.level] || 1) + player.bonusAmount;
+    const count = (w.evolved ? 4 : this.tableValue(countTable, w.level, 1)) + player.bonusAmount;
     const dmgTable = [0, 38, 44, 52, 60, 70];
-    const baseDamage = (w.evolved ? 66 : dmgTable[w.level] || 38) * player.might;
+    const baseDamage = (w.evolved ? 66 : this.tableValue(dmgTable, w.level, 38)) * player.might;
     const aoeRadius =
       (w.evolved ? 64 : w.level >= 3 ? 56 : 44) * player.areaMultiplier;
     const chainHops = w.evolved ? 4 : w.level >= 5 ? 2 : w.level >= 3 ? 1 : 0;
@@ -1783,9 +1823,9 @@ export class WeaponSystem {
       (w.evolved ? 92 : w.level >= 3 ? 80 : 68) * player.areaMultiplier;
 
     const countTable = [0, 1, 2, 2, 3, 4];
-    const orbCount = (w.evolved ? 6 : countTable[w.level] || 1) + player.bonusAmount;
+    const orbCount = (w.evolved ? 6 : this.tableValue(countTable, w.level, 1)) + player.bonusAmount;
     const dmgTable = [0, 18, 23, 28, 34, 40];
-    const baseDamage = (w.evolved ? 38 : dmgTable[w.level] || 18) * player.might;
+    const baseDamage = (w.evolved ? 38 : this.tableValue(dmgTable, w.level, 18)) * player.might;
     const hitRadius = (w.evolved ? 26 : 22) * player.areaMultiplier;
     const hitIcd = w.evolved ? 0.2 : 0.3;
 
@@ -1835,7 +1875,7 @@ export class WeaponSystem {
     this.garlicTimer += dt;
     const radiusTable = [0, 60, 72, 74, 88, 94];
     this.garlicRadius =
-      (w.evolved ? 112 : radiusTable[w.level] || 60) * player.areaMultiplier;
+      (w.evolved ? 112 : this.tableValue(radiusTable, w.level, 60)) * player.areaMultiplier;
 
     const cdFactor = Math.max(0.6, 1 - player.cooldownReduction * 0.65);
     const tickInterval = (w.evolved ? 0.32 : w.level >= 4 ? 0.38 : 0.45) * cdFactor;
@@ -1845,7 +1885,7 @@ export class WeaponSystem {
       sound.playGarlicPulse();
 
       const dmgTable = [0, 11, 14, 18, 22, 26];
-      const baseDamage = (w.evolved ? 32 : dmgTable[w.level] || 11) * player.might;
+      const baseDamage = (w.evolved ? 32 : this.tableValue(dmgTable, w.level, 11)) * player.might;
       const knockForce = w.evolved ? 105 : w.level >= 3 ? 150 : 125;
       const enemies = grid.queryRadius(player.x, player.y, this.garlicRadius);
       let healedCount = 0;
@@ -2448,7 +2488,7 @@ export class WeaponSystem {
     const bible = this.weapons.get('bible');
     if (bible && (this.bibleIsActive || bible.evolved)) {
       const countTable = [0, 1, 2, 2, 3, 4];
-      const orbCount = (bible.evolved ? 6 : countTable[bible.level] || 1) + player.bonusAmount;
+      const orbCount = (bible.evolved ? 6 : this.tableValue(countTable, bible.level, 1)) + player.bonusAmount;
       const cycleAlpha = bible.evolved
         ? 1
         : Math.min(1, this.bibleCycleTimer / 0.25, (this.bibleCycleMax - this.bibleCycleTimer + 0.05) / 0.25);
@@ -2817,8 +2857,8 @@ export class WeaponSystem {
       }
     }
 
-    // 2. New weapons (if under limit of 6)
-    if (this.weapons.size < 6) {
+    // 2. New weapons (Amazon Forest caps the category at 4 slots).
+    if (this.weapons.size < this.maxWeaponSlots) {
       for (const wId of ALL_WEAPON_IDS) {
         if (!this.weapons.has(wId)) {
           const meta = WEAPON_REGISTRY[wId];
@@ -2868,8 +2908,8 @@ export class WeaponSystem {
       }
     }
 
-    // 4. New passives (if under limit of 6)
-    if (this.passives.size < 6) {
+    // 4. New passives (Amazon Forest caps the category at 4 slots).
+    if (this.passives.size < this.maxPassiveSlots) {
       for (const pId of ALL_PASSIVE_IDS) {
         if (!this.passives.has(pId)) {
           const meta = PASSIVE_REGISTRY[pId];

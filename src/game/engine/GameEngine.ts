@@ -445,7 +445,12 @@ export class GameEngine {
     this.player.setCollisionResolver((fromX, fromY, dx, dy, radius, airborne) =>
       this.worldProps.resolvePlayerMovement(fromX, fromY, dx, dy, radius, airborne)
     );
-    this.weaponSystem = new WeaponSystem(character.startingWeapon);
+    this.weaponSystem = new WeaponSystem(
+      character.startingWeapon,
+      mapId === 'amazon_forest'
+        ? { maxWeaponSlots: 4, maxPassiveSlots: 4, maxItemLevel: 10 }
+        : undefined
+    );
     this.weaponSystem.recalculatePlayerStats(this.player);
     this.player.hp = this.player.maxHp;
 
@@ -2277,6 +2282,7 @@ export class GameEngine {
       : undefined;
 
     this.callbacks.onHUDUpdate({
+      mapId: this.waveDirector.isAmazonForest ? 'amazon_forest' : 'night_plain',
       playerHp: Math.round(this.player.hp),
       playerMaxHp: Math.round(this.player.maxHp),
       stamina: Math.round(this.player.stamina),

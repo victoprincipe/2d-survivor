@@ -279,6 +279,7 @@ export interface MissionObjectivesHUD {
 }
 
 export interface HUDState {
+  mapId?: MapId;
   playerHp: number;
   playerMaxHp: number;
   stamina: number;
