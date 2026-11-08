@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="250" viewBox="0 0 200 250" fill="none">
+  <defs>
+    <g id="acai-frond">
+      <path d="M102 104 L102 14" stroke="#14532d" stroke-width="2.6" stroke-linecap="round"/>
+      <path d="M102 92 Q 94 88 88 82 Q 94 88 102 92 Z" fill="#2f8f4e" stroke="#14532d" stroke-width="0.8"/>
+      <path d="M102 92 Q 110 88 116 82 Q 110 88 102 92 Z" fill="#1f7a42" stroke="#14532d" stroke-width="0.8"/>
+      <path d="M102 82 Q 92 76 84 68 Q 93 77 102 82 Z" fill="#1f7a42" stroke="#14532d" stroke-width="0.8"/>
+      <path d="M102 82 Q 112 76 120 68 Q 111 77 102 82 Z" fill="#2f8f4e" stroke="#14532d" stroke-width="0.8"/>
+      <path d="M102 72 Q 90 65 80 56 Q 91 66 102 72 Z" fill="#2f8f4e" stroke="#14532d" stroke-width="0.8"/>
+      <path d="M102 72 Q 114 65 124 56 Q 113 66 102 72 Z" fill="#1f7a42" stroke="#14532d" stroke-width="0.8"/>
+      <path d="M102 62 Q 92 55 84 46 Q 93 56 102 62 Z" fill="#1f7a42" stroke="#14532d" stroke-width="0.8"/>
+      <path d="M102 62 Q 112 55 120 46 Q 111 56 102 62 Z" fill="#2f8f4e" stroke="#14532d" stroke-width="0.8"/>
+      <path d="M102 52 Q 94 46 88 38 Q 95 47 102 52 Z" fill="#2f8f4e" stroke="#14532d" stroke-width="0.8"/>
+      <path d="M102 52 Q 110 46 116 38 Q 109 47 102 52 Z" fill="#1f7a42" stroke="#14532d" stroke-width="0.8"/>
+      <path d="M102 42 Q 96 37 92 31 Q 97 38 102 42 Z" fill="#1f7a42" stroke="#14532d" stroke-width="0.8"/>
+      <path d="M102 42 Q 108 37 112 31 Q 107 38 102 42 Z" fill="#2f8f4e" stroke="#14532d" stroke-width="0.8"/>
+      <path d="M102 34 Q 99 24 102 12 Q 105 24 102 34 Z" fill="#2f8f4e" stroke="#14532d" stroke-width="0.8"/>
+    </g>
+  </defs>
+
+  <!-- Trunk -->
+  <path d="M94 248 C 97 210 98 158 99 104 L 105 104 C 104 158 103 210 106 248 Z" fill="#8a6a3f" stroke="#4a3420" stroke-width="1.6" stroke-linejoin="round"/>
+  <path d="M91 248 L 99 236 L 105 236 L 110 248 Z" fill="#7a5c35" stroke="#4a3420" stroke-width="1"/>
+  <path d="M97 244 C 99 200 99 150 100 108" stroke="#b08a55" stroke-width="1.4" stroke-linecap="round" opacity="0.7"/>
+  <g stroke="#6b4f2a" stroke-width="1.4" stroke-linecap="round" opacity="0.85">
+    <path d="M96 236 Q 100 238 105 236"/>
+    <path d="M96 224 Q 100 226 105 224"/>
+    <path d="M97 212 Q 100 214 104 212"/>
+    <path d="M97 200 Q 100 202 104 200"/>
+    <path d="M97 188 Q 100 190 104 188"/>
+    <path d="M98 176 Q 100 178 104 176"/>
+    <path d="M98 164 Q 100 166 104 164"/>
+    <path d="M98 152 Q 100 154 104 152"/>
+    <path d="M99 140 Q 100 142 104 140"/>
+    <path d="M99 128 Q 100 130 104 128"/>
+    <path d="M99 116 Q 100 118 104 116"/>
+  </g>
+
+  <!-- Crown: radial fronds -->
+  <g>
+    <use href="#acai-frond" transform="rotate(-105 102 104)"/>
+    <use href="#acai-frond" transform="rotate(-78 102 104)"/>
+    <use href="#acai-frond" transform="rotate(-50 102 104)"/>
+    <use href="#acai-frond" transform="rotate(-22 102 104)"/>
+    <use href="#acai-frond" transform="rotate(0 102 104)"/>
+    <use href="#acai-frond" transform="rotate(22 102 104)"/>
+    <use href="#acai-frond" transform="rotate(50 102 104)"/>
+    <use href="#acai-frond" transform="rotate(78 102 104)"/>
+    <use href="#acai-frond" transform="rotate(105 102 104)"/>
+  </g>
+
+  <!-- Berry stems -->
+  <path d="M102 112 C 94 120 84 128 79 136" stroke="#5b3a1e" stroke-width="2" stroke-linecap="round"/>
+  <path d="M102 112 C 110 122 118 132 123 142" stroke="#5b3a1e" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Left açaí bunch -->
+  <g fill="#4a1a5e" stroke="#2e0f3a" stroke-width="0.7">
+    <circle cx="79" cy="138" r="4.6"/>
+    <circle cx="70" cy="143" r="4.4"/>
+    <circle cx="87" cy="143" r="4.4"/>
+    <circle cx="77" cy="147" r="5"/>
+    <circle cx="66" cy="151" r="4.2"/>
+    <circle cx="87" cy="152" r="4.6"/>
+    <circle cx="74" cy="157" r="4.8"/>
+    <circle cx="84" cy="160" r="4.4"/>
+    <circle cx="67" cy="161" r="3.8"/>
+    <circle cx="77" cy="167" r="4.6"/>
+    <circle cx="87" cy="169" r="3.8"/>
+    <circle cx="71" cy="172" r="3.6"/>
+    <circle cx="81" cy="176" r="4"/>
+    <circle cx="75" cy="182" r="3.4"/>
+  </g>
+  <g fill="#6b2a85">
+    <circle cx="78" cy="139" r="2.1"/>
+    <circle cx="75" cy="149" r="2.3"/>
+    <circle cx="85" cy="153" r="2.1"/>
+    <circle cx="73" cy="158" r="2.2"/>
+    <circle cx="82" cy="162" r="2"/>
+    <circle cx="76" cy="169" r="2"/>
+  </g>
+  <g fill="#a855f7">
+    <circle cx="76" cy="141" r="1.1"/>
+    <circle cx="72" cy="152" r="1.1"/>
+    <circle cx="83" cy="156" r="1"/>
+    <circle cx="74" cy="164" r="1"/>
+  </g>
+
+  <!-- Right açaí bunch -->
+  <g fill="#4a1a5e" stroke="#2e0f3a" stroke-width="0.7">
+    <circle cx="123" cy="144" r="4.5"/>
+    <circle cx="132" cy="148" r="4.4"/>
+    <circle cx="114" cy="149" r="4.3"/>
+    <circle cx="124" cy="153" r="4.9"/>
+    <circle cx="135" cy="156" r="4.2"/>
+    <circle cx="115" cy="158" r="4.5"/>
+    <circle cx="126" cy="162" r="4.7"/>
+    <circle cx="136" cy="164" r="3.8"/>
+    <circle cx="117" cy="166" r="4"/>
+    <circle cx="127" cy="172" r="4.4"/>
+    <circle cx="137" cy="172" r="3.4"/>
+    <circle cx="120" cy="176" r="3.6"/>
+    <circle cx="130" cy="181" r="3.8"/>
+    <circle cx="124" cy="187" r="3.2"/>
+  </g>
+  <g fill="#6b2a85">
+    <circle cx="122" cy="145" r="2.1"/>
+    <circle cx="125" cy="154" r="2.2"/>
+    <circle cx="117" cy="159" r="2.1"/>
+    <circle cx="128" cy="164" r="2.1"/>
+    <circle cx="119" cy="168" r="2"/>
+    <circle cx="129" cy="174" r="2"/>
+  </g>
+  <g fill="#a855f7">
+    <circle cx="120" cy="146" r="1.1"/>
+    <circle cx="127" cy="157" r="1.1"/>
+    <circle cx="118" cy="162" r="1"/>
+    <circle cx="131" cy="167" r="1"/>
+  </g>
+</svg>

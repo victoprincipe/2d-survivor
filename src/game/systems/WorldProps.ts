@@ -166,6 +166,7 @@ export class WorldSystem {
 
   private floorImage: HTMLImageElement | null = null;
   private floorPattern: CanvasPattern | null = null;
+  private acaiTreeImage: HTMLImageElement | null = null;
   private waterAnimTimer: number = 0;
 
   constructor(mapId: MapId = 'night_plain') {
@@ -174,6 +175,7 @@ export class WorldSystem {
       this.worldHalfSize = FOREST_HALF_SIZE;
       this.generateForest();
       this.spawnInitialFruitTrees();
+      this.loadAcaiTreeTexture();
     }
     this.loadFloorTexture();
   }
@@ -356,6 +358,8 @@ export class WorldSystem {
         offset = -112;
         break;
       case 'acai':
+        offset = -126;
+        break;
       case 'araca':
       default:
         offset = -104;
@@ -1056,6 +1060,15 @@ export class WorldSystem {
     image.src = '/grass-texture.jpg';
   }
 
+  private loadAcaiTreeTexture(): void {
+    if (typeof window === 'undefined') return;
+    const image = new Image();
+    image.onload = () => {
+      this.acaiTreeImage = image;
+    };
+    image.src = '/acai_arvore.svg';
+  }
+
   private rollTorchBuff(): DropType {
     // Healing (chicken) is intentionally excluded from lamps.
     const roll = Math.random();
@@ -1685,7 +1698,7 @@ export class WorldSystem {
       ctx.ellipse(0, 6, 46, 16, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      if (tree.kind === 'acai') {
+      if (tree.kind === 'acai' && !this.acaiTreeImage) {
         // Açaizeiro: slender leaning palm with purple berry bunches.
         const topX = 6 + sway;
         const topY = -68;
@@ -1733,6 +1746,17 @@ export class WorldSystem {
         ctx.beginPath();
         ctx.arc(topX - 5, topY + 3, 1.6, 0, Math.PI * 2);
         ctx.fill();
+      } else if (tree.kind === 'acai' && this.acaiTreeImage) {
+        // Açaí palm sprite, with the trunk base centered on the tree position.
+        const imageWidth = 80;
+        const imageHeight = 100;
+        ctx.drawImage(
+          this.acaiTreeImage,
+          -imageWidth / 2,
+          -imageHeight,
+          imageWidth,
+          imageHeight
+        );
       } else if (tree.kind === 'cupuacu') {
         // Cupuaçuzeiro: short thick trunk, broad canopy and big brown fruit.
         ctx.fillStyle = '#5b3a1e';
