@@ -443,15 +443,28 @@ export class WeaponSystem {
       }
     }
 
+    // Submerged ambush fauna cannot be seen, targeted or damaged by any
+    // automatic weapon; the engine also keeps it out of the spatial grid.
+    const targetableEnemies = enemies.filter((e) => !e.isSubmerged);
+
     // 3. Process enemy DoTs (Poison & Bleed)
-    this.updateEnemyDoTs(dt, player, enemies, spatialGrid, vfx, onEnemyKilled);
+    this.updateEnemyDoTs(dt, player, targetableEnemies, spatialGrid, vfx, onEnemyKilled);
 
     // 4. Update weapon cooldowns & trigger active firing
     this.weapons.forEach((weapon) => {
       if (weapon.id === 'bible' || weapon.id === 'garlic') return;
       weapon.cooldownTimer -= dt;
       if (weapon.cooldownTimer <= 0) {
-        this.fireWeapon(weapon, player, enemies, spatialGrid, camera, vfx, sound, onEnemyKilled);
+        this.fireWeapon(
+          weapon,
+          player,
+          targetableEnemies,
+          spatialGrid,
+          camera,
+          vfx,
+          sound,
+          onEnemyKilled
+        );
       }
     });
 

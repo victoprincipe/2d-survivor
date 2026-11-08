@@ -462,27 +462,30 @@ export class GameEngine {
     // 2. Update Camera
     this.camera.follow(this.player.x, this.player.y, dt);
 
-    // 3. Clear and Rebuild Spatial Grid with current enemies
+    // 3. Clear and Rebuild Spatial Grid with current enemies.
+    // Piranha, Boto-cor-de-rosa and Ariranha stay hidden under the surface
+    // until the hero enters the water. While submerged they are left out of
+    // the grid so weapons, projectiles and separation cannot detect or hit
+    // them at all.
+    const playerInWater = this.worldProps.isWaterSurface(this.player.x, this.player.y);
+    const amazonNight = this.isAmazonNight();
     this.spatialGrid.clear();
     for (let i = 0; i < this.enemies.length; i++) {
-      this.spatialGrid.insert(this.enemies[i]);
+      const e = this.enemies[i];
+      e.isSubmerged = e.isAmbushAquatic && !playerInWater;
+      if (!e.isSubmerged) this.spatialGrid.insert(e);
     }
 
     // 3.5. Food-chain target selection (grazing / fruit foraging).
     this.prepareAmazonEcology(dt);
 
     // 4. Update Enemies + Boss Special Attacks
-    const playerInWater = this.worldProps.isWaterSurface(this.player.x, this.player.y);
-    const amazonNight = this.isAmazonNight();
     const spawnedMinions: Enemy[] = [];
     for (let i = this.enemies.length - 1; i >= 0; i--) {
       const e = this.enemies[i];
       e.playerInWater = playerInWater;
       // The forest night frenzy accelerates every animal by 25%.
       e.isAmazonNight = amazonNight;
-      // Piranha, Boto-cor-de-rosa and Ariranha stay hidden under the surface
-      // until the hero enters the water.
-      e.isSubmerged = e.isAmbushAquatic && !playerInWater;
       // Jacaré-açu and Sucuri gain speed in the water (+50%) and on the beach
       // (+30%) once the hero is wet enough to hunt.
       e.terrainSpeedMultiplier =
@@ -492,7 +495,9 @@ export class GameEngine {
             : 1.3
           : 1.0;
 
-      const sep = this.spatialGrid.applySeparation(e, e.radius * 2, 0.45);
+      const sep = e.isSubmerged
+        ? { vx: 0, vy: 0 }
+        : this.spatialGrid.applySeparation(e, e.radius * 2, 0.45);
       const previousX = e.x;
       const previousY = e.y;
       const alive = e.update(dt, this.player, sep);
@@ -1178,6 +1183,7 @@ export class GameEngine {
       for (let j = 0; j < this.enemies.length; j++) {
         const candidate = this.enemies[j];
         if (candidate === predator || candidate.hp <= 0 || devoured.has(candidate)) continue;
+        if (candidate.isSubmerged) continue;
         if (!preyTypes.includes(candidate.type)) continue;
 
         const dx = candidate.x - predator.x;
@@ -1623,6 +1629,7 @@ export class GameEngine {
       // Purges regular monsters, deals heavy % damage to Elites & chip damage to Bosses
       for (let i = this.enemies.length - 1; i >= 0; i--) {
         const e = this.enemies[i];
+        if (e.isSubmerged) continue;
         if (e.isBoss) {
           const bossDmg = Math.max(1, Math.round(e.maxHp * 0.06));
           const dead = e.takeDamage(bossDmg, 0, 0, 0);
@@ -1732,6 +1739,7 @@ export class GameEngine {
 
       for (let i = this.enemies.length - 1; i >= 0; i--) {
         const enemy = this.enemies[i];
+        if (enemy.isSubmerged) continue;
         const dx = enemy.x - fruit.x;
         const dy = enemy.y - fruit.y;
         if (dx * dx + dy * dy > radius * radius) continue;

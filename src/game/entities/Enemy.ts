@@ -957,6 +957,9 @@ export class Enemy {
   }
 
   takeDamage(amount: number, knockX: number = 0, knockY: number = 0, knockForce: number = 200): boolean {
+    // Submerged ambush fauna is intangible: no damage, knockback or death.
+    if (this.isSubmerged) return false;
+
     if (this.shieldHp > 0) {
       const absorbed = Math.min(this.shieldHp, amount);
       this.shieldHp -= absorbed;
