@@ -166,6 +166,7 @@ export class WorldSystem {
 
   private floorImage: HTMLImageElement | null = null;
   private floorPattern: CanvasPattern | null = null;
+  private waterAnimTimer: number = 0;
 
   constructor(mapId: MapId = 'night_plain') {
     this.mapId = mapId;
@@ -1151,6 +1152,8 @@ export class WorldSystem {
   }
 
   update(dt: number, player: Player, onBuffSpawn?: (drop: Drop) => void): void {
+    this.waterAnimTimer += dt;
+
     // Torches/candles belong to the night plain. The Amazon Forest only keeps
     // its fruit trees as collectible resources, so no torch ever spawns there.
     if (this.mapId !== 'amazon_forest') {
@@ -1412,6 +1415,67 @@ export class WorldSystem {
         ctx.fill();
       }
 
+      ctx.restore();
+    }
+
+    this.renderWaterSurfaceRipples(ctx, camera);
+
+    ctx.restore();
+  }
+
+  /** Soft animated ripples that keep the river and lake surfaces alive. */
+  private renderWaterSurfaceRipples(
+    ctx: CanvasRenderingContext2D,
+    camera: Camera
+  ): void {
+    const time = this.waterAnimTimer;
+    const left = camera.x - camera.viewportWidth / 2 - 240;
+    const right = camera.x + camera.viewportWidth / 2 + 240;
+    const step = 260;
+    const start = Math.floor(left / step) * step;
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(214, 244, 248, 0.8)';
+    ctx.lineWidth = 1.5;
+    ctx.lineCap = 'round';
+
+    for (let x = start; x <= right; x += step) {
+      const y = this.riverCenterY(x) + Math.sin(time * 0.7 + x * 0.004) * 48;
+      const phase = time * 0.9 + x * 0.01;
+      for (let ring = 0; ring < 2; ring++) {
+        const rx = 34 + ring * 22 + Math.sin(phase + ring) * 6;
+        const ry = 7 + ring * 4;
+        ctx.globalAlpha = 0.16 + 0.08 * Math.sin(phase + ring * 1.3);
+        ctx.beginPath();
+        ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+
+    for (let i = 0; i < this.lakes.length; i++) {
+      const lake = this.lakes[i];
+      const margin = Math.max(lake.rx, lake.ry) + 30;
+      if (!camera.isInView(lake.x, lake.y, margin)) continue;
+
+      ctx.save();
+      ctx.translate(lake.x, lake.y);
+      ctx.rotate(lake.rotation);
+      for (let ring = 0; ring < 3; ring++) {
+        const scale = 0.22 + ring * 0.22;
+        const wobble = Math.sin(time * 0.8 + ring * 1.7 + lake.x) * 0.04;
+        ctx.globalAlpha = 0.12 + 0.06 * Math.sin(time * 0.6 + ring * 2.1);
+        ctx.beginPath();
+        ctx.ellipse(
+          0,
+          0,
+          lake.rx * scale * (1 + wobble),
+          lake.ry * scale * (1 - wobble),
+          0,
+          0,
+          Math.PI * 2
+        );
+        ctx.stroke();
+      }
       ctx.restore();
     }
 

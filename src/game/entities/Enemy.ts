@@ -33,6 +33,8 @@ export class Enemy {
   // Water ambush state, refreshed by the engine every frame.
   public isSubmerged: boolean = false;
   public playerInWater: boolean = false;
+  // Rate limiter for the water splash/ripple trail while walking in the river.
+  public waterRippleTimer: number = Math.random() * 0.2;
   // Set by the engine for the Amazon Forest night frenzy (+25% speed).
   public isAmazonNight: boolean = false;
   public terrainSpeedMultiplier: number = 1;

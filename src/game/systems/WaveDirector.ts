@@ -492,6 +492,7 @@ export class WaveDirector {
 
     this.triggerAlert(`👑 ${bossName.toUpperCase()} SURGIU NA FLORESTA!`, 6);
     sound.playBossWarning();
+    sound.playBossRoar();
   }
 
   private spawnAmazonEliteHorde(

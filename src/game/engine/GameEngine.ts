@@ -63,6 +63,16 @@ interface BossHazard {
   windStrength: number;
 }
 
+interface WaterRipple {
+  x: number;
+  y: number;
+  life: number;
+  maxLife: number;
+  maxRadius: number;
+  splash: boolean;
+  angle: number;
+}
+
 // Amazon food-chain tuning. Animals only leave the player alone outside this
 // radius; predators hunt on the requested 10-12s / 15s cycles.
 const ECOLOGY_PLAYER_SAFE_RADIUS = 420;
@@ -252,6 +262,8 @@ export class GameEngine {
   public drops: Drop[] = [];
   private bossProjectiles: BossProjectile[] = [];
   private bossHazards: BossHazard[] = [];
+  private waterRipples: WaterRipple[] = [];
+  private playerWaterFxTimer: number = 0;
 
   public kills: number = 0;
   public goldCollected: number = 0;
@@ -361,6 +373,9 @@ export class GameEngine {
     this.isRunning = true;
     this.lastTime = performance.now();
     this.sound.startBgm();
+    if (this.waveDirector.isAmazonForest) {
+      this.sound.startAmazonAmbient();
+    }
     this.loop(this.lastTime);
   }
 
@@ -441,6 +456,9 @@ export class GameEngine {
       return;
     }
 
+    // 1.5. Water trail for the hero (and timers for the animal trails below).
+    this.updateWaterEffects(dt);
+
     // 2. Update Camera
     this.camera.follow(this.player.x, this.player.y, dt);
 
@@ -507,6 +525,20 @@ export class GameEngine {
         );
         e.x = resolved.x;
         e.y = resolved.y;
+      }
+
+      // Animals wading through the river leave the same ring/splash trail as
+      // the hero. Submerged ambushers stay hidden and therefore leave no wake.
+      const movedX = e.x - previousX;
+      const movedY = e.y - previousY;
+      if (
+        !e.isSubmerged &&
+        movedX * movedX + movedY * movedY > 4 &&
+        this.worldProps.isWaterSurface(e.x, e.y) &&
+        e.waterRippleTimer <= 0
+      ) {
+        e.waterRippleTimer = 0.2 + Math.random() * 0.16;
+        this.spawnWaterRipple(e.x, e.y + e.radius * 0.55, e.radius >= 22);
       }
 
       // Boss Nova Burst Resolution
@@ -959,6 +991,52 @@ export class GameEngine {
   }
 
   /**
+   * Expands and fades the water rings left by the hero and the animals, and
+   * emits a fresh splash under the hero's feet while it wades.
+   */
+  private updateWaterEffects(dt: number): void {
+    this.playerWaterFxTimer = Math.max(0, this.playerWaterFxTimer - dt);
+    for (let i = 0; i < this.enemies.length; i++) {
+      const enemy = this.enemies[i];
+      if (enemy.waterRippleTimer > 0) {
+        enemy.waterRippleTimer = Math.max(0, enemy.waterRippleTimer - dt);
+      }
+    }
+
+    for (let i = this.waterRipples.length - 1; i >= 0; i--) {
+      const ripple = this.waterRipples[i];
+      ripple.life -= dt;
+      if (ripple.life <= 0) {
+        this.waterRipples.splice(i, 1);
+      }
+    }
+
+    if (
+      this.player.isMoving &&
+      !this.player.isJumping &&
+      this.worldProps.isWaterSurface(this.player.x, this.player.y) &&
+      this.playerWaterFxTimer <= 0
+    ) {
+      this.playerWaterFxTimer = 0.22;
+      this.spawnWaterRipple(this.player.x, this.player.y + this.player.radius * 0.6, true);
+      this.sound.playWaterStep();
+    }
+  }
+
+  private spawnWaterRipple(x: number, y: number, splash: boolean): void {
+    const maxLife = splash ? 0.7 : 0.55;
+    this.waterRipples.push({
+      x,
+      y,
+      life: maxLife,
+      maxLife,
+      maxRadius: splash ? 38 : 24,
+      splash,
+      angle: Math.random() * Math.PI * 2,
+    });
+  }
+
+  /**
    * Night in the Amazon Forest lasts from 10:00 to 20:00 on the run clock.
    */
   private isAmazonNight(): boolean {
@@ -1228,6 +1306,7 @@ export class GameEngine {
     if (this.getAmazonMissionProgress(turn, mission) < mission.target) return false;
 
     turn.claimedMissions.push(mission.id);
+    this.sound.playMissionClaim();
     if (!turn.bonusApplied) {
       turn.bonusApplied = true;
       this.applyAmazonTurnBonus(turn.turn);
@@ -1584,6 +1663,7 @@ export class GameEngine {
   }
 
   private handleFruitCollected(fruit: CollectedFruit): void {
+    this.sound.playFruitCollect();
     if (this.waveDirector.isAmazonForest) {
       this.amazonObjectives.fruitsCollected += 1;
     }
@@ -1702,6 +1782,7 @@ export class GameEngine {
     this.isGameOver = true;
     this.sound.playGameOver();
     this.sound.stopBgm();
+    this.sound.stopAmazonAmbient();
     this.persistRunStats(false);
 
     const summary = this.buildSummary(false);
@@ -1712,6 +1793,7 @@ export class GameEngine {
     this.hasWon = true;
     this.pause();
     this.sound.playVictory();
+    this.sound.stopAmazonAmbient();
     this.persistRunStats(true);
 
     const summary = this.buildSummary(true);
@@ -1720,6 +1802,9 @@ export class GameEngine {
 
   public continueEndless(): void {
     this.waveDirector.isEndless = true;
+    if (this.waveDirector.isAmazonForest) {
+      this.sound.startAmazonAmbient();
+    }
     this.resume();
   }
 
@@ -1845,6 +1930,9 @@ export class GameEngine {
     // 2. Render Torches & Props
     this.worldProps.renderTorches(ctx, camera);
 
+    // 2.5. Water rings and white splashes under anyone wading in the river.
+    this.renderWaterRipples();
+
     // 3. Render Drops (Gems, Pickups, Chests)
     for (let i = 0; i < this.drops.length; i++) {
       this.drops[i].render(ctx, camera);
@@ -1903,6 +1991,59 @@ export class GameEngine {
 
     // 9. Render Minimap Radar (fixed bottom-left)
     this.renderMinimap();
+  }
+
+  private renderWaterRipples(): void {
+    const { ctx, camera } = this;
+
+    for (let i = 0; i < this.waterRipples.length; i++) {
+      const ripple = this.waterRipples[i];
+      if (!camera.isInView(ripple.x, ripple.y, ripple.maxRadius + 20)) continue;
+
+      const screen = camera.worldToScreen(ripple.x, ripple.y);
+      const progress = 1 - ripple.life / ripple.maxLife;
+      const alpha = Math.max(0, ripple.life / ripple.maxLife);
+      const radius = ripple.maxRadius * progress;
+
+      ctx.save();
+      ctx.strokeStyle = '#e0f2fe';
+      ctx.globalAlpha = alpha * (ripple.splash ? 0.8 : 0.5);
+      ctx.lineWidth = ripple.splash ? 2 : 1.2;
+      ctx.beginPath();
+      ctx.ellipse(screen.x, screen.y, radius, radius * 0.45, 0, 0, Math.PI * 2);
+      ctx.stroke();
+
+      if (ripple.splash) {
+        ctx.globalAlpha = alpha * 0.5;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.ellipse(
+          screen.x,
+          screen.y,
+          radius * 0.55,
+          radius * 0.25,
+          0,
+          0,
+          Math.PI * 2
+        );
+        ctx.stroke();
+
+        // White droplets kicked up around the feet.
+        ctx.globalAlpha = alpha * 0.9;
+        ctx.fillStyle = '#f8fafc';
+        for (let drop = 0; drop < 4; drop++) {
+          const angle = ripple.angle + (drop * Math.PI) / 2;
+          const dropX = screen.x + Math.cos(angle) * radius * 1.05;
+          const dropY =
+            screen.y + Math.sin(angle) * radius * 0.45 - progress * 7;
+          ctx.beginPath();
+          ctx.arc(dropX, dropY, 1.6, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      ctx.restore();
+    }
   }
 
   private renderMinimap(): void {

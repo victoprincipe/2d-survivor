@@ -13,6 +13,9 @@ export class SoundEngine {
   private lastPlayedTimestamps: Record<string, number> = {};
   private bgmAudio: HTMLAudioElement | null = null;
   private isBgmPlaying: boolean = false;
+  private ambientSource: AudioBufferSourceNode | null = null;
+  private ambientGain: GainNode | null = null;
+  private ambientLfo: OscillatorNode | null = null;
 
   constructor() {
     // Lazy init AudioContext on first user interaction
@@ -72,6 +75,206 @@ export class SoundEngine {
     if (now - last < minIntervalMs) return true;
     this.lastPlayedTimestamps[type] = now;
     return false;
+  }
+
+  /** Procedural white-noise buffer used by the water and ambient effects. */
+  private createNoiseBuffer(duration: number): AudioBuffer | null {
+    if (!this.ctx) return null;
+    const length = Math.max(1, Math.floor(this.ctx.sampleRate * duration));
+    const buffer = this.ctx.createBuffer(1, length, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < length; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+    return buffer;
+  }
+
+  /** Short filtered noise burst: water footsteps and splashes. */
+  playWaterStep(): void {
+    if (this.muted || !this.initCtx() || !this.ctx || !this.sfxGain) return;
+    if (this.shouldRateLimit('waterStep', 80)) return;
+
+    const buffer = this.createNoiseBuffer(0.18);
+    if (!buffer) return;
+
+    const now = this.ctx.currentTime;
+    const source = this.ctx.createBufferSource();
+    source.buffer = buffer;
+
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(800 + Math.random() * 700, now);
+    filter.Q.value = 0.7;
+
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.linearRampToValueAtTime(0.16 + Math.random() * 0.08, now + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+
+    source.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.sfxGain);
+
+    source.start(now);
+    source.stop(now + 0.19);
+  }
+
+  /** Soft two-note pluck when a fruit tree is harvested. */
+  playFruitCollect(): void {
+    if (this.muted || !this.initCtx() || !this.ctx || !this.sfxGain) return;
+    if (this.shouldRateLimit('fruitCollect', 100)) return;
+
+    const now = this.ctx.currentTime;
+    const notes = [659.25, 987.77];
+    notes.forEach((freq, index) => {
+      if (!this.ctx || !this.sfxGain) return;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      const start = now + index * 0.055;
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, start);
+      osc.frequency.exponentialRampToValueAtTime(freq * 1.04, start + 0.12);
+
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.linearRampToValueAtTime(0.12, start + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.16);
+
+      osc.connect(gain);
+      gain.connect(this.sfxGain);
+      osc.start(start);
+      osc.stop(start + 0.17);
+    });
+  }
+
+  /** Light click + confirmation chime for claiming a mission reward. */
+  playMissionClaim(): void {
+    if (this.muted || !this.initCtx() || !this.ctx || !this.sfxGain) return;
+    if (this.shouldRateLimit('missionClaim', 120)) return;
+
+    const now = this.ctx.currentTime;
+    const click = this.ctx.createOscillator();
+    const clickGain = this.ctx.createGain();
+    click.type = 'square';
+    click.frequency.setValueAtTime(1200, now);
+    click.frequency.exponentialRampToValueAtTime(600, now + 0.035);
+    clickGain.gain.setValueAtTime(0.09, now);
+    clickGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.045);
+    click.connect(clickGain);
+    clickGain.connect(this.sfxGain);
+    click.start(now);
+    click.stop(now + 0.05);
+
+    const chime = this.ctx.createOscillator();
+    const chimeGain = this.ctx.createGain();
+    const chimeStart = now + 0.04;
+    chime.type = 'sine';
+    chime.frequency.setValueAtTime(880, chimeStart);
+    chime.frequency.setValueAtTime(1318.51, chimeStart + 0.05);
+    chimeGain.gain.setValueAtTime(0.0001, chimeStart);
+    chimeGain.gain.linearRampToValueAtTime(0.12, chimeStart + 0.01);
+    chimeGain.gain.exponentialRampToValueAtTime(0.0001, chimeStart + 0.2);
+    chime.connect(chimeGain);
+    chimeGain.connect(this.sfxGain);
+    chime.start(chimeStart);
+    chime.stop(chimeStart + 0.21);
+  }
+
+  /** Deep folklore boss roar: a low sweep plus a short rumble. */
+  playBossRoar(): void {
+    if (this.muted || !this.initCtx() || !this.ctx || !this.sfxGain) return;
+
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(88, now);
+    osc.frequency.exponentialRampToValueAtTime(34, now + 0.85);
+
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.linearRampToValueAtTime(0.32, now + 0.08);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.95);
+
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+    osc.start(now);
+    osc.stop(now + 0.98);
+
+    const buffer = this.createNoiseBuffer(0.9);
+    if (!buffer) return;
+    const rumble = this.ctx.createBufferSource();
+    rumble.buffer = buffer;
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(220, now);
+    filter.frequency.exponentialRampToValueAtTime(80, now + 0.85);
+    const rumbleGain = this.ctx.createGain();
+    rumbleGain.gain.setValueAtTime(0.0001, now);
+    rumbleGain.gain.linearRampToValueAtTime(0.14, now + 0.08);
+    rumbleGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.9);
+    rumble.connect(filter);
+    filter.connect(rumbleGain);
+    rumbleGain.connect(this.sfxGain);
+    rumble.start(now);
+    rumble.stop(now + 0.92);
+  }
+
+  /** Gentle looping forest/rain bed for the Amazon map, routed through BGM volume. */
+  startAmazonAmbient(): void {
+    if (this.ambientSource || !this.initCtx() || !this.ctx || !this.bgmGain) return;
+
+    const buffer = this.createNoiseBuffer(2);
+    if (!buffer) return;
+
+    const now = this.ctx.currentTime;
+    const source = this.ctx.createBufferSource();
+    source.buffer = buffer;
+    source.loop = true;
+
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(1400, now);
+
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(0.055, now);
+
+    // Slow swell makes the rain breathe instead of sounding like static.
+    const lfo = this.ctx.createOscillator();
+    lfo.type = 'sine';
+    lfo.frequency.setValueAtTime(0.11, now);
+    const lfoGain = this.ctx.createGain();
+    lfoGain.gain.setValueAtTime(0.018, now);
+    lfo.connect(lfoGain);
+    lfoGain.connect(gain.gain);
+
+    source.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.bgmGain);
+
+    source.start(now);
+    lfo.start(now);
+    this.ambientSource = source;
+    this.ambientGain = gain;
+    this.ambientLfo = lfo;
+  }
+
+  stopAmazonAmbient(): void {
+    try {
+      this.ambientSource?.stop();
+    } catch {
+      // Source may already be stopped after the context closed.
+    }
+    this.ambientSource?.disconnect();
+    this.ambientGain?.disconnect();
+    try {
+      this.ambientLfo?.stop();
+    } catch {
+      // Same as above.
+    }
+    this.ambientLfo?.disconnect();
+    this.ambientSource = null;
+    this.ambientGain = null;
+    this.ambientLfo = null;
   }
 
   playShoot(): void {
@@ -396,6 +599,7 @@ export class SoundEngine {
 
   destroy(): void {
     this.stopBgm();
+    this.stopAmazonAmbient();
     this.bgmAudio = null;
     if (this.ctx) {
       this.ctx.close().catch(() => {});
