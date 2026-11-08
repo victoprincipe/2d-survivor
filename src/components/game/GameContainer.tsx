@@ -16,8 +16,10 @@ import { EndGameModal } from './EndGameModal';
 import { PauseModal } from './PauseModal';
 import { DevTools } from './DevTools';
 import { GorillaDialogue } from './GorillaDialogue';
+import { ForestQuizDialogue } from './ForestQuizDialogue';
+import { ForestQuizView } from '@/game/data/forestQuiz';
 
-type GameState = 'menu' | 'playing' | 'paused' | 'level_up' | 'chest' | 'game_over' | 'victory' | 'dialogue';
+type GameState = 'menu' | 'playing' | 'paused' | 'level_up' | 'chest' | 'game_over' | 'victory' | 'dialogue' | 'quiz';
 
 const DEFAULT_HUD: HUDState = {
   playerHp: 100,
@@ -36,6 +38,7 @@ const DEFAULT_HUD: HUDState = {
 
 export const GameContainer: React.FC = () => {
   const [gameState, setGameState] = useState<GameState>('menu');
+  const [forestQuiz, setForestQuiz] = useState<ForestQuizView | null>(null);
   const [savedData, setSavedData] = useState<SavedGameData>(loadSavedData);
   const [selectedCharacter, setSelectedCharacter] = useState<CharacterConfig>(CHARACTERS[0]);
   const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyId>(
@@ -90,6 +93,11 @@ export const GameContainer: React.FC = () => {
       }
 
       const engine = new GameEngine(canvas, character, currentSavedData, difficulty, mapId, {
+        onForestQuiz: quiz => {
+          setForestQuiz(quiz);
+          gameStateRef.current = 'quiz';
+          setGameState('quiz');
+        },
         onGorillaDialogue: () => {
           gameStateRef.current = 'dialogue';
           setGameState('dialogue');
@@ -289,6 +297,21 @@ export const GameContainer: React.FC = () => {
       )}
 
       {/* Overlays / Modals */}
+      {gameState === 'quiz' && forestQuiz && (
+        <ForestQuizDialogue quiz={forestQuiz} onAnswer={choice => {
+          const next = engineRef.current?.answerForestQuiz(choice);
+          if (next?.status === 'failed') {
+            gameStateRef.current = 'playing';
+            setGameState('playing');
+            setForestQuiz(null);
+          } else if (next) setForestQuiz(next);
+        }} onClose={() => {
+          engineRef.current?.closeForestQuiz();
+          gameStateRef.current = 'playing';
+          setGameState('playing');
+          setForestQuiz(null);
+        }} />
+      )}
       {gameState === 'dialogue' && (
         <GorillaDialogue onStartCombat={() => {
           if (engineRef.current?.startGorillaCombat()) {

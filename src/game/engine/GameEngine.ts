@@ -23,6 +23,8 @@ import { SpatialGrid } from './SpatialGrid';
 import { Player } from '../entities/Player';
 import { Enemy } from '../entities/Enemy';
 import { GorillaNpc } from '../entities/GorillaNpc';
+import { QuizKeeper } from '../entities/QuizKeeper';
+import { ForestQuiz, ForestQuizView } from '../data/forestQuiz';
 import { GorillaBoss } from '../entities/GorillaBoss';
 import { GORILLA_LEAP, GORILLA_ROAR } from '../data/gorilla';
 import { Drop } from '../entities/Drops';
@@ -36,6 +38,7 @@ import { getDifficulty } from '../data/difficulties';
 import { applyRunToMissions } from '../data/missions';
 
 export interface GameEngineCallbacks {
+  onForestQuiz?: (quiz: ForestQuizView) => void;
   onGorillaDialogue?: () => void;
   onHUDUpdate: (hud: HUDState) => void;
   onLevelUp: (options: UpgradeOption[]) => void;
@@ -265,6 +268,36 @@ export class GameEngine {
 
   public enemies: Enemy[] = [];
   private readonly gorillaNpc: GorillaNpc | null;
+  private readonly quizKeeper: QuizKeeper | null;
+  private readonly forestQuiz = new ForestQuiz();
+  private forestQuizOpen = false;
+  private quizLaunchRemaining = 0;
+  private readonly quizLaunchDuration = 2.2;
+
+  public answerForestQuiz(choice: number): ForestQuizView {
+    if (this.forestQuizOpen && this.isPaused && !this.isGameOver) {
+      const reward = this.forestQuiz.answer(choice);
+      if (this.forestQuiz.view().status === 'failed') {
+        this.forestQuizOpen = false;
+        this.quizLaunchRemaining = this.quizLaunchDuration;
+        this.input.handlePointerUp();
+        this.sound.playQuizFailureScream();
+        this.resume();
+      }
+      if (reward > 0) {
+        this.goldCollected += reward;
+        this.sound.playMissionClaim();
+        this.syncHUD();
+      }
+    }
+    return this.forestQuiz.view();
+  }
+
+  public closeForestQuiz(): void {
+    if (!this.forestQuizOpen) return;
+    this.forestQuizOpen = false;
+    this.resume();
+  }
   private gorillaDefeated = false;
   private gorillaFight: { boss: GorillaBoss; hiddenEnemies: Enemy[]; previousBoss: Enemy | null } | null = null;
 
@@ -364,6 +397,7 @@ export class GameEngine {
     this.vfx = new VFXManager();
     this.worldProps = new WorldSystem(mapId);
     this.gorillaNpc = mapId === 'amazon_forest' ? new GorillaNpc() : null;
+    this.quizKeeper = mapId === 'amazon_forest' ? new QuizKeeper() : null;
     this.difficulty = getDifficulty(difficultyId);
     this.waveDirector = new WaveDirector(this.difficulty, mapId, this.worldProps);
     this.amazonTurns = this.createAmazonMissionTurns();
@@ -483,8 +517,28 @@ export class GameEngine {
   }
 
   private update(dt: number): void {
+    // The launch is a short cinematic: hazards and controls wait for the landing.
+    if (this.quizLaunchRemaining > 0) {
+      this.quizLaunchRemaining = Math.max(0, this.quizLaunchRemaining - dt);
+      this.quizKeeper?.update(dt);
+      this.input.clearInteract();
+      this.input.clearJump();
+      if (this.quizLaunchRemaining === 0) {
+        this.player.hp = 0;
+        this.handlePlayerDeath();
+      }
+      return;
+    }
+    this.quizKeeper?.update(dt);
     this.gorillaNpc?.update(dt);
     const interactRequested = this.input.consumeInteract();
+    if (interactRequested && !this.gorillaFight && this.quizKeeper?.canInteract(this.player) && this.callbacks.onForestQuiz) {
+      this.pause();
+      this.input.handlePointerUp();
+      this.forestQuizOpen = true;
+      this.callbacks.onForestQuiz(this.forestQuiz.begin());
+      return;
+    }
     if (interactRequested && this.gorillaAvailable && this.gorillaNpc?.canInteract(this.player) && this.callbacks.onGorillaDialogue) {
       this.pause();
       this.input.handlePointerUp();
@@ -2123,7 +2177,20 @@ export class GameEngine {
     if (this.gorillaAvailable && this.gorillaNpc && this.player.y >= this.gorillaNpc.y) {
       this.gorillaNpc.render(ctx, camera);
     }
+    if (this.quizKeeper && this.player.y >= this.quizKeeper.y) this.quizKeeper.render(ctx, camera);
+    ctx.save();
+    if (this.quizLaunchRemaining > 0) {
+      const progress = 1 - this.quizLaunchRemaining / this.quizLaunchDuration;
+      const arc = Math.sin(progress * Math.PI);
+      const origin = camera.worldToScreen(this.player.x, this.player.y);
+      ctx.translate(origin.x + arc * 100, origin.y - arc * (camera.viewportHeight + 220));
+      ctx.rotate(arc * Math.PI * 2);
+      ctx.scale(1 - arc * 0.6, 1 - arc * 0.6);
+      ctx.translate(-origin.x, -origin.y);
+    }
     this.player.render(ctx, camera);
+    ctx.restore();
+    if (this.quizKeeper && this.player.y < this.quizKeeper.y) this.quizKeeper.render(ctx, camera);
     if (this.player.stunTimer > 0) {
       const playerScreen = camera.worldToScreen(this.player.x, this.player.y);
       ctx.save();
@@ -2161,6 +2228,21 @@ export class GameEngine {
 
     // 7.3. Fire bosses shine through the jungle night.
     this.renderNightFireBossGlow();
+    if (this.quizLaunchRemaining > 0) {
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.font = 'bold 22px sans-serif';
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = '#1c1917';
+      ctx.fillStyle = '#fde68a';
+      const message = 'Resposta errada, viajante!';
+      ctx.strokeText(message, camera.viewportWidth / 2, camera.viewportHeight * 0.3);
+      ctx.fillText(message, camera.viewportWidth / 2, camera.viewportHeight * 0.3);
+      ctx.restore();
+    }
+    if (!this.isPaused && !this.isGameOver && this.quizLaunchRemaining === 0 && !this.gorillaFight && this.quizKeeper?.canInteract(this.player)) {
+      this.quizKeeper.renderPrompt(ctx, camera);
+    }
     if (!this.isPaused && !this.isGameOver && this.gorillaAvailable && this.gorillaNpc?.canInteract(this.player)) {
       this.gorillaNpc.renderPrompt(ctx, camera);
     }

@@ -20,6 +20,7 @@ export class SoundEngine {
   private gorillaLeapBuffer: Promise<AudioBuffer | null> | null = null;
   private gorillaChargeBuffer: Promise<AudioBuffer | null> | null = null;
   private gorillaGroundSlamBuffer: Promise<AudioBuffer | null> | null = null;
+  private quizFailureScreamBuffer: Promise<AudioBuffer | null> | null = null;
 
   playGorillaGroundSlam(): void {
     if (this.muted || !this.initCtx() || !this.ctx || !this.sfxGain) return;
@@ -153,6 +154,10 @@ export class SoundEngine {
         .catch(() => null);
       this.gorillaGroundSlamBuffer = fetch('/audio/gorilla-ground-slam.mp3')
         .then(response => { if (!response.ok) throw new Error('Gorilla ground slam audio unavailable'); return response.arrayBuffer(); })
+        .then(data => ctx.decodeAudioData(data))
+        .catch(() => null);
+      this.quizFailureScreamBuffer = fetch('/audio/quiz-failure-scream.mp3')
+        .then(response => { if (!response.ok) throw new Error('Quiz failure scream audio unavailable'); return response.arrayBuffer(); })
         .then(data => ctx.decodeAudioData(data))
         .catch(() => null);
 
@@ -306,6 +311,21 @@ export class SoundEngine {
     chimeGain.connect(this.sfxGain);
     chime.start(chimeStart);
     chime.stop(chimeStart + 0.21);
+  }
+
+  /** User-provided recording, played at its original speed and pitch. */
+  playQuizFailureScream(): void {
+    if (this.muted || !this.initCtx() || !this.ctx || !this.sfxGain) return;
+    const ctx = this.ctx;
+    const gain = this.sfxGain;
+    void this.quizFailureScreamBuffer?.then(buffer => {
+      if (!buffer || this.ctx !== ctx || ctx.state === 'closed') return;
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(gain);
+      source.onended = () => source.disconnect();
+      source.start();
+    });
   }
 
   /** Deep folklore boss roar: a low sweep plus a short rumble. */
@@ -761,6 +781,7 @@ export class SoundEngine {
   }
 
   destroy(): void {
+    this.quizFailureScreamBuffer = null;
     this.gorillaGroundSlamBuffer = null;
     this.gorillaChargeBuffer = null;
     this.gorillaLeapBuffer = null;
