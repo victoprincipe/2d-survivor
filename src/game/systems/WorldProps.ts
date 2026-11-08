@@ -61,6 +61,16 @@ const PUPUNHA_SPRITE_WIDTH = 48;
 const PUPUNHA_SPRITE_HEIGHT = 64;
 const PUPUNHA_SPRITE_SCALE = 2;
 
+// The araçazeiro is a hand-crafted 56x64 pixel-art fruit tree: a dark contour,
+// a textured brown trunk that forks into three main branches, a very dense
+// rounded canopy with layered dark/light green leaves, bright round yellow
+// araçá fruits scattered through the foliage and a dark oval ground shadow. It
+// is rasterized once into an offscreen canvas and upscaled with
+// nearest-neighbour so every pixel stays crisp at any zoom.
+const ARACA_SPRITE_WIDTH = 56;
+const ARACA_SPRITE_HEIGHT = 64;
+const ARACA_SPRITE_SCALE = 2;
+
 // Fruit tree minimap markers: hand-drawn 16x16 pixel-art icons, rasterized
 // once into offscreen canvases and blitted at 16x16 with smoothing disabled
 // so every pixel of the art is preserved.
@@ -272,6 +282,7 @@ export class WorldSystem {
   private castanhaPixelSprite: HTMLCanvasElement | null = null;
   private buritiPixelSprite: HTMLCanvasElement | null = null;
   private pupunhaPixelSprite: HTMLCanvasElement | null = null;
+  private aracaPixelSprite: HTMLCanvasElement | null = null;
   private acaiMinimapIcon: HTMLCanvasElement | null = null;
   private fruitMinimapIcons: Partial<Record<FruitTreeKind, HTMLCanvasElement>> = {};
   private waterAnimTimer: number = 0;
@@ -472,7 +483,7 @@ export class WorldSystem {
         break;
       case 'araca':
       default:
-        offset = -104;
+        offset = -124;
         break;
     }
     return offset + Math.sin(tree.animTimer * 2.2) * 2;
@@ -2139,6 +2150,343 @@ export class WorldSystem {
     }
 
     this.cupuacuPixelSprite = canvas;
+    return canvas;
+  }
+
+  /**
+   * Builds (once) the Araçazeiro sprite. The 56x64 pixel-art canvas follows the
+   * reference: a dark contour, a textured brown trunk that splits into three
+   * main branches near the base, a very dense rounded canopy layered with
+   * dark-to-light green leaves, bright round yellow araçá fruits scattered and
+   * hanging through the foliage, and a wide dark oval shadow on the ground.
+   */
+  private getAracaPixelSprite(): HTMLCanvasElement | null {
+    if (this.aracaPixelSprite) return this.aracaPixelSprite;
+    if (typeof document === 'undefined') return null;
+
+    const width = ARACA_SPRITE_WIDTH;
+    const height = ARACA_SPRITE_HEIGHT;
+    const pixels: (string | null)[] = new Array(width * height).fill(null);
+
+    const setPixel = (x: number, y: number, color: string): void => {
+      const px = Math.round(x);
+      const py = Math.round(y);
+      if (px < 0 || px >= width || py < 0 || py >= height) return;
+      pixels[py * width + px] = color;
+    };
+
+    const fillEllipse = (
+      cx: number,
+      cy: number,
+      rx: number,
+      ry: number,
+      color: string
+    ): void => {
+      const minX = Math.floor(cx - rx);
+      const maxX = Math.ceil(cx + rx);
+      const minY = Math.floor(cy - ry);
+      const maxY = Math.ceil(cy + ry);
+      for (let y = minY; y <= maxY; y++) {
+        for (let x = minX; x <= maxX; x++) {
+          const dx = (x - cx) / rx;
+          const dy = (y - cy) / ry;
+          if (dx * dx + dy * dy <= 1.05) setPixel(x, y, color);
+        }
+      }
+    };
+
+    const fillCircle = (cx: number, cy: number, radius: number, color: string): void => {
+      fillEllipse(cx, cy, radius, radius, color);
+    };
+
+    const drawLine = (
+      x0: number,
+      y0: number,
+      x1: number,
+      y1: number,
+      color: string
+    ): void => {
+      const steps = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+      for (let i = 0; i <= steps; i++) {
+        const t = steps === 0 ? 0 : i / steps;
+        setPixel(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, color);
+      }
+    };
+
+    // Tapered branch stamped with circles along its axis.
+    const drawBranch = (
+      x0: number,
+      y0: number,
+      x1: number,
+      y1: number,
+      startRadius: number,
+      endRadius: number,
+      color: string
+    ): void => {
+      const steps = Math.max(2, Math.ceil(Math.hypot(x1 - x0, y1 - y0) * 2));
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        fillCircle(
+          x0 + (x1 - x0) * t,
+          y0 + (y1 - y0) * t,
+          startRadius + (endRadius - startRadius) * t,
+          color
+        );
+      }
+    };
+
+    // Pointed pixel-art leaf with dark outline, two-tone blade and pale vein.
+    const drawLeaf = (
+      cx: number,
+      cy: number,
+      length: number,
+      spread: number,
+      angle: number,
+      fill: string,
+      light: string
+    ): void => {
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      const nx = -sin;
+      const ny = cos;
+      const baseX = cx - cos * length * 0.5;
+      const baseY = cy - sin * length * 0.5;
+      const steps = Math.max(16, Math.ceil(length * 6));
+      const halfWidth = spread * 0.5;
+
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const px = baseX + cos * length * t;
+        const py = baseY + sin * length * t;
+        const radius = Math.sin(Math.PI * t) * halfWidth + 0.55;
+        const maxOffset = Math.ceil(radius);
+        for (let offset = -maxOffset; offset <= maxOffset; offset++) {
+          if (Math.abs(offset) > radius) continue;
+          setPixel(px + nx * offset, py + ny * offset, '#06180c');
+        }
+      }
+
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const px = baseX + cos * length * t;
+        const py = baseY + sin * length * t;
+        const radius = Math.sin(Math.PI * t) * halfWidth;
+        const maxOffset = Math.ceil(radius);
+        for (let offset = -maxOffset; offset <= maxOffset; offset++) {
+          if (Math.abs(offset) > radius) continue;
+          setPixel(px + nx * offset, py + ny * offset, offset <= 0 ? light : fill);
+        }
+        setPixel(px, py, '#6dbb64');
+      }
+    };
+
+    // Wide dark oval shadow resting on the forest floor under the tree.
+    fillEllipse(28, 59.5, 21, 4.2, 'rgba(4, 10, 6, 0.62)');
+
+    const canopyOutline = '#06180c';
+    const canopyBase = '#0f3a20';
+    const canopyBlobs: [number, number, number, number][] = [
+      [28, 16, 22, 14],
+      [12, 22, 11, 11],
+      [44, 22, 11, 11],
+      [17, 10, 13, 9],
+      [39, 10, 13, 9],
+      [28, 24, 20, 10],
+      [16, 32, 11, 8],
+      [40, 32, 11, 8],
+      [28, 9, 10, 7],
+    ];
+
+    for (let i = 0; i < canopyBlobs.length; i++) {
+      const [cx, cy, rx, ry] = canopyBlobs[i];
+      fillEllipse(cx, cy, rx + 1.1, ry + 1.1, canopyOutline);
+    }
+    for (let i = 0; i < canopyBlobs.length; i++) {
+      const [cx, cy, rx, ry] = canopyBlobs[i];
+      fillEllipse(cx, cy, rx, ry, canopyBase);
+    }
+    // Darker lower half gives the rounded crown its 2.5D volume.
+    fillEllipse(28, 30, 21, 7, 'rgba(5, 23, 12, 0.38)');
+
+    const trunkOutline = '#24150a';
+    const trunkBody = '#8a6a3f';
+    const trunkLight = '#b08a55';
+    const trunkShade = '#5f4527';
+
+    // Three main branches fork out of the trunk just below the canopy.
+    drawBranch(28, 47, 15, 30, 2.4, 1.0, trunkOutline);
+    drawBranch(28, 46, 28, 25, 2.2, 1.0, trunkOutline);
+    drawBranch(28, 47, 41, 30, 2.4, 1.0, trunkOutline);
+    drawBranch(28, 47, 15, 30, 1.3, 0.55, trunkBody);
+    drawBranch(28, 46, 28, 25, 1.2, 0.55, trunkBody);
+    drawBranch(28, 47, 41, 30, 1.3, 0.55, trunkBody);
+
+    // Textured trunk: dark contour, lighter bark and a flared root base.
+    for (let y = 42; y <= 60; y++) {
+      const t = (y - 42) / 18;
+      const halfWidth = 2.1 + t * 1.4 + (y >= 57 ? (y - 56) * 0.55 : 0);
+      for (let x = Math.floor(28 - halfWidth - 0.8); x <= Math.ceil(28 + halfWidth + 0.8); x++) {
+        setPixel(x, y, trunkOutline);
+      }
+      for (let x = Math.floor(28 - halfWidth); x <= Math.ceil(28 + halfWidth); x++) {
+        const relative = (x - 28) / halfWidth;
+        setPixel(
+          x,
+          y,
+          relative < -0.2 ? trunkLight : relative > 0.4 ? trunkShade : trunkBody
+        );
+      }
+      if (y % 4 === 0) {
+        setPixel(28 - halfWidth * 0.35, y, trunkShade);
+        setPixel(28 + halfWidth * 0.3, y, trunkLight);
+      }
+      if (y === 48 || y === 49) setPixel(27, y, trunkShade);
+    }
+
+    // Roots spreading over the shadow.
+    drawLine(24, 59, 19, 62, trunkOutline);
+    drawLine(25, 59, 21, 62, trunkBody);
+    drawLine(32, 59, 37, 62, trunkOutline);
+    drawLine(31, 59, 35, 62, trunkBody);
+
+    const leafShade = '#123a21';
+    const leafMid = '#1c5a30';
+    const leafLight = '#2f8a45';
+    const leafHighlight = '#59bb63';
+
+    const leaves: {
+      x: number;
+      y: number;
+      length: number;
+      spread: number;
+      angle: number;
+      fill: string;
+      light: string;
+    }[] = [
+      // Outer crown, darker leaves defining the rounded silhouette.
+      { x: 8, y: 16, length: 12, spread: 5, angle: -2.4, fill: leafShade, light: leafMid },
+      { x: 14, y: 9, length: 12, spread: 5, angle: -2.0, fill: leafShade, light: leafMid },
+      { x: 22, y: 6, length: 10, spread: 5, angle: -1.7, fill: leafShade, light: leafMid },
+      { x: 30, y: 6, length: 10, spread: 5, angle: -1.45, fill: leafShade, light: leafMid },
+      { x: 38, y: 8, length: 12, spread: 5, angle: -1.15, fill: leafShade, light: leafMid },
+      { x: 46, y: 14, length: 12, spread: 5, angle: -0.8, fill: leafShade, light: leafMid },
+      { x: 49, y: 22, length: 10, spread: 5, angle: -0.35, fill: leafShade, light: leafMid },
+      { x: 48, y: 30, length: 10, spread: 5, angle: 0.1, fill: leafShade, light: leafMid },
+      { x: 42, y: 36, length: 10, spread: 4, angle: 0.5, fill: leafShade, light: leafMid },
+      { x: 34, y: 39, length: 9, spread: 4, angle: 0.9, fill: leafShade, light: leafMid },
+      { x: 26, y: 40, length: 9, spread: 4, angle: 1.4, fill: leafShade, light: leafMid },
+      { x: 18, y: 38, length: 10, spread: 4, angle: 1.9, fill: leafShade, light: leafMid },
+      { x: 10, y: 33, length: 10, spread: 5, angle: 2.4, fill: leafShade, light: leafMid },
+      { x: 7, y: 25, length: 10, spread: 5, angle: 2.85, fill: leafShade, light: leafMid },
+      { x: 10, y: 23, length: 10, spread: 5, angle: 2.7, fill: leafShade, light: leafMid },
+      // Middle layer, warmer greens filling the interior.
+      { x: 14, y: 15, length: 11, spread: 5, angle: -2.7, fill: leafMid, light: leafLight },
+      { x: 22, y: 12, length: 12, spread: 5, angle: -1.9, fill: leafMid, light: leafLight },
+      { x: 31, y: 12, length: 11, spread: 5, angle: -1.3, fill: leafMid, light: leafLight },
+      { x: 40, y: 15, length: 11, spread: 5, angle: -0.6, fill: leafMid, light: leafLight },
+      { x: 43, y: 24, length: 10, spread: 5, angle: -0.05, fill: leafMid, light: leafLight },
+      { x: 37, y: 31, length: 10, spread: 5, angle: 0.5, fill: leafMid, light: leafLight },
+      { x: 28, y: 34, length: 10, spread: 5, angle: 1.2, fill: leafMid, light: leafLight },
+      { x: 19, y: 31, length: 10, spread: 5, angle: 1.9, fill: leafMid, light: leafLight },
+      { x: 11, y: 25, length: 10, spread: 5, angle: 2.6, fill: leafMid, light: leafLight },
+      { x: 17, y: 22, length: 10, spread: 5, angle: 2.9, fill: leafMid, light: leafLight },
+      { x: 27, y: 20, length: 11, spread: 5, angle: -1.8, fill: leafMid, light: leafLight },
+      { x: 34, y: 20, length: 10, spread: 5, angle: -0.7, fill: leafMid, light: leafLight },
+      { x: 23, y: 28, length: 9, spread: 4, angle: 2.2, fill: leafMid, light: leafLight },
+      { x: 33, y: 27, length: 9, spread: 4, angle: 0.9, fill: leafMid, light: leafLight },
+      // Sunlit upper-left leaves, as in the reference art.
+      { x: 16, y: 13, length: 9, spread: 4, angle: -2.5, fill: leafLight, light: leafHighlight },
+      { x: 24, y: 9, length: 10, spread: 4, angle: -2.0, fill: leafLight, light: leafHighlight },
+      { x: 32, y: 10, length: 9, spread: 4, angle: -1.3, fill: leafLight, light: leafHighlight },
+      { x: 20, y: 19, length: 9, spread: 4, angle: -2.8, fill: leafLight, light: leafHighlight },
+      { x: 29, y: 17, length: 9, spread: 4, angle: -1.5, fill: leafLight, light: leafHighlight },
+      { x: 38, y: 21, length: 8, spread: 4, angle: -0.4, fill: leafLight, light: leafHighlight },
+      { x: 14, y: 23, length: 8, spread: 4, angle: 3.0, fill: leafLight, light: leafHighlight },
+      // Brightest highlights on the top-left face of the crown.
+      { x: 20, y: 12, length: 7, spread: 3, angle: -2.3, fill: leafHighlight, light: '#8ed17a' },
+      { x: 27, y: 10, length: 7, spread: 3, angle: -1.8, fill: leafHighlight, light: '#8ed17a' },
+      { x: 24, y: 16, length: 7, spread: 3, angle: -2.7, fill: leafHighlight, light: '#8ed17a' },
+      { x: 17, y: 17, length: 6, spread: 3, angle: -2.9, fill: leafHighlight, light: '#8ed17a' },
+      { x: 32, y: 15, length: 6, spread: 3, angle: -1.1, fill: leafHighlight, light: '#8ed17a' },
+      { x: 35, y: 24, length: 6, spread: 3, angle: -0.3, fill: leafHighlight, light: '#8ed17a' },
+    ];
+
+    for (let i = 0; i < leaves.length; i++) {
+      const leaf = leaves[i];
+      drawLeaf(
+        leaf.x,
+        leaf.y,
+        leaf.length,
+        leaf.spread,
+        leaf.angle,
+        leaf.fill,
+        leaf.light
+      );
+    }
+
+    // Bright round araçá fruits: dark contour, yellow body, lit highlight and a
+    // tiny stem where the fruit hangs from the foliage.
+    const drawFruit = (
+      cx: number,
+      cy: number,
+      radius: number,
+      stemY: number | null
+    ): void => {
+      if (stemY !== null) {
+        drawLine(cx, cy - radius - 0.5, cx - 0.5, stemY, '#5f4527');
+      }
+      fillEllipse(cx, cy, radius + 0.6, radius + 0.6, '#3d2a05');
+      fillEllipse(cx, cy, radius, radius, '#eab308');
+      fillEllipse(cx - radius * 0.3, cy - radius * 0.3, radius * 0.62, radius * 0.62, '#facc15');
+      fillEllipse(cx - radius * 0.35, cy - radius * 0.38, radius * 0.3, radius * 0.3, '#fef08a');
+      fillEllipse(cx + radius * 0.35, cy + radius * 0.35, radius * 0.4, radius * 0.4, '#ca8a04');
+      setPixel(cx - radius * 0.25, cy - radius * 0.35, '#fffde7');
+    };
+
+    const fruits: [number, number, number, number | null][] = [
+      [13, 26, 2.4, 22],
+      [20, 36, 2.6, 32],
+      [27, 40, 2.7, 36],
+      [35, 37, 2.5, 33],
+      [43, 28, 2.4, 24],
+      [10, 33, 2.2, 29],
+      [46, 35, 2.3, 31],
+      [16, 17, 2.5, 13],
+      [25, 15, 2.6, 11],
+      [34, 16, 2.4, 12],
+      [40, 22, 2.5, 18],
+      [30, 27, 2.4, 23],
+      [21, 26, 2.2, 22],
+      [37, 30, 2.2, 26],
+      [24, 34, 2.2, 30],
+      [31, 35, 2.3, 31],
+      [14, 22, 2.0, 18],
+      [44, 19, 2.1, 15],
+    ];
+
+    for (let i = 0; i < fruits.length; i++) {
+      const [cx, cy, radius, stemY] = fruits[i];
+      drawFruit(cx, cy, radius, stemY);
+    }
+
+    // Rasterize the 56x64 colour matrix into an offscreen canvas.
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    ctx.imageSmoothingEnabled = false;
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const color = pixels[y * width + x];
+        if (!color) continue;
+        ctx.fillStyle = color;
+        ctx.fillRect(x, y, 1, 1);
+      }
+    }
+
+    this.aracaPixelSprite = canvas;
     return canvas;
   }
 
@@ -5035,6 +5383,8 @@ export class WorldSystem {
         tree.kind === 'buriti' ? this.getBuritiPixelSprite() : null;
       const pupunhaSprite =
         tree.kind === 'pupunha' ? this.getPupunhaPixelSprite() : null;
+      const aracaSprite =
+        tree.kind === 'araca' ? this.getAracaPixelSprite() : null;
 
       ctx.save();
       ctx.translate(screen.x, screen.y);
@@ -5044,7 +5394,8 @@ export class WorldSystem {
         !cupuacuSprite &&
         !castanhaSprite &&
         !buritiSprite &&
-        !pupunhaSprite
+        !pupunhaSprite &&
+        !aracaSprite
       ) {
         // Shared ground shadow for the procedurally drawn trees.
         ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
@@ -5122,6 +5473,20 @@ export class WorldSystem {
         ctx.imageSmoothingEnabled = false;
         ctx.drawImage(
           pupunhaSprite,
+          -spriteWidth / 2,
+          -spriteHeight,
+          spriteWidth,
+          spriteHeight
+        );
+        ctx.restore();
+      } else if (aracaSprite) {
+        // Nearest-neighbour upscale keeps the hand-placed pixel-art grid crisp.
+        const spriteWidth = ARACA_SPRITE_WIDTH * ARACA_SPRITE_SCALE;
+        const spriteHeight = ARACA_SPRITE_HEIGHT * ARACA_SPRITE_SCALE;
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(
+          aracaSprite,
           -spriteWidth / 2,
           -spriteHeight,
           spriteWidth,
