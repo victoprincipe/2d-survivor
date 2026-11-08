@@ -252,6 +252,8 @@ export interface MissionHUDItem {
   progress: number;
   target: number;
   complete: boolean;
+  claimed: boolean;
+  claimable: boolean;
 }
 
 export interface MissionObjectivesHUD {

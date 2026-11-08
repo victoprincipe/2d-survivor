@@ -20,9 +20,17 @@ interface HUDProps {
   isMuted: boolean;
   onToggleMute: () => void;
   difficultyName: string;
+  onClaimMission: (missionId: string) => void;
 }
 
-export const HUD: React.FC<HUDProps> = ({ hud, onPause, isMuted, onToggleMute, difficultyName }) => {
+export const HUD: React.FC<HUDProps> = ({
+  hud,
+  onPause,
+  isMuted,
+  onToggleMute,
+  difficultyName,
+  onClaimMission,
+}) => {
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -82,25 +90,43 @@ export const HUD: React.FC<HUDProps> = ({ hud, onPause, isMuted, onToggleMute, d
                   <span className="truncate text-right text-slate-400">{objectives.turnLabel}</span>
                 </div>
                 <div className="flex flex-col gap-1">
-                  {objectives.missions.map((mission) => (
-                    <div
-                      key={mission.id}
-                      className={`rounded border px-1.5 py-1 text-[10px] ${
-                        mission.complete
-                          ? 'border-emerald-500/60 bg-emerald-950/50 text-emerald-200'
-                          : 'border-slate-700/70 bg-slate-900/70 text-slate-100'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="truncate">
-                          {mission.complete ? '✓' : '○'} {mission.title}
-                        </span>
-                        <span className="shrink-0 font-mono text-[9px] text-slate-300">
-                          {mission.progress}/{mission.target}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                  {objectives.missions.map((mission) => {
+                    const claimable = mission.claimable;
+                    return (
+                      <button
+                        key={mission.id}
+                        type="button"
+                        disabled={!claimable}
+                        onClick={claimable ? () => onClaimMission(mission.id) : undefined}
+                        className={`w-full rounded border px-1.5 py-1 text-left text-[10px] transition ${
+                          mission.claimed
+                            ? 'border-emerald-500/60 bg-emerald-950/50 text-emerald-200'
+                            : claimable
+                              ? 'pointer-events-auto animate-pulse cursor-pointer border-amber-400 bg-amber-950/50 text-amber-100 shadow-[0_0_12px_rgba(251,191,36,0.75)]'
+                              : 'border-slate-700/70 bg-slate-900/70 text-slate-100'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="truncate">
+                            {mission.claimed ? '✓' : mission.complete ? '★' : '○'} {mission.title}
+                          </span>
+                          <span className="shrink-0 font-mono text-[9px] text-slate-300">
+                            {mission.progress}/{mission.target}
+                          </span>
+                        </div>
+                        {claimable && (
+                          <div className="mt-0.5 text-center text-[9px] font-black uppercase tracking-wider">
+                            Clique para Resgatar!
+                          </div>
+                        )}
+                        {mission.claimed && (
+                          <div className="mt-0.5 text-center text-[9px] font-bold uppercase tracking-wider text-emerald-300">
+                            Resgatado
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}

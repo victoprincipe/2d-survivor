@@ -157,6 +157,10 @@ export const GameContainer: React.FC = () => {
     }
   };
 
+  const handleClaimMission = (missionId: string) => {
+    engineRef.current?.claimAmazonMission(missionId);
+  };
+
   const handleResume = () => {
     if (engineRef.current) {
       engineRef.current.resume();
@@ -265,6 +269,7 @@ export const GameContainer: React.FC = () => {
           isMuted={isMuted}
           onToggleMute={handleToggleMute}
           difficultyName={getDifficulty(selectedDifficulty).name}
+          onClaimMission={handleClaimMission}
         />
       )}
 

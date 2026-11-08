@@ -80,7 +80,7 @@ const OBJECTIVE_ACT2_PREDATORS = 2;
 const OBJECTIVE_ACT2_START = 300;
 const OBJECTIVE_MAP_END = 1200;
 
-// Random Amazon Forest missions: five options per phase, drawn before the run.
+// Random Amazon Forest missions: seven options per phase, drawn before the run.
 const AMAZON_TURN_ENDS = [300, 900, 1200] as const;
 const AMAZON_TURN_LABELS: Record<1 | 2 | 3, string> = {
   1: 'Fase 1 · 00:00–05:00',
@@ -112,6 +112,13 @@ const AMAZON_MISSION_BANK: Record<1 | 2 | 3, AmazonMissionTemplate[]> = {
       metric: 'evolvedPredators',
       target: 1,
     },
+    {
+      id: 'a1_fruits_big',
+      title: 'Coleta reforçada',
+      metric: 'fruits',
+      target: 8,
+    },
+    { id: 'a1_gold_big', title: 'Ouro da mata', metric: 'gold', target: 500 },
   ],
   2: [
     { id: 'a2_fruits', title: 'Coletar frutas', metric: 'fruits', target: 10 },
@@ -134,6 +141,13 @@ const AMAZON_MISSION_BANK: Record<1 | 2 | 3, AmazonMissionTemplate[]> = {
       metric: 'bosses',
       target: 5,
     },
+    {
+      id: 'a2_fruits_big',
+      title: 'Fartura da floresta',
+      metric: 'fruits',
+      target: 15,
+    },
+    { id: 'a2_gold', title: 'Fortuna verde', metric: 'gold', target: 800 },
   ],
   3: [
     { id: 'a3_level', title: 'Alcançar nível', metric: 'level', target: 30 },
@@ -156,6 +170,18 @@ const AMAZON_MISSION_BANK: Record<1 | 2 | 3, AmazonMissionTemplate[]> = {
       metric: 'bosses',
       target: 8,
     },
+    {
+      id: 'a3_fruits',
+      title: 'Colheita final',
+      metric: 'fruits',
+      target: 20,
+    },
+    {
+      id: 'a3_water_big',
+      title: 'Rio infestado',
+      metric: 'waterKills',
+      target: 75,
+    },
   ],
 };
 
@@ -172,6 +198,8 @@ interface AmazonTurnState {
   endTime: number;
   missions: AmazonMissionTemplate[];
   baseline: AmazonMissionBaseline;
+  claimedMissions: string[];
+  bonusApplied: boolean;
 }
 
 interface AmazonObjectivesState {
@@ -1115,6 +1143,8 @@ export class GameEngine {
           bosses: 0,
           gold: 0,
         },
+        claimedMissions: [],
+        bonusApplied: false,
       };
     });
   }
@@ -1161,14 +1191,49 @@ export class GameEngine {
     const turn = this.amazonTurns[this.amazonCurrentTurn];
     if (!turn) return;
 
-    const missionsDone = turn.missions.every(
-      (mission) => this.getAmazonMissionProgress(turn, mission) >= mission.target
-    );
-    const timeUp = this.waveDirector.survivalTime >= turn.endTime;
-    if (!missionsDone && !timeUp) return;
+    // The next phase only starts when the clock reaches its exact time. Any
+    // objective completed but not claimed before then is lost.
+    if (this.waveDirector.survivalTime < turn.endTime) return;
 
     if (this.amazonCurrentTurn < this.amazonTurns.length - 1) {
       this.beginAmazonTurn(this.amazonCurrentTurn + 1);
+    }
+  }
+
+  public claimAmazonMission(missionId: string): boolean {
+    if (!this.waveDirector.isAmazonForest) return false;
+    const turn = this.amazonTurns[this.amazonCurrentTurn];
+    if (!turn) return false;
+    if (this.waveDirector.survivalTime >= turn.endTime) return false;
+
+    const mission = turn.missions.find((item) => item.id === missionId);
+    if (!mission || turn.claimedMissions.includes(mission.id)) return false;
+    if (this.getAmazonMissionProgress(turn, mission) < mission.target) return false;
+
+    turn.claimedMissions.push(mission.id);
+    if (!turn.bonusApplied) {
+      turn.bonusApplied = true;
+      this.applyAmazonTurnBonus(turn.turn);
+    }
+    this.syncHUD();
+    return true;
+  }
+
+  private applyAmazonTurnBonus(turn: 1 | 2 | 3): void {
+    this.sound.playLevelUp();
+    this.vfx.triggerFlash('#fbbf24', 0.25);
+    if (turn === 1) {
+      this.amazonObjectives.act1RewardApplied = true;
+      this.player.objectiveSpeedBonus = Math.max(this.player.objectiveSpeedBonus, 0.1);
+      this.weaponSystem.recalculatePlayerStats(this.player);
+    } else if (turn === 2) {
+      this.amazonObjectives.act2RewardApplied = true;
+      this.player.objectiveMightBonus = Math.max(this.player.objectiveMightBonus, 0.2);
+      this.player.objectiveRecoveryBonus = Math.max(this.player.objectiveRecoveryBonus, 1);
+      this.weaponSystem.recalculatePlayerStats(this.player);
+    } else {
+      this.goldCollected += 300;
+      this.vfx.addDamageNumber(this.player.x, this.player.y, 300, true, true);
     }
   }
 
@@ -1206,25 +1271,12 @@ export class GameEngine {
       objectives.act1Complete = true;
     }
 
-    if (objectives.act1Complete && !objectives.act1RewardApplied) {
-      objectives.act1RewardApplied = true;
-      this.player.objectiveSpeedBonus = Math.max(this.player.objectiveSpeedBonus, 0.1);
-      this.weaponSystem.recalculatePlayerStats(this.player);
-    }
-
     if (
       !objectives.act2Complete &&
       objectives.folkloreBossesDefeated >= OBJECTIVE_ACT2_BOSSES &&
       objectives.evolvedPredatorsDefeated >= OBJECTIVE_ACT2_PREDATORS
     ) {
       objectives.act2Complete = true;
-    }
-
-    if (objectives.act2Complete && !objectives.act2RewardApplied) {
-      objectives.act2RewardApplied = true;
-      this.player.objectiveMightBonus = Math.max(this.player.objectiveMightBonus, 0.2);
-      this.player.objectiveRecoveryBonus = Math.max(this.player.objectiveRecoveryBonus, 1);
-      this.weaponSystem.recalculatePlayerStats(this.player);
     }
 
     if (
@@ -1259,12 +1311,19 @@ export class GameEngine {
           mission.target,
           Math.max(0, this.getAmazonMissionProgress(turn, mission))
         );
+        const claimed = turn.claimedMissions.includes(mission.id);
+        const complete = progress >= mission.target;
         return {
           id: mission.id,
           title: mission.title,
           progress,
           target: mission.target,
-          complete: progress >= mission.target,
+          complete,
+          claimed,
+          claimable:
+            complete &&
+            !claimed &&
+            this.waveDirector.survivalTime < turn.endTime,
         };
       }),
     };
