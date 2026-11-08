@@ -20,6 +20,13 @@ const FRUIT_TREE_PROMPT_WIDTH = 190;
 const FRUIT_TREE_PROMPT_HEIGHT = 42;
 const FRUIT_TREE_PROMPT_PADDING = 10;
 
+// The açaí palm is a hand-crafted 32x40 pixel-art sprite. Its colours live in
+// a matrix that is rasterized once into an offscreen canvas (nearest-neighbour)
+// and then reused every frame, so the tree stays crisp at any zoom.
+const ACAI_SPRITE_WIDTH = 32;
+const ACAI_SPRITE_HEIGHT = 40;
+const ACAI_SPRITE_SCALE = 3;
+
 // Amazon water. For the player the river and lakes are purely visual, but
 // aquatic enemies use the stricter isNavigableWater check below to stay wet.
 const RIVER_WIDTH = 980;
@@ -166,7 +173,7 @@ export class WorldSystem {
 
   private floorImage: HTMLImageElement | null = null;
   private floorPattern: CanvasPattern | null = null;
-  private acaiTreeImage: HTMLImageElement | null = null;
+  private acaiPixelSprite: HTMLCanvasElement | null = null;
   private waterAnimTimer: number = 0;
 
   constructor(mapId: MapId = 'night_plain') {
@@ -175,7 +182,6 @@ export class WorldSystem {
       this.worldHalfSize = FOREST_HALF_SIZE;
       this.generateForest();
       this.spawnInitialFruitTrees();
-      this.loadAcaiTreeTexture();
     }
     this.loadFloorTexture();
   }
@@ -358,7 +364,7 @@ export class WorldSystem {
         offset = -112;
         break;
       case 'acai':
-        offset = -126;
+        offset = -146;
         break;
       case 'araca':
       default:
@@ -1060,13 +1066,213 @@ export class WorldSystem {
     image.src = '/grass-texture.jpg';
   }
 
-  private loadAcaiTreeTexture(): void {
-    if (typeof window === 'undefined') return;
-    const image = new Image();
-    image.onload = () => {
-      this.acaiTreeImage = image;
+  private getAcaiPixelSprite(): HTMLCanvasElement | null {
+    if (this.acaiPixelSprite) return this.acaiPixelSprite;
+    if (typeof document === 'undefined') return null;
+
+    const width = ACAI_SPRITE_WIDTH;
+    const height = ACAI_SPRITE_HEIGHT;
+    const pixels: (string | null)[] = new Array(width * height).fill(null);
+
+    const setPixel = (x: number, y: number, color: string): void => {
+      const px = Math.round(x);
+      const py = Math.round(y);
+      if (px < 0 || px >= width || py < 0 || py >= height) return;
+      pixels[py * width + px] = color;
     };
-    image.src = '/acai_arvore.svg';
+
+    const fillCircle = (cx: number, cy: number, radius: number, color: string): void => {
+      const minX = Math.floor(cx - radius);
+      const maxX = Math.ceil(cx + radius);
+      const minY = Math.floor(cy - radius);
+      const maxY = Math.ceil(cy + radius);
+      for (let y = minY; y <= maxY; y++) {
+        for (let x = minX; x <= maxX; x++) {
+          const dx = x - cx;
+          const dy = y - cy;
+          if (dx * dx + dy * dy <= radius * radius + 0.2) setPixel(x, y, color);
+        }
+      }
+    };
+
+    // Dark oval shadow on the ground, wider than the trunk base just like the
+    // reference art. It is plotted first so the tree stands on top of it.
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const dx = (x - 16) / 15.2;
+        const dy = (y - 37.3) / 2.8;
+        if (dx * dx + dy * dy <= 1) setPixel(x, y, 'rgba(4, 10, 6, 0.62)');
+      }
+    }
+
+    // Ringed brown trunk: two-pixel body with a dark outline and a slight
+    // flare at the base.
+    for (let y = 17; y < height - 1; y++) {
+      if (y >= height - 3) {
+        setPixel(13, y, '#2f1d10');
+        setPixel(18, y, '#2f1d10');
+        for (let x = 14; x <= 17; x++) setPixel(x, y, '#7a5a35');
+      } else {
+        setPixel(14, y, '#2f1d10');
+        setPixel(17, y, '#2f1d10');
+        setPixel(15, y, '#8a6a3f');
+        setPixel(16, y, '#6b4f2a');
+      }
+
+      if (y % 3 === 0) {
+        setPixel(15, y, '#4a3420');
+        setPixel(16, y, '#4a3420');
+      }
+    }
+
+    // Seven broad, arched fronds. Each blade gets a dark pixel outline and is
+    // split into two green tones so the crown reads like the reference image.
+    const drawFrond = (
+      baseX: number,
+      baseY: number,
+      controlX: number,
+      controlY: number,
+      tipX: number,
+      tipY: number,
+      lightOnLeft: boolean
+    ): void => {
+      const outline = '#0a1c10';
+      const darkGreen = '#14532d';
+      const lightGreen = '#2f9e52';
+      const steps = 72;
+
+      const pointX = (t: number): number => {
+        const u = 1 - t;
+        return u * u * baseX + 2 * u * t * controlX + t * t * tipX;
+      };
+      const pointY = (t: number): number => {
+        const u = 1 - t;
+        return u * u * baseY + 2 * u * t * controlY + t * t * tipY;
+      };
+      const tangentX = (t: number): number =>
+        2 * (1 - t) * (controlX - baseX) + 2 * t * (tipX - controlX);
+      const tangentY = (t: number): number =>
+        2 * (1 - t) * (controlY - baseY) + 2 * t * (tipY - controlY);
+
+      // Outline pass first, then the coloured blade on top of it.
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const x = pointX(t);
+        const y = pointY(t);
+        const dx = tangentX(t);
+        const dy = tangentY(t);
+        const length = Math.sqrt(dx * dx + dy * dy) || 1;
+        const nx = -dy / length;
+        const ny = dx / length;
+        const halfWidth = 0.8 + 1.6 * Math.sin(Math.PI * t);
+        const outlineWidth = halfWidth + 1;
+        const maxOffset = Math.ceil(outlineWidth);
+        for (let offset = -maxOffset; offset <= maxOffset; offset++) {
+          if (Math.abs(offset) <= outlineWidth) {
+            setPixel(x + nx * offset, y + ny * offset, outline);
+          }
+        }
+      }
+
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const x = pointX(t);
+        const y = pointY(t);
+        const dx = tangentX(t);
+        const dy = tangentY(t);
+        const length = Math.sqrt(dx * dx + dy * dy) || 1;
+        const nx = -dy / length;
+        const ny = dx / length;
+        const halfWidth = 0.8 + 1.6 * Math.sin(Math.PI * t);
+        const maxOffset = Math.ceil(halfWidth);
+        for (let offset = -maxOffset; offset <= maxOffset; offset++) {
+          if (Math.abs(offset) > halfWidth) continue;
+          const lightSide = lightOnLeft ? offset <= 0 : offset >= 0;
+          setPixel(x + nx * offset, y + ny * offset, lightSide ? lightGreen : darkGreen);
+        }
+      }
+    };
+
+    drawFrond(15.5, 17.5, 8, 20, 4, 23, false);
+    drawFrond(16.5, 17.5, 23, 20, 28, 23, true);
+    drawFrond(15, 17, 7, 12, 2, 13, true);
+    drawFrond(16.5, 17, 24, 12, 29, 13, false);
+    drawFrond(15, 16.5, 9, 7, 5, 4, false);
+    drawFrond(16, 16.5, 22, 7, 27, 4, true);
+    drawFrond(15.5, 16.5, 15.5, 6, 16, 1, true);
+
+    // Short stems holding the two heavy açaí bunches.
+    const drawLine = (
+      x0: number,
+      y0: number,
+      x1: number,
+      y1: number,
+      color: string
+    ): void => {
+      const steps = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+      for (let i = 0; i <= steps; i++) {
+        const t = steps === 0 ? 0 : i / steps;
+        setPixel(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, color);
+      }
+    };
+    drawLine(15, 18, 12, 22, '#4a3420');
+    drawLine(16, 18, 20, 22, '#4a3420');
+
+    const berries: { x: number; y: number; highlight: boolean }[] = [
+      { x: 12, y: 23, highlight: true },
+      { x: 11, y: 24, highlight: false },
+      { x: 13, y: 24, highlight: false },
+      { x: 10, y: 25, highlight: true },
+      { x: 12, y: 25, highlight: false },
+      { x: 13, y: 26, highlight: false },
+      { x: 11, y: 26, highlight: true },
+      { x: 12, y: 27, highlight: false },
+      { x: 10, y: 27, highlight: false },
+      { x: 13, y: 28, highlight: true },
+      { x: 11, y: 29, highlight: false },
+      { x: 12, y: 30, highlight: false },
+      { x: 19, y: 24, highlight: true },
+      { x: 21, y: 24, highlight: false },
+      { x: 18, y: 25, highlight: false },
+      { x: 20, y: 25, highlight: true },
+      { x: 22, y: 25, highlight: false },
+      { x: 19, y: 26, highlight: false },
+      { x: 21, y: 26, highlight: true },
+      { x: 18, y: 27, highlight: false },
+      { x: 20, y: 27, highlight: false },
+      { x: 22, y: 27, highlight: true },
+      { x: 18, y: 28, highlight: false },
+      { x: 19, y: 28, highlight: false },
+      { x: 21, y: 29, highlight: true },
+      { x: 20, y: 30, highlight: false },
+    ];
+
+    for (let i = 0; i < berries.length; i++) {
+      const berry = berries[i];
+      fillCircle(berry.x, berry.y, 1.6, '#2e0f3a');
+      fillCircle(berry.x, berry.y, 1.05, '#4a1a5e');
+      if (berry.highlight) setPixel(berry.x, berry.y - 1, '#8b3fa8');
+    }
+
+    // Rasterize the 32x40 colour matrix into an offscreen canvas.
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    ctx.imageSmoothingEnabled = false;
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const color = pixels[y * width + x];
+        if (!color) continue;
+        ctx.fillStyle = color;
+        ctx.fillRect(x, y, 1, 1);
+      }
+    }
+
+    this.acaiPixelSprite = canvas;
+    return canvas;
   }
 
   private rollTorchBuff(): DropType {
@@ -1683,80 +1889,38 @@ export class WorldSystem {
 
       const screen = camera.worldToScreen(tree.x, tree.y);
       const sway = Math.sin(tree.animTimer) * 2;
+      const acaiSprite = tree.kind === 'acai' ? this.getAcaiPixelSprite() : null;
 
       ctx.save();
       ctx.translate(screen.x, screen.y);
 
-      // Shared shadow and a soft golden glow that marks a harvestable tree.
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
-      ctx.beginPath();
-      ctx.ellipse(0, 8, 34, 12, 0, 0, Math.PI * 2);
-      ctx.fill();
+      if (tree.kind !== 'acai' || !acaiSprite) {
+        // Shared shadow and a soft golden glow that marks a harvestable tree.
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
+        ctx.beginPath();
+        ctx.ellipse(0, 8, 34, 12, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
 
       ctx.fillStyle = 'rgba(250, 204, 21, 0.16)';
       ctx.beginPath();
       ctx.ellipse(0, 6, 46, 16, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      if (tree.kind === 'acai' && !this.acaiTreeImage) {
-        // Açaizeiro: slender leaning palm with purple berry bunches.
-        const topX = 6 + sway;
-        const topY = -68;
-
-        ctx.strokeStyle = '#5b3a1e';
-        ctx.lineWidth = 7;
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.quadraticCurveTo(2, -34, topX, topY);
-        ctx.stroke();
-
-        for (let f = 0; f < 8; f++) {
-          const angle = -Math.PI + (f / 7) * Math.PI;
-          const length = 30 + (f % 2) * 8;
-          ctx.strokeStyle = f % 2 === 0 ? '#166534' : '#15803d';
-          ctx.lineWidth = 4;
-          ctx.beginPath();
-          ctx.moveTo(topX, topY);
-          ctx.quadraticCurveTo(
-            topX + Math.cos(angle) * length * 0.55,
-            topY + Math.sin(angle) * length * 0.55 - 6,
-            topX + Math.cos(angle) * length,
-            topY + Math.sin(angle) * length * 0.65
-          );
-          ctx.stroke();
-        }
-
-        ctx.fillStyle = '#6b21a8';
-        for (let b = 0; b < 12; b++) {
-          const angle = (b / 12) * Math.PI * 2;
-          const radius = 7 + (b % 3) * 3;
-          ctx.beginPath();
-          ctx.arc(
-            topX + Math.cos(angle) * radius,
-            topY + 6 + Math.sin(angle) * radius * 0.7,
-            3.2,
-            0,
-            Math.PI * 2
-          );
-          ctx.fill();
-        }
-
-        ctx.fillStyle = '#c084fc';
-        ctx.beginPath();
-        ctx.arc(topX - 5, topY + 3, 1.6, 0, Math.PI * 2);
-        ctx.fill();
-      } else if (tree.kind === 'acai' && this.acaiTreeImage) {
-        // Açaí palm sprite, with the trunk base centered on the tree position.
-        const imageWidth = 80;
-        const imageHeight = 100;
+      if (acaiSprite) {
+        // Nearest-neighbour upscale keeps the pixel-art grid perfectly crisp.
+        const spriteWidth = ACAI_SPRITE_WIDTH * ACAI_SPRITE_SCALE;
+        const spriteHeight = ACAI_SPRITE_HEIGHT * ACAI_SPRITE_SCALE;
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
         ctx.drawImage(
-          this.acaiTreeImage,
-          -imageWidth / 2,
-          -imageHeight,
-          imageWidth,
-          imageHeight
+          acaiSprite,
+          -spriteWidth / 2,
+          -spriteHeight,
+          spriteWidth,
+          spriteHeight
         );
+        ctx.restore();
       } else if (tree.kind === 'cupuacu') {
         // Cupuaçuzeiro: short thick trunk, broad canopy and big brown fruit.
         ctx.fillStyle = '#5b3a1e';
