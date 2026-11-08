@@ -27,6 +27,7 @@ interface FaunaEntry {
   rank: FaunaRank;
   habitat: FaunaHabitat;
   behavior: string;
+  nightFrenzy?: boolean;
 }
 
 interface FaunaStats {
@@ -198,6 +199,7 @@ const FAUNA: FaunaEntry[] = [
     rank: 'Elite',
     habitat: 'Terra',
     behavior: 'Elite terrestre que caça outros animais e cresce a cada presa; fica mais rápida e forte sem limite.',
+    nightFrenzy: true,
   },
   {
     type: 'elite_tapir',
@@ -219,6 +221,7 @@ const FAUNA: FaunaEntry[] = [
     rank: 'Elite',
     habitat: 'Água',
     behavior: 'Foge em terra; ataca com +50% de velocidade na água (+30% na praia) e cresce sem limite ao caçar, como a Sucuri.',
+    nightFrenzy: true,
   },
 ];
 
@@ -228,6 +231,7 @@ interface BossEntry {
   time: string;
   ability: string;
   finalBoss?: boolean;
+  nightFrenzy?: boolean;
 }
 
 const BOSSES: BossEntry[] = [
@@ -281,9 +285,10 @@ const BOSSES: BossEntry[] = [
   },
   {
     type: 'boss_cobra_grande',
-    name: 'Cobra-Grande',
+    name: 'Sucuri (Cobra-Grande)',
     time: '17:00',
     ability: 'Arrancadas colossais pela terra e pelo rio.',
+    nightFrenzy: true,
   },
   {
     type: 'boss_boitata',
@@ -421,6 +426,13 @@ const FaunaCard: React.FC<{
       </div>
 
       <p className="text-[10.5px] leading-relaxed text-[#9ca3af]">{animal.behavior}</p>
+
+      {animal.nightFrenzy && (
+        <p className="rounded border border-indigo-700/60 bg-indigo-950/40 px-2 py-1.5 text-[10px] leading-relaxed text-indigo-200">
+          <span className="font-bold text-indigo-100">Frenesi Noturno (10:00–20:00):</span>{' '}
+          +25% de velocidade; caça e cresce no dobro da frequência.
+        </p>
+      )}
     </div>
   );
 };
@@ -472,11 +484,24 @@ const BossCard: React.FC<{
       <p className="text-[10.5px] leading-relaxed text-[#9ca3af]">
         <span className="font-bold text-[#cbd5e1]">Habilidade:</span> {boss.ability}
       </p>
+
+      {boss.nightFrenzy && (
+        <p className="rounded border border-indigo-700/60 bg-indigo-950/40 px-2 py-1.5 text-[10px] leading-relaxed text-indigo-200">
+          <span className="font-bold text-indigo-100">Frenesi Noturno (10:00–20:00):</span>{' '}
+          +25% de velocidade; caça e cresce no dobro da frequência.
+        </p>
+      )}
     </div>
   );
 };
 
 const RULES: { title: string; icon: React.ReactNode; accent: string; text: string }[] = [
+  {
+    title: 'Ciclo Dia / Pôr do Sol / Noite',
+    icon: <Clock className="h-4 w-4" />,
+    accent: 'text-indigo-300',
+    text: '00:00–05:00: dia claro com folhas ao vento. 05:00–10:00: pôr do sol alaranjado, quando surgem os primeiros chefes. 10:00–20:00: noite azul-escura com luz ao redor do herói, vaga-lumes e chefes de fogo em destaque. À noite, todos os animais ficam 25% mais rápidos e os predadores (Jacaré-açu, Sucuri e Onça-pintada) caçam e crescem no dobro da frequência.',
+  },
   {
     title: '3 Turnos de Missão',
     icon: <MousePointerClick className="h-4 w-4" />,

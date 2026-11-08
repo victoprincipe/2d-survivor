@@ -380,6 +380,16 @@ export class WaveDirector {
     const enemy = new Enemy(this.nextEnemyId++, type, x, y, hpMult);
     enemy.damage = Math.max(1, Math.round(enemy.damage * this.difficulty.enemyDamage));
     enemy.xpValue = Math.max(1, Math.round(enemy.xpValue * this.difficulty.xpMultiplier));
+
+    // Amazon night (10:00–20:00): newly spawned animals start in frenzy.
+    const amazonNight = this.isAmazonForest && this.survivalTime >= 600;
+    if (amazonNight) {
+      enemy.isAmazonNight = true;
+      if (enemy.isEcologyPredator) {
+        enemy.ecologyHuntTimer *= 0.5;
+      }
+    }
+
     return enemy;
   }
 

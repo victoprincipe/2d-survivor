@@ -802,6 +802,152 @@ export class WorldSystem {
   }
 
   /**
+   * Amazon Forest lighting phases, synchronized with the 20-minute run clock:
+   * 00:00–05:00 day, 05:00–10:00 sunset and 10:00–20:00 jungle night.
+   */
+  public getAmazonDayPhase(survivalTime: number): 'day' | 'sunset' | 'night' {
+    if (survivalTime < 300) return 'day';
+    if (survivalTime < 600) return 'sunset';
+    return 'night';
+  }
+
+  /**
+   * Renders the map's atmospheric lighting and ambient particles on top of the
+   * world. The HUD/minimap stay above this layer because the engine draws them
+   * afterwards.
+   */
+  public renderAmazonAtmosphere(
+    ctx: CanvasRenderingContext2D,
+    camera: Camera,
+    player: Player,
+    survivalTime: number
+  ): void {
+    if (this.mapId !== 'amazon_forest') return;
+
+    const phase = this.getAmazonDayPhase(survivalTime);
+    const width = camera.viewportWidth;
+    const height = camera.viewportHeight;
+
+    if (phase === 'day') {
+      // Clear jungle daylight: only the soft, wind-blown leaves move.
+      ctx.fillStyle = 'rgba(255, 247, 214, 0.05)';
+      ctx.fillRect(0, 0, width, height);
+      this.renderFallingLeaves(ctx, camera, player, survivalTime);
+      return;
+    }
+
+    if (phase === 'sunset') {
+      const sunset = ctx.createLinearGradient(0, 0, 0, height);
+      sunset.addColorStop(0, 'rgba(249, 115, 22, 0.16)');
+      sunset.addColorStop(0.55, 'rgba(234, 88, 12, 0.1)');
+      sunset.addColorStop(1, 'rgba(120, 53, 15, 0.2)');
+      ctx.fillStyle = sunset;
+      ctx.fillRect(0, 0, width, height);
+      this.renderFallingLeaves(ctx, camera, player, survivalTime);
+      return;
+    }
+
+    // Night: deep blue atmosphere with a circular pool of light around the hero.
+    const hero = camera.worldToScreen(player.x, player.y);
+    const darkness = ctx.createRadialGradient(
+      hero.x,
+      hero.y,
+      56,
+      hero.x,
+      hero.y,
+      420
+    );
+    darkness.addColorStop(0, 'rgba(4, 10, 30, 0.08)');
+    darkness.addColorStop(0.35, 'rgba(6, 14, 40, 0.3)');
+    darkness.addColorStop(0.7, 'rgba(4, 10, 32, 0.62)');
+    darkness.addColorStop(1, 'rgba(2, 6, 20, 0.8)');
+    ctx.fillStyle = darkness;
+    ctx.fillRect(0, 0, width, height);
+
+    // Warm rim of the hero's lantern-like aura.
+    const heroGlow = ctx.createRadialGradient(hero.x, hero.y, 16, hero.x, hero.y, 230);
+    heroGlow.addColorStop(0, 'rgba(254, 243, 199, 0.16)');
+    heroGlow.addColorStop(0.5, 'rgba(253, 224, 71, 0.06)');
+    heroGlow.addColorStop(1, 'rgba(253, 224, 71, 0)');
+    ctx.fillStyle = heroGlow;
+    ctx.beginPath();
+    ctx.arc(hero.x, hero.y, 230, 0, Math.PI * 2);
+    ctx.fill();
+
+    this.renderFireflies(ctx, camera, player, survivalTime);
+  }
+
+  private renderFireflies(
+    ctx: CanvasRenderingContext2D,
+    camera: Camera,
+    player: Player,
+    survivalTime: number
+  ): void {
+    const count = 26;
+    for (let i = 0; i < count; i++) {
+      const slow = survivalTime * 0.7 + i * 1.73;
+      const worldX =
+        player.x +
+        Math.sin(slow * 0.7 + i) * (150 + (i % 5) * 55) +
+        Math.cos(slow * 0.35 + i * 1.4) * 55;
+      const worldY =
+        player.y +
+        Math.cos(slow * 0.9 + i * 2.1) * (95 + (i % 4) * 45) +
+        Math.sin(slow * 0.45 + i) * 40;
+      const screen = camera.worldToScreen(worldX, worldY);
+
+      const blink = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(survivalTime * 3.2 + i * 1.9));
+      ctx.save();
+      ctx.shadowColor = '#fef08a';
+      ctx.shadowBlur = 12;
+      ctx.fillStyle = `rgba(253, 230, 138, ${blink})`;
+      ctx.beginPath();
+      ctx.arc(screen.x, screen.y, 1.7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  private renderFallingLeaves(
+    ctx: CanvasRenderingContext2D,
+    camera: Camera,
+    player: Player,
+    survivalTime: number
+  ): void {
+    const count = 20;
+    const colors = ['#84cc16', '#65a30d', '#facc15', '#a3e635'];
+
+    for (let i = 0; i < count; i++) {
+      const fallSpeed = 16 + (i % 4) * 7;
+      const worldX =
+        player.x + (((i * 173 + survivalTime * 18) % 1180) - 590) +
+        Math.sin(survivalTime * 0.8 + i) * 34;
+      const worldY =
+        player.y + (((i * 71 + survivalTime * fallSpeed) % 860) - 430);
+      const screen = camera.worldToScreen(worldX, worldY);
+
+      if (
+        screen.x < -20 ||
+        screen.x > camera.viewportWidth + 20 ||
+        screen.y < -20 ||
+        screen.y > camera.viewportHeight + 20
+      ) {
+        continue;
+      }
+
+      ctx.save();
+      ctx.translate(screen.x, screen.y);
+      ctx.rotate(survivalTime * 1.3 + i);
+      ctx.globalAlpha = 0.62;
+      ctx.fillStyle = colors[i % colors.length];
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 4.8, 2.1, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  /**
    * Draws the scenery layer (river, lakes and the map-edge tree wall) inside
    * the minimap. The minimap square is already clipped by the caller.
    */

@@ -33,6 +33,8 @@ export class Enemy {
   // Water ambush state, refreshed by the engine every frame.
   public isSubmerged: boolean = false;
   public playerInWater: boolean = false;
+  // Set by the engine for the Amazon Forest night frenzy (+25% speed).
+  public isAmazonNight: boolean = false;
   public terrainSpeedMultiplier: number = 1;
   public name: string = '';
   private spriteImage: HTMLImageElement | null = null;
@@ -657,6 +659,8 @@ export class Enemy {
       this.isRiverPredator && this.playerInWater ? this.terrainSpeedMultiplier : 1.0;
     const speedMult =
       (this.slowTimer > 0 ? Math.max(0.35, 1 - this.slowFactor) : 1.0) * terrainMult;
+    // Forest night frenzy: +25% movement speed only (skills keep their cadence).
+    const movementMult = speedMult * (this.isAmazonNight ? 1.25 : 1.0);
 
     // River predators flee while the hero stays in the forest. They only
     // charge (and use their skills) once the hero steps into the water.
@@ -665,7 +669,7 @@ export class Enemy {
       this.skillState = 'idle';
       this.skillStateTimer = 0;
       if (dist > 0) {
-        const fleeSpeed = this.speed * speedMult;
+        const fleeSpeed = this.speed * movementMult;
         this.x += (-dx / dist) * fleeSpeed * dt;
         this.y += (-dy / dist) * fleeSpeed * dt;
       }
@@ -686,7 +690,7 @@ export class Enemy {
             : this.isBoss
               ? 275
               : 210;
-      const dashSpeed = baseDashSpeed * speedMult;
+      const dashSpeed = baseDashSpeed * movementMult;
       this.x += this.dashDirX * dashSpeed * dt;
       this.y += this.dashDirY * dashSpeed * dt;
       return this.hp > 0;
@@ -699,15 +703,15 @@ export class Enemy {
     ) {
       // Slow ominous step while telegraphing
       if (dist > 0) {
-        this.x += (dx / dist) * this.speed * 0.25 * speedMult * dt;
-        this.y += (dy / dist) * this.speed * 0.25 * speedMult * dt;
+        this.x += (dx / dist) * this.speed * 0.25 * movementMult * dt;
+        this.y += (dy / dist) * this.speed * 0.25 * movementMult * dt;
       }
       return this.hp > 0;
     }
 
     // Standard movement towards the current walk target (player by default).
     if (moveDist > 0) {
-      const currentSpeed = this.speed * speedMult;
+      const currentSpeed = this.speed * movementMult;
       let vx = (moveDx / moveDist) * currentSpeed;
       let vy = (moveDy / moveDist) * currentSpeed;
 
@@ -720,7 +724,7 @@ export class Enemy {
         const norm = dist > 0 ? dist : 1;
         const perpX = -dy / norm;
         const perpY = dx / norm;
-        const wave = Math.sin(this.animTimer * 1.5) * 44 * speedMult;
+        const wave = Math.sin(this.animTimer * 1.5) * 44 * movementMult;
         vx += perpX * wave;
         vy += perpY * wave;
       }

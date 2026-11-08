@@ -15,7 +15,7 @@ export const GAME_MAPS: GameMap[] = [
   {
     id: 'amazon_forest',
     name: 'Floresta Amazônica',
-    description: 'Mapa de índio',
+    description: 'Selva com ciclo dinâmico de Dia, Pôr do Sol e Noite.',
   },
 ];
 

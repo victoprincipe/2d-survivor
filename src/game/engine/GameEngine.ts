@@ -455,10 +455,13 @@ export class GameEngine {
 
     // 4. Update Enemies + Boss Special Attacks
     const playerInWater = this.worldProps.isWaterSurface(this.player.x, this.player.y);
+    const amazonNight = this.isAmazonNight();
     const spawnedMinions: Enemy[] = [];
     for (let i = this.enemies.length - 1; i >= 0; i--) {
       const e = this.enemies[i];
       e.playerInWater = playerInWater;
+      // The forest night frenzy accelerates every animal by 25%.
+      e.isAmazonNight = amazonNight;
       // Piranha, Boto-cor-de-rosa and Ariranha stay hidden under the surface
       // until the hero enters the water.
       e.isSubmerged = e.isAmbushAquatic && !playerInWater;
@@ -956,6 +959,15 @@ export class GameEngine {
   }
 
   /**
+   * Night in the Amazon Forest lasts from 10:00 to 20:00 on the run clock.
+   */
+  private isAmazonNight(): boolean {
+    return (
+      this.waveDirector.isAmazonForest && this.waveDirector.survivalTime >= 600
+    );
+  }
+
+  /**
    * Assigns food-chain walk targets while the hero is far enough away:
    * herbivores head to the riverbank and the Anta heads to a fruit tree.
    */
@@ -1040,6 +1052,8 @@ export class GameEngine {
   private resolveAmazonEcology(): void {
     if (!this.waveDirector.isAmazonForest) return;
 
+    const nightFrenzy = this.isAmazonNight();
+
     // Antas eat active fruit trees, then heal and gain a shield.
     for (let i = 0; i < this.enemies.length; i++) {
       const enemy = this.enemies[i];
@@ -1100,12 +1114,15 @@ export class GameEngine {
       if (prey) {
         devoured.add(prey);
         predator.growFromPrey();
+        // At night predators digest faster and grow twice as fast per meal.
+        if (nightFrenzy) predator.growFromPrey();
         this.vfx.addDeathBurst(prey.x, prey.y, '#ef4444', 10);
         this.vfx.addSparks(predator.x, predator.y, '#f97316', 8);
-        predator.ecologyHuntTimer = isJaguar ? 15 : 10 + Math.random() * 2;
+        predator.ecologyHuntTimer =
+          (isJaguar ? 15 : 10 + Math.random() * 2) * (nightFrenzy ? 0.5 : 1);
       } else {
         // Nothing in reach: retry soon instead of waiting a full cycle.
-        predator.ecologyHuntTimer = 2;
+        predator.ecologyHuntTimer = nightFrenzy ? 1 : 2;
       }
     }
 
@@ -1851,6 +1868,17 @@ export class GameEngine {
     // 7. Render VFX (Damage numbers, death particles, screen flash)
     this.vfx.render(ctx, camera);
 
+    // 7.2. Amazon Forest day/sunset/night atmosphere
+    this.worldProps.renderAmazonAtmosphere(
+      ctx,
+      camera,
+      this.player,
+      this.waveDirector.survivalTime
+    );
+
+    // 7.3. Fire bosses shine through the jungle night.
+    this.renderNightFireBossGlow();
+
     // 7.5. Render Debug Overlay (Hitboxes, Ranges, Spatial Grid)
     this.renderDebugOverlay();
 
@@ -2155,6 +2183,33 @@ export class GameEngine {
         ctx.arc(0, 0, p.radius + 22, -0.45, 0.45);
         ctx.stroke();
       }
+      ctx.restore();
+    }
+  }
+
+  private renderNightFireBossGlow(): void {
+    if (!this.isAmazonNight()) return;
+
+    const { ctx, camera } = this;
+    for (let i = 0; i < this.enemies.length; i++) {
+      const enemy = this.enemies[i];
+      if (enemy.type !== 'boss_curupira' && enemy.type !== 'boss_boitata') continue;
+      if (!camera.isInView(enemy.x, enemy.y, enemy.radius * 3)) continue;
+
+      const screen = camera.worldToScreen(enemy.x, enemy.y);
+      const isBoitata = enemy.type === 'boss_boitata';
+      const radius = enemy.radius * 3.2;
+      const glow = ctx.createRadialGradient(screen.x, screen.y, 4, screen.x, screen.y, radius);
+      glow.addColorStop(0, isBoitata ? 'rgba(254, 240, 138, 0.8)' : 'rgba(253, 186, 116, 0.75)');
+      glow.addColorStop(0.4, 'rgba(249, 115, 22, 0.42)');
+      glow.addColorStop(1, 'rgba(220, 38, 38, 0)');
+
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(screen.x, screen.y, radius, 0, Math.PI * 2);
+      ctx.fill();
       ctx.restore();
     }
   }
