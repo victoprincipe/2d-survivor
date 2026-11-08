@@ -28,9 +28,10 @@ const ACAI_SPRITE_HEIGHT = 40;
 const ACAI_SPRITE_SCALE = 3;
 
 // Açaí minimap marker: a hand-drawn 16x16 pixel-art bunch, rasterized once
-// into an offscreen canvas and blitted at 14x14 with smoothing disabled.
+// into an offscreen canvas and blitted at 16x16 with smoothing disabled so
+// every pixel of the reference-style art is preserved.
 const ACAI_MINIMAP_ICON_SIZE = 16;
-const ACAI_MINIMAP_ICON_DRAW_SIZE = 14;
+const ACAI_MINIMAP_ICON_DRAW_SIZE = 16;
 
 // Amazon water. For the player the river and lakes are purely visual, but
 // aquatic enemies use the stricter isNavigableWater check below to stay wet.
@@ -82,7 +83,7 @@ const FRUIT_TREE_BENEFITS: Record<FruitTreeKind, string> = {
 };
 
 // Distinct minimap colors so each fruit can be told apart at a glance.
-// Açaí is only a fallback: active trees use the pixel-art bunch icon instead.
+// Açaí always uses its pixel-art bunch icon and never falls back to a dot.
 const FRUIT_TREE_MINIMAP_COLORS: Record<FruitTreeKind, string> = {
   acai: '#3a1050',
   cupuacu: '#d4a017',
@@ -1060,8 +1061,9 @@ export class WorldSystem {
             drawSize
           );
           ctx.restore();
-          continue;
         }
+        // The açaí never falls back to the generic purple dot.
+        continue;
       }
 
       // Dark backing keeps the icon readable over water and tree wall.
@@ -1389,6 +1391,10 @@ export class WorldSystem {
     fillEllipse(12.1, 3.7, 1.9, 0.8, leafLight);
     fillEllipse(8.4, 3.0, 1.5, 1.6, leafDark);
     fillEllipse(8.2, 2.8, 1.0, 1.1, leafLight);
+
+    // Lower-right leaf peeking out from under the bunch, as in the reference.
+    fillEllipse(13.3, 12.8, 2.1, 1.1, leafDark);
+    fillEllipse(13.5, 12.5, 1.5, 0.7, leafLight);
 
     // Compact bunch: back row first so the front berries overlap naturally.
     const berries: { x: number; y: number }[] = [
