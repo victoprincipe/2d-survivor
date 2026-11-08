@@ -44,6 +44,14 @@ const CASTANHA_SPRITE_WIDTH = 64;
 const CASTANHA_SPRITE_HEIGHT = 92;
 const CASTANHA_SPRITE_SCALE = 2;
 
+// The buritizeiro is a slender hand-crafted 48x64 palm: a tall grey trunk with
+// well-defined rings, a wide fan crown of large open dark-green fronds, hanging
+// orange-red fruit bunches and a dark oval shadow under the trunk. It is
+// rasterized once into an offscreen canvas and upscaled with nearest-neighbour.
+const BURITI_SPRITE_WIDTH = 48;
+const BURITI_SPRITE_HEIGHT = 64;
+const BURITI_SPRITE_SCALE = 2;
+
 // Fruit tree minimap markers: hand-drawn 16x16 pixel-art icons, rasterized
 // once into offscreen canvases and blitted at 16x16 with smoothing disabled
 // so every pixel of the art is preserved.
@@ -253,6 +261,7 @@ export class WorldSystem {
   private acaiPixelSprite: HTMLCanvasElement | null = null;
   private cupuacuPixelSprite: HTMLCanvasElement | null = null;
   private castanhaPixelSprite: HTMLCanvasElement | null = null;
+  private buritiPixelSprite: HTMLCanvasElement | null = null;
   private acaiMinimapIcon: HTMLCanvasElement | null = null;
   private fruitMinimapIcons: Partial<Record<FruitTreeKind, HTMLCanvasElement>> = {};
   private waterAnimTimer: number = 0;
@@ -2525,6 +2534,276 @@ export class WorldSystem {
   }
 
   /**
+   * Builds (once) the Buritizeiro sprite. The 48x64 pixel-art canvas follows
+   * the reference: A dark contour around a slender vertical grey trunk with
+   * clearly defined rings, a wide fan crown made of large rounded open fronds
+   * in deep greens, orange-red fruit bunches hanging under the crown and a dark
+   * oval shadow centred on the base of the trunk.
+   */
+  private getBuritiPixelSprite(): HTMLCanvasElement | null {
+    if (this.buritiPixelSprite) return this.buritiPixelSprite;
+    if (typeof document === 'undefined') return null;
+
+    const width = BURITI_SPRITE_WIDTH;
+    const height = BURITI_SPRITE_HEIGHT;
+    const pixels: (string | null)[] = new Array(width * height).fill(null);
+
+    const setPixel = (x: number, y: number, color: string): void => {
+      const px = Math.round(x);
+      const py = Math.round(y);
+      if (px < 0 || px >= width || py < 0 || py >= height) return;
+      pixels[py * width + px] = color;
+    };
+
+    const fillEllipse = (
+      cx: number,
+      cy: number,
+      rx: number,
+      ry: number,
+      color: string
+    ): void => {
+      const minX = Math.floor(cx - rx);
+      const maxX = Math.ceil(cx + rx);
+      const minY = Math.floor(cy - ry);
+      const maxY = Math.ceil(cy + ry);
+      for (let y = minY; y <= maxY; y++) {
+        for (let x = minX; x <= maxX; x++) {
+          const dx = (x - cx) / rx;
+          const dy = (y - cy) / ry;
+          if (dx * dx + dy * dy <= 1.05) setPixel(x, y, color);
+        }
+      }
+    };
+
+    const drawLine = (
+      x0: number,
+      y0: number,
+      x1: number,
+      y1: number,
+      color: string
+    ): void => {
+      const steps = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+      for (let i = 0; i <= steps; i++) {
+        const t = steps === 0 ? 0 : i / steps;
+        setPixel(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, color);
+      }
+    };
+
+    // Soft dark oval shadow, centred exactly under the trunk base.
+    fillEllipse(24, 61.3, 20.5, 4.1, 'rgba(4, 10, 6, 0.62)');
+    fillEllipse(24, 61.5, 14.5, 2.7, 'rgba(3, 7, 4, 0.45)');
+
+    const frondOutline = '#07160b';
+    const frondDark = '#14532d';
+    const frondMid = '#1d6f38';
+    const frondLight = '#3f9c4c';
+    const frondGlint = '#7ed16f';
+
+    const drawFrond = (
+      baseX: number,
+      baseY: number,
+      controlX: number,
+      controlY: number,
+      tipX: number,
+      tipY: number,
+      tone: number,
+      litFromLeft: boolean
+    ): void => {
+      const pointX = (t: number): number => {
+        const u = 1 - t;
+        return u * u * baseX + 2 * u * t * controlX + t * t * tipX;
+      };
+      const pointY = (t: number): number => {
+        const u = 1 - t;
+        return u * u * baseY + 2 * u * t * controlY + t * t * tipY;
+      };
+      const tangentX = (t: number): number =>
+        2 * (1 - t) * (controlX - baseX) + 2 * t * (tipX - controlX);
+      const tangentY = (t: number): number =>
+        2 * (1 - t) * (controlY - baseY) + 2 * t * (tipY - controlY);
+
+      // Broad rounded blade that swells in the middle and tapers to the tip,
+      // with a subtle scalloped edge that reads like palm pinnae in pixel art.
+      const halfWidthAt = (t: number): number => {
+        const shape = Math.sin(Math.PI * t);
+        const scallop = 0.92 + Math.sin(t * 33 + baseX) * 0.1;
+        return 0.8 + 2.5 * shape * scallop;
+      };
+
+      const steps = 80;
+
+      // Dark contour pass.
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const x = pointX(t);
+        const y = pointY(t);
+        const dx = tangentX(t);
+        const dy = tangentY(t);
+        const length = Math.sqrt(dx * dx + dy * dy) || 1;
+        const nx = -dy / length;
+        const ny = dx / length;
+        const halfWidth = halfWidthAt(t) + 1.05;
+        const maxOffset = Math.ceil(halfWidth);
+        for (let offset = -maxOffset; offset <= maxOffset; offset++) {
+          if (Math.abs(offset) <= halfWidth) {
+            setPixel(x + nx * offset, y + ny * offset, frondOutline);
+          }
+        }
+      }
+
+      // Volumetric leaf surface: sunlit edge, deep green body and a darker
+      // lower rim, so the fan reads as a 2.5D crown instead of a flat shape.
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const x = pointX(t);
+        const y = pointY(t);
+        const dx = tangentX(t);
+        const dy = tangentY(t);
+        const length = Math.sqrt(dx * dx + dy * dy) || 1;
+        const nx = -dy / length;
+        const ny = dx / length;
+        const halfWidth = halfWidthAt(t);
+        const maxOffset = Math.ceil(halfWidth);
+        for (let offset = -maxOffset; offset <= maxOffset; offset++) {
+          if (Math.abs(offset) > halfWidth) continue;
+          const side = halfWidth < 0.001 ? 0 : offset / halfWidth;
+          const lit = litFromLeft ? side <= 0.05 : side >= -0.05;
+          let color = tone === 1 ? frondMid : frondDark;
+          if (lit) color = tone === 2 ? frondGlint : frondLight;
+          if (Math.abs(side) > 0.74) color = frondDark;
+          setPixel(x + nx * offset, y + ny * offset, color);
+        }
+        if (i % 6 === 0) {
+          setPixel(x, y, t > 0.55 ? frondGlint : frondLight);
+        }
+      }
+      setPixel(tipX, tipY, frondGlint);
+    };
+
+    // Back half of the fan is painted first so the trunk overlaps its base.
+    drawFrond(24, 24.5, 10, 20, 1, 17, 0, true);
+    drawFrond(24, 24, 12, 11, 6, 4, 1, true);
+    drawFrond(24, 23.5, 18, 7, 15, 0, 2, true);
+    drawFrond(24, 23.5, 24, 5, 24, 0, 1, true);
+    drawFrond(24, 23.5, 30, 7, 33, 0, 2, false);
+    drawFrond(24, 24, 36, 11, 42, 4, 1, false);
+    drawFrond(24, 24.5, 38, 20, 47, 17, 0, false);
+
+    const trunkOutline = '#15120e';
+    const trunkLight = '#c4b69c';
+    const trunkBody = '#a99c84';
+    const trunkMid = '#8a7e68';
+    const trunkShade = '#665c4b';
+    const trunkRing = '#3e362b';
+
+    for (let y = 23; y <= 61; y++) {
+      const t = (y - 23) / 38;
+      const flare = y >= 57 ? (y - 56) * 0.85 : 0;
+      const halfWidth = 2.05 + t * 1.05 + flare;
+
+      for (
+        let x = Math.floor(24 - halfWidth - 1);
+        x <= Math.ceil(24 + halfWidth + 1);
+        x++
+      ) {
+        setPixel(x, y, trunkOutline);
+      }
+      for (let x = Math.floor(24 - halfWidth); x <= Math.ceil(24 + halfWidth); x++) {
+        const relative = (x - 24) / halfWidth;
+        let color = trunkBody;
+        if (relative < -0.35) color = trunkLight;
+        else if (relative > 0.55) color = trunkShade;
+        else if (relative > 0.15) color = trunkMid;
+        setPixel(x, y, color);
+      }
+
+      // Sharp, well-spaced rings give the slender trunk its buriti texture.
+      if (y % 3 === 0) {
+        for (let x = Math.ceil(24 - halfWidth); x <= Math.floor(24 + halfWidth); x++) {
+          setPixel(x, y, trunkRing);
+        }
+      } else if (y % 3 === 1) {
+        setPixel(24 - halfWidth + 0.6, y, '#e2d6bd');
+      }
+    }
+
+    // Compact crown knob where the fronds and fruit stems meet the trunk.
+    fillEllipse(24, 24, 3.6, 2.4, trunkOutline);
+    fillEllipse(24, 23.8, 2.7, 1.6, trunkBody);
+    fillEllipse(23, 23.3, 1.2, 0.7, trunkLight);
+
+    // Front fronds drape over the trunk to add depth to the fan.
+    drawFrond(24, 25.5, 34, 27, 46, 31, 0, false);
+    drawFrond(24, 25.5, 14, 27, 2, 31, 1, true);
+    drawFrond(24, 26, 17, 31, 8, 38, 2, true);
+    drawFrond(24, 26, 31, 31, 40, 38, 2, false);
+
+    const fruitOutline = '#1a0a05';
+    const fruitBody = '#c2410c';
+    const fruitLight = '#f97316';
+    const fruitGlint = '#fbbf24';
+    const fruitShade = '#7f1d12';
+    const fruitStem = '#3a2412';
+
+    const drawFruit = (
+      cx: number,
+      cy: number,
+      rx: number,
+      ry: number,
+      stemX: number,
+      stemY: number
+    ): void => {
+      drawLine(cx, cy - ry, stemX, stemY, fruitStem);
+      fillEllipse(cx, cy, rx + 0.7, ry + 0.7, fruitOutline);
+      fillEllipse(cx, cy, rx, ry, fruitBody);
+      fillEllipse(cx - rx * 0.28, cy - ry * 0.32, rx * 0.55, ry * 0.46, fruitLight);
+      fillEllipse(cx + rx * 0.34, cy + ry * 0.36, rx * 0.42, ry * 0.38, fruitShade);
+
+      // Scaly diamond texture from the reference art.
+      setPixel(cx - rx * 0.18, cy + ry * 0.05, '#9a3412');
+      setPixel(cx + rx * 0.25, cy - ry * 0.05, fruitGlint);
+      setPixel(cx - rx * 0.1, cy - ry * 0.45, fruitGlint);
+      setPixel(cx + rx * 0.42, cy + ry * 0.12, '#5c160d');
+    };
+
+    // Heavy central bunch, exactly like the reference, with two smaller
+    // bunches tucked behind the left and right fronds.
+    drawFruit(21.5, 32.5, 2.5, 3.0, 23.5, 26);
+    drawFruit(26.2, 33.0, 2.6, 3.1, 24.5, 26);
+    drawFruit(23.6, 37.2, 2.8, 3.3, 24, 27);
+    drawFruit(28.4, 37.6, 2.5, 3.0, 26, 27);
+    drawFruit(20.2, 37.8, 2.4, 2.9, 22, 27);
+    drawFruit(24.5, 42.0, 2.5, 3.0, 24, 32);
+
+    drawFruit(15.6, 29.6, 2.1, 2.5, 18.5, 25);
+    drawFruit(18.4, 31.5, 2.2, 2.6, 19.5, 25.5);
+    drawFruit(16.8, 34.0, 2.1, 2.5, 19, 27);
+
+    drawFruit(33.4, 29.2, 2.0, 2.4, 31, 25);
+    drawFruit(36.0, 30.6, 2.1, 2.5, 32, 25.5);
+    drawFruit(34.8, 33.4, 2.0, 2.4, 32.5, 27);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    ctx.imageSmoothingEnabled = false;
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const color = pixels[y * width + x];
+        if (!color) continue;
+        ctx.fillStyle = color;
+        ctx.fillRect(x, y, 1, 1);
+      }
+    }
+
+    this.buritiPixelSprite = canvas;
+    return canvas;
+  }
+
+  /**
    * Draws the Cupuaçu minimap marker: a compact 16x16 pixel-art capsule that
    * follows the reference fruit — velvety brown oval, thin dark outline and a
    * small lighter highlight on the upper-left skin. It is painted with
@@ -4452,11 +4731,13 @@ export class WorldSystem {
         tree.kind === 'cupuacu' ? this.getCupuacuPixelSprite() : null;
       const castanhaSprite =
         tree.kind === 'castanha' ? this.getCastanhaPixelSprite() : null;
+      const buritiSprite =
+        tree.kind === 'buriti' ? this.getBuritiPixelSprite() : null;
 
       ctx.save();
       ctx.translate(screen.x, screen.y);
 
-      if (!acaiSprite && !cupuacuSprite && !castanhaSprite) {
+      if (!acaiSprite && !cupuacuSprite && !castanhaSprite && !buritiSprite) {
         // Shared ground shadow for the procedurally drawn trees.
         ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
         ctx.beginPath();
@@ -4511,6 +4792,20 @@ export class WorldSystem {
           spriteHeight
         );
         ctx.restore();
+      } else if (buritiSprite) {
+        // Nearest-neighbour upscale keeps the hand-placed pixel-art grid crisp.
+        const spriteWidth = BURITI_SPRITE_WIDTH * BURITI_SPRITE_SCALE;
+        const spriteHeight = BURITI_SPRITE_HEIGHT * BURITI_SPRITE_SCALE;
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(
+          buritiSprite,
+          -spriteWidth / 2,
+          -spriteHeight,
+          spriteWidth,
+          spriteHeight
+        );
+        ctx.restore();
       } else if (tree.kind === 'castanha') {
         // Castanheira-do-Brasil: tall trunk, high canopy and spiky seed pods.
         ctx.fillStyle = '#5b3a1e';
@@ -4548,55 +4843,6 @@ export class WorldSystem {
           ctx.closePath();
           ctx.fill();
         }
-      } else if (tree.kind === 'buriti') {
-        // Buritizeiro: tall palm with a fan crown and orange fruit clusters.
-        const topX = sway * 0.5;
-        const topY = -96;
-
-        ctx.strokeStyle = '#6b4423';
-        ctx.lineWidth = 8;
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.quadraticCurveTo(4, -52, topX, topY);
-        ctx.stroke();
-        ctx.lineCap = 'butt';
-
-        for (let f = 0; f < 10; f++) {
-          const angle = -Math.PI + (f / 9) * Math.PI;
-          const length = 34 + (f % 3) * 6;
-          ctx.strokeStyle = f % 2 === 0 ? '#15803d' : '#166534';
-          ctx.lineWidth = 3.5;
-          ctx.beginPath();
-          ctx.moveTo(topX, topY);
-          ctx.quadraticCurveTo(
-            topX + Math.cos(angle) * length * 0.55,
-            topY + Math.sin(angle) * length * 0.55 - 5,
-            topX + Math.cos(angle) * length,
-            topY + Math.sin(angle) * length * 0.7
-          );
-          ctx.stroke();
-        }
-
-        // Hanging bunches of reddish buriti fruit.
-        ctx.fillStyle = '#c2410c';
-        for (let b = 0; b < 10; b++) {
-          const angle = (b / 10) * Math.PI * 2;
-          const radius = 8 + (b % 3) * 3;
-          ctx.beginPath();
-          ctx.arc(
-            topX + Math.cos(angle) * radius,
-            topY + 14 + Math.sin(angle) * radius * 0.6,
-            3,
-            0,
-            Math.PI * 2
-          );
-          ctx.fill();
-        }
-        ctx.fillStyle = '#f97316';
-        ctx.beginPath();
-        ctx.arc(topX - 4, topY + 11, 1.8, 0, Math.PI * 2);
-        ctx.fill();
       } else if (tree.kind === 'pupunha') {
         // Pupunheira: slim ringed palm with long fronds and red fruit bunches.
         const topX = -sway * 0.4;
