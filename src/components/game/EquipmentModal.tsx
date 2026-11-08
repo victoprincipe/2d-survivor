@@ -23,6 +23,19 @@ const SLOT_POSITIONS: { slot: EquipmentSlot; left: string; top: string }[] = [
   { slot: 'gloves', left: '62.7%', top: '38%' },
 ];
 
+// Inner artwork only: preserve the color of the golden frames and the forest.
+// Accessories without an equipment slot yet remain empty and gray.
+const ITEM_ARTWORK: { slot?: EquipmentSlot; left: number; top: number }[] = [
+  { slot: 'helmet', left: 18.5, top: 24.3 },
+  { slot: 'armor', left: 18.5, top: 39.1 },
+  { slot: 'weapon', left: 18.5, top: 53.5 },
+  { slot: 'boots', left: 18.5, top: 68 },
+  { left: 64.7, top: 24.3 },
+  { slot: 'gloves', left: 64.7, top: 39.1 },
+  { left: 64.7, top: 53.5 },
+  { left: 64.7, top: 68 },
+];
+
 export function EquipmentModal({ character, savedData, onUpdateSave, onClose }: Props) {
   const [showItems, setShowItems] = useState(false);
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
@@ -77,6 +90,17 @@ export function EquipmentModal({ character, savedData, onUpdateSave, onClose }: 
         </button>
         <Image src="/images/ui/equipment-panel-no-close.png" alt="Painel de equipamento com moldura de madeira e ouro na floresta"
           width={1024} height={1536} priority unoptimized draggable={false} className="block h-auto w-full" />
+        {ITEM_ARTWORK.map(({ slot, left, top }, index) => {
+          const equipped = slot && inventory.items.some((item) => item.id === inventory.equipped[slot] && item.slot === slot);
+          if (equipped) return null;
+          return <div key={index} aria-hidden="true" className="pointer-events-none absolute inset-0"
+            style={{
+              backgroundImage: 'url("/images/ui/equipment-panel-no-close.png")',
+              backgroundSize: '100% 100%',
+              filter: 'grayscale(1)',
+              clipPath: `inset(${top}% ${100 - left - 17.5}% ${100 - top - 11.2}% ${left}%)`,
+            }} />;
+        })}
         <p className="absolute left-[26%] top-[9%] w-[48%] truncate text-center text-[clamp(10px,2dvh,18px)] font-bold text-amber-100 drop-shadow-lg">
           {character.name}
         </p>
