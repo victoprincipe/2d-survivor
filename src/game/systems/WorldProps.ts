@@ -35,6 +35,15 @@ const CUPUACU_SPRITE_WIDTH = 48;
 const CUPUACU_SPRITE_HEIGHT = 56;
 const CUPUACU_SPRITE_SCALE = 2;
 
+// The castanheira-do-Brasil is the tallest hand-crafted fruit tree: a 64x92
+// pixel-art sprite with buttress roots, a thick grey barked trunk, a broad
+// rounded canopy and large round seed pods. It is rasterized once into an
+// offscreen canvas and then upscaled with nearest-neighbour so every pixel
+// stays crisp at any zoom.
+const CASTANHA_SPRITE_WIDTH = 64;
+const CASTANHA_SPRITE_HEIGHT = 92;
+const CASTANHA_SPRITE_SCALE = 2;
+
 // Fruit tree minimap markers: hand-drawn 16x16 pixel-art icons, rasterized
 // once into offscreen canvases and blitted at 16x16 with smoothing disabled
 // so every pixel of the art is preserved.
@@ -243,6 +252,7 @@ export class WorldSystem {
   private waterShimmerPattern: CanvasPattern | null = null;
   private acaiPixelSprite: HTMLCanvasElement | null = null;
   private cupuacuPixelSprite: HTMLCanvasElement | null = null;
+  private castanhaPixelSprite: HTMLCanvasElement | null = null;
   private acaiMinimapIcon: HTMLCanvasElement | null = null;
   private fruitMinimapIcons: Partial<Record<FruitTreeKind, HTMLCanvasElement>> = {};
   private waterAnimTimer: number = 0;
@@ -427,7 +437,7 @@ export class WorldSystem {
     let offset: number;
     switch (tree.kind) {
       case 'castanha':
-        offset = -158;
+        offset = -196;
         break;
       case 'buriti':
         offset = -142;
@@ -2110,6 +2120,407 @@ export class WorldSystem {
     }
 
     this.cupuacuPixelSprite = canvas;
+    return canvas;
+  }
+
+  /**
+   * Builds (once) the Castanheira-do-Brasil sprite. The 64x92 pixel-art canvas
+   * follows the reference: dark contour, wide buttress roots over a broad oval
+   * shadow, a thick grey barked trunk that forks high into a volumetric round
+   * canopy, and large round seed pods hanging from the branches.
+   */
+  private getCastanhaPixelSprite(): HTMLCanvasElement | null {
+    if (this.castanhaPixelSprite) return this.castanhaPixelSprite;
+    if (typeof document === 'undefined') return null;
+
+    const width = CASTANHA_SPRITE_WIDTH;
+    const height = CASTANHA_SPRITE_HEIGHT;
+    const pixels: (string | null)[] = new Array(width * height).fill(null);
+
+    const hash = (x: number, y: number): number => {
+      const value = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+      return value - Math.floor(value);
+    };
+
+    const setPixel = (x: number, y: number, color: string): void => {
+      const px = Math.round(x);
+      const py = Math.round(y);
+      if (px < 0 || px >= width || py < 0 || py >= height) return;
+      pixels[py * width + px] = color;
+    };
+
+    const fillEllipse = (
+      cx: number,
+      cy: number,
+      rx: number,
+      ry: number,
+      color: string
+    ): void => {
+      const minX = Math.floor(cx - rx);
+      const maxX = Math.ceil(cx + rx);
+      const minY = Math.floor(cy - ry);
+      const maxY = Math.ceil(cy + ry);
+      for (let y = minY; y <= maxY; y++) {
+        for (let x = minX; x <= maxX; x++) {
+          const dx = (x - cx) / rx;
+          const dy = (y - cy) / ry;
+          if (dx * dx + dy * dy <= 1.05) setPixel(x, y, color);
+        }
+      }
+    };
+
+    const fillCircle = (cx: number, cy: number, radius: number, color: string): void => {
+      fillEllipse(cx, cy, radius, radius, color);
+    };
+
+    const drawLine = (
+      x0: number,
+      y0: number,
+      x1: number,
+      y1: number,
+      color: string
+    ): void => {
+      const steps = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+      for (let i = 0; i <= steps; i++) {
+        const t = steps === 0 ? 0 : i / steps;
+        setPixel(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, color);
+      }
+    };
+
+    const drawBranch = (
+      x0: number,
+      y0: number,
+      x1: number,
+      y1: number,
+      startRadius: number,
+      endRadius: number,
+      color: string
+    ): void => {
+      const steps = Math.max(2, Math.ceil(Math.hypot(x1 - x0, y1 - y0) * 2));
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        fillCircle(
+          x0 + (x1 - x0) * t,
+          y0 + (y1 - y0) * t,
+          startRadius + (endRadius - startRadius) * t,
+          color
+        );
+      }
+    };
+
+    const trunkOutline = '#241a10';
+    const trunkLight = '#aa9a76';
+    const trunkBody = '#8e7f5f';
+    const trunkMid = '#76684b';
+    const trunkShade = '#5a4d34';
+    const trunkDark = '#3e3322';
+    const barkLine = '#4b402b';
+
+    // Wide, dark oval shadow centred under the buttress roots.
+    fillEllipse(32, 87.5, 27.5, 4.4, 'rgba(4, 10, 6, 0.62)');
+    fillEllipse(32, 87.6, 21, 3.1, 'rgba(3, 7, 4, 0.45)');
+
+    // Thick grey trunk, slightly flared at the base.
+    for (let y = 38; y <= 87; y++) {
+      const t = (y - 38) / 49;
+      const flare = y >= 80 ? (y - 79) * 0.8 : 0;
+      const halfWidth = 4.8 + t * 1.9 + flare;
+
+      for (
+        let x = Math.floor(32 - halfWidth - 1.2);
+        x <= Math.ceil(32 + halfWidth + 1.2);
+        x++
+      ) {
+        setPixel(x, y, trunkOutline);
+      }
+      for (let x = Math.floor(32 - halfWidth); x <= Math.ceil(32 + halfWidth); x++) {
+        const relative = (x - 32) / halfWidth;
+        let color: string;
+        if (relative < -0.45) color = trunkLight;
+        else if (relative < 0.05) color = trunkBody;
+        else if (relative < 0.55) color = trunkMid;
+        else color = trunkShade;
+        setPixel(x, y, color);
+      }
+    }
+
+    // Wavy bark grooves and small knots break up the flat trunk.
+    const barkLines: [number, number, number, number][] = [
+      [29, 45, 85, 1.2],
+      [31.5, 42, 86, -1.1],
+      [34, 48, 84, 1.3],
+      [27, 60, 84, 0.8],
+      [37, 58, 84, -0.7],
+    ];
+    for (let i = 0; i < barkLines.length; i++) {
+      const baseX = barkLines[i][0];
+      const startY = barkLines[i][1];
+      const endY = barkLines[i][2];
+      const wobble = barkLines[i][3];
+      for (let y = startY; y <= endY; y++) {
+        if (hash(baseX, y) < 0.28) continue;
+        setPixel(baseX + Math.sin(y * 0.32) * wobble, y, barkLine);
+      }
+    }
+    for (let i = 0; i < 18; i++) {
+      const y = 45 + i * 2.4;
+      const x = 27 + hash(3, i) * 9;
+      setPixel(x, y, i % 2 === 0 ? trunkLight : trunkDark);
+    }
+    fillEllipse(29.5, 57, 1.5, 2.2, trunkDark);
+    fillEllipse(29.8, 56.5, 0.8, 1.1, trunkLight);
+    fillEllipse(35, 71, 1.3, 1.8, trunkDark);
+    setPixel(34.7, 70.4, trunkLight);
+
+    // Buttress roots crawling out over the shadow.
+    const roots: [number, number, number, number, number][] = [
+      [29, 82, 16, 89, 2.4],
+      [35, 82, 48, 89, 2.4],
+      [28, 85, 22, 91, 1.9],
+      [36, 85, 42, 91, 1.9],
+      [31, 86, 32, 91.5, 1.5],
+      [26, 84, 19, 89.5, 1.6],
+      [38, 84, 45, 89.5, 1.6],
+    ];
+    for (let i = 0; i < roots.length; i++) {
+      const root = roots[i];
+      drawBranch(root[0], root[1], root[2], root[3], root[4] + 0.8, 0.8, trunkOutline);
+    }
+    for (let i = 0; i < roots.length; i++) {
+      const root = roots[i];
+      drawBranch(root[0], root[1], root[2], root[3], root[4], 0.3, trunkBody);
+      setPixel(root[0] - 0.4, root[1] + 0.6, trunkLight);
+    }
+
+    // Rounded canopy silhouette assembled from overlapping pixel blobs.
+    const canopyOutline = '#06180c';
+    const canopyPalette = ['#0b2c17', '#1c5b2e', '#2b7a3d', '#47a052', '#6cc46a'];
+    const canopyBlobs: [number, number, number, number][] = [
+      [32, 16, 25, 13],
+      [14, 20, 12, 11],
+      [50, 20, 12, 11],
+      [9, 29, 8, 8],
+      [55, 29, 8, 8],
+      [20, 31, 11, 9],
+      [44, 31, 11, 9],
+      [32, 28, 17, 10],
+      [15, 12, 10, 8],
+      [49, 12, 10, 8],
+      [32, 9, 17, 8],
+      [25, 38, 8, 6],
+      [39, 38, 8, 6],
+    ];
+    const canopyMask = new Uint8Array(width * height);
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        for (let b = 0; b < canopyBlobs.length; b++) {
+          const cx = canopyBlobs[b][0];
+          const cy = canopyBlobs[b][1];
+          const rx = canopyBlobs[b][2];
+          const ry = canopyBlobs[b][3];
+          const dx = (x - cx) / rx;
+          const dy = (y - cy) / ry;
+          if (dx * dx + dy * dy <= 1.02) {
+            canopyMask[y * width + x] = 1;
+            break;
+          }
+        }
+      }
+    }
+
+    // One-pixel dark contour around the whole crown.
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        if (canopyMask[y * width + x]) continue;
+        let nearCrown = false;
+        for (let oy = -1; oy <= 1 && !nearCrown; oy++) {
+          for (let ox = -1; ox <= 1; ox++) {
+            if (ox === 0 && oy === 0) continue;
+            const nx = x + ox;
+            const ny = y + oy;
+            if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
+            if (canopyMask[ny * width + nx]) {
+              nearCrown = true;
+              break;
+            }
+          }
+        }
+        if (nearCrown) setPixel(x, y, canopyOutline);
+      }
+    }
+
+    // Volume: sunlit upper-left greens fading to deep shade on the lower right.
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        if (!canopyMask[y * width + x]) continue;
+        const nx = (x - 32) / 30;
+        const ny = (y - 20) / 22;
+        const lighting = -(nx * 0.5 + ny * 0.95);
+        const noise = hash(x, y);
+        let level: number;
+        if (lighting > 0.55) level = 4;
+        else if (lighting > 0.24) level = 3;
+        else if (lighting > -0.08) level = 2;
+        else if (lighting > -0.48) level = 1;
+        else level = 0;
+        if (noise > 0.9) level = Math.min(4, level + 1);
+        else if (noise < 0.1) level = Math.max(0, level - 1);
+        setPixel(x, y, canopyPalette[level]);
+      }
+    }
+
+    // Overlapping leaf clumps give the crown the fluffy pixel-art texture.
+    const canopyClumps: [number, number, number, number, number][] = [
+      [12, 18, 5, 3, 2],
+      [18, 10, 5, 3, 3],
+      [26, 7, 5, 3, 3],
+      [35, 8, 5, 3, 2],
+      [45, 10, 5, 3, 3],
+      [54, 15, 4, 3, 2],
+      [9, 29, 4, 3, 1],
+      [17, 24, 5, 3, 2],
+      [27, 19, 5, 3, 3],
+      [37, 18, 5, 3, 2],
+      [47, 23, 5, 3, 3],
+      [56, 29, 4, 3, 1],
+      [13, 34, 4, 3, 1],
+      [23, 32, 5, 3, 2],
+      [33, 30, 5, 3, 3],
+      [43, 33, 5, 3, 1],
+      [51, 36, 4, 3, 2],
+      [21, 39, 4, 2, 1],
+      [31, 38, 4, 2, 2],
+      [41, 40, 4, 2, 1],
+      [6, 22, 3, 3, 1],
+      [48, 6, 4, 3, 3],
+    ];
+    for (let i = 0; i < canopyClumps.length; i++) {
+      const cx = canopyClumps[i][0];
+      const cy = canopyClumps[i][1];
+      const rx = canopyClumps[i][2];
+      const ry = canopyClumps[i][3];
+      const color = canopyPalette[canopyClumps[i][4]];
+      const minX = Math.floor(cx - rx);
+      const maxX = Math.ceil(cx + rx);
+      const minY = Math.floor(cy - ry);
+      const maxY = Math.ceil(cy + ry);
+      for (let y = minY; y <= maxY; y++) {
+        for (let x = minX; x <= maxX; x++) {
+          if (!canopyMask[y * width + x]) continue;
+          const dx = (x - cx) / rx;
+          const dy = (y - cy) / ry;
+          if (dx * dx + dy * dy <= 1) setPixel(x, y, color);
+        }
+      }
+    }
+    // Tiny bright leaf glints on the sunlit side.
+    for (let i = 0; i < 24; i++) {
+      const x = Math.round(6 + hash(i, 4) * 50);
+      const y = Math.round(5 + hash(i, 5) * 36);
+      if (canopyMask[y * width + x]) setPixel(x, y, canopyPalette[4]);
+    }
+
+    // Branches fork out of the trunk and stay visible over the lower crown.
+    const branches: [number, number, number, number, number][] = [
+      [32, 46, 16, 31, 2.8],
+      [32, 46, 47, 30, 2.8],
+      [30, 45, 12, 41, 2.0],
+      [34, 45, 52, 42, 2.0],
+      [32, 44, 31, 32, 1.8],
+    ];
+    for (let i = 0; i < branches.length; i++) {
+      const branch = branches[i];
+      drawBranch(
+        branch[0],
+        branch[1],
+        branch[2],
+        branch[3],
+        branch[4] + 0.8,
+        1.0,
+        trunkOutline
+      );
+    }
+    for (let i = 0; i < branches.length; i++) {
+      const branch = branches[i];
+      drawBranch(branch[0], branch[1], branch[2], branch[3], branch[4], 0.4, trunkBody);
+      setPixel(branch[0] - 0.6, branch[1] - 3, trunkLight);
+    }
+
+    // Large round seed pods hanging below the crown.
+    const podOutline = '#1b0e06';
+    const podBody = '#7a4a28';
+    const podLight = '#a56d3f';
+    const podShade = '#4c2a14';
+    const podCap = '#3a2210';
+    const podStem = '#3a2412';
+
+    const drawPod = (
+      cx: number,
+      cy: number,
+      rx: number,
+      ry: number,
+      stemX: number,
+      stemY: number
+    ): void => {
+      drawLine(cx, cy - ry, stemX, stemY, podStem);
+      fillEllipse(cx, cy, rx + 0.8, ry + 0.8, podOutline);
+      fillEllipse(cx, cy, rx, ry, podBody);
+      fillEllipse(cx - rx * 0.3, cy - ry * 0.3, rx * 0.55, ry * 0.5, podLight);
+      fillEllipse(cx + rx * 0.45, cy + ry * 0.3, rx * 0.42, ry * 0.45, podShade);
+      fillEllipse(cx, cy - ry * 0.8, rx * 0.6, ry * 0.25, podCap);
+      drawLine(cx + rx * 0.15, cy - ry * 0.55, cx + rx * 0.15, cy + ry * 0.65, podShade);
+      setPixel(cx - rx * 0.5, cy - ry * 0.35, '#c08a58');
+      setPixel(cx - rx * 0.3, cy - ry * 0.55, '#c08a58');
+    };
+
+    const drawOpenPod = (
+      cx: number,
+      cy: number,
+      rx: number,
+      ry: number,
+      stemX: number,
+      stemY: number
+    ): void => {
+      drawLine(cx, cy - ry, stemX, stemY, podStem);
+      fillEllipse(cx, cy, rx + 0.9, ry + 0.9, podOutline);
+      fillEllipse(cx, cy, rx, ry, podBody);
+      fillEllipse(cx + rx * 0.35, cy + ry * 0.2, rx * 0.5, ry * 0.55, podShade);
+      // Cracked opening: dark rim around a pale woody interior.
+      fillEllipse(cx, cy + 0.2, rx * 0.72, ry * 0.68, podOutline);
+      fillEllipse(cx, cy + 0.2, rx * 0.6, ry * 0.56, '#c9a06a');
+      fillEllipse(cx - rx * 0.1, cy + 0.6, rx * 0.42, ry * 0.34, '#e0c08c');
+      // Brazil nuts nested inside the open shell.
+      fillEllipse(cx - rx * 0.24, cy + ry * 0.12, rx * 0.15, ry * 0.2, podShade);
+      fillEllipse(cx + rx * 0.18, cy + ry * 0.2, rx * 0.15, ry * 0.2, podShade);
+      setPixel(cx - rx * 0.45, cy - ry * 0.1, '#d6b07a');
+      fillEllipse(cx + rx * 0.55, cy - ry * 0.35, rx * 0.35, ry * 0.45, podLight);
+    };
+
+    drawPod(18, 27, 4.2, 4.7, 20, 20);
+    drawPod(9, 41, 3.4, 4.1, 12, 34);
+    drawPod(23, 54, 5.8, 6.4, 26, 44);
+    drawPod(36, 29, 3.6, 4.1, 35, 23);
+    drawPod(44, 49, 5.0, 5.8, 43, 39);
+    drawPod(52, 54, 5.4, 6.1, 49, 43);
+    drawOpenPod(40, 68, 4.8, 5.4, 39, 59);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    ctx.imageSmoothingEnabled = false;
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const color = pixels[y * width + x];
+        if (!color) continue;
+        ctx.fillStyle = color;
+        ctx.fillRect(x, y, 1, 1);
+      }
+    }
+
+    this.castanhaPixelSprite = canvas;
     return canvas;
   }
 
@@ -4031,18 +4442,20 @@ export class WorldSystem {
     for (let i = 0; i < this.fruitTrees.length; i++) {
       const tree = this.fruitTrees[i];
       if (!tree.active) continue;
-      if (!camera.isInView(tree.x, tree.y, 140)) continue;
+      if (!camera.isInView(tree.x, tree.y, tree.kind === 'castanha' ? 210 : 140)) continue;
 
       const screen = camera.worldToScreen(tree.x, tree.y);
       const sway = Math.sin(tree.animTimer) * 2;
       const acaiSprite = tree.kind === 'acai' ? this.getAcaiPixelSprite() : null;
       const cupuacuSprite =
         tree.kind === 'cupuacu' ? this.getCupuacuPixelSprite() : null;
+      const castanhaSprite =
+        tree.kind === 'castanha' ? this.getCastanhaPixelSprite() : null;
 
       ctx.save();
       ctx.translate(screen.x, screen.y);
 
-      if (!acaiSprite && !cupuacuSprite) {
+      if (!acaiSprite && !cupuacuSprite && !castanhaSprite) {
         // Shared ground shadow for the procedurally drawn trees.
         ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
         ctx.beginPath();
@@ -4077,6 +4490,20 @@ export class WorldSystem {
         ctx.imageSmoothingEnabled = false;
         ctx.drawImage(
           cupuacuSprite,
+          -spriteWidth / 2,
+          -spriteHeight,
+          spriteWidth,
+          spriteHeight
+        );
+        ctx.restore();
+      } else if (castanhaSprite) {
+        // Nearest-neighbour upscale keeps the crafted pixel-art grid crisp.
+        const spriteWidth = CASTANHA_SPRITE_WIDTH * CASTANHA_SPRITE_SCALE;
+        const spriteHeight = CASTANHA_SPRITE_HEIGHT * CASTANHA_SPRITE_SCALE;
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(
+          castanhaSprite,
           -spriteWidth / 2,
           -spriteHeight,
           spriteWidth,
