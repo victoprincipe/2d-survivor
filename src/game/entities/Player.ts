@@ -39,7 +39,8 @@ export type PlayerCollisionResolver = (
   fromY: number,
   dx: number,
   dy: number,
-  radius: number
+  radius: number,
+  airborne?: boolean
 ) => { x: number; y: number };
 
 export type PermanentPowerUps = {
@@ -333,7 +334,14 @@ export class Player {
 
     if (moveX !== 0 || moveY !== 0) {
       if (this.collisionResolver) {
-        const resolved = this.collisionResolver(this.x, this.y, moveX, moveY, this.radius);
+        const resolved = this.collisionResolver(
+          this.x,
+          this.y,
+          moveX,
+          moveY,
+          this.radius,
+          this.isJumping
+        );
         this.x = resolved.x;
         this.y = resolved.y;
       } else {

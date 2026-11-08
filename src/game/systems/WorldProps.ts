@@ -182,6 +182,22 @@ interface RockProp {
   rotation: number;
 }
 
+// Elevated plateaus in the middle of the forest. The ellipse is the walkable
+// hilltop and its rim is an impassable earth/stone wall, except for the single
+// dirt ramp described by rampAngle/rampHalfWidth/rampLength.
+interface PlateauProp {
+  x: number;
+  y: number;
+  rx: number;
+  ry: number;
+  rampAngle: number;
+  rampHalfWidth: number;
+  rampLength: number;
+}
+
+const PLATEAU_RIM_WIDTH = 22;
+const PLATEAU_RAMP_INSET = 120;
+
 export class WorldSystem {
   public torches: TorchProp[] = [];
   private nextTorchId: number = 1;
@@ -204,6 +220,7 @@ export class WorldSystem {
   private groundTufts: GroundTuftProp[] = [];
   private beachStones: BeachStoneProp[] = [];
   private beachBranches: BeachBranchProp[] = [];
+  private plateaus: PlateauProp[] = [];
 
   private floorImage: HTMLImageElement | null = null;
   private floorPattern: CanvasPattern | null = null;
@@ -219,6 +236,7 @@ export class WorldSystem {
     this.mapId = mapId;
     if (mapId === 'amazon_forest') {
       this.worldHalfSize = FOREST_HALF_SIZE;
+      this.generatePlateaus();
       this.generateForest();
       this.spawnInitialFruitTrees();
     }
@@ -258,6 +276,7 @@ export class WorldSystem {
       const y = (Math.random() * 2 - 1) * limit;
 
       if (this.isInWater(x, y)) continue;
+      if (this.isOverPlateau(x, y, 70) || this.isOnPlateauRamp(x, y, 70)) continue;
       if (this.collidesWithTree(x, y, 70)) continue;
 
       let overlapsFruitTree = false;
@@ -280,7 +299,9 @@ export class WorldSystem {
     for (let attempt = 0; attempt < 200; attempt++) {
       const x = (Math.random() * 2 - 1) * limit;
       const y = (Math.random() * 2 - 1) * limit;
-      if (this.isInWater(x, y) || this.collidesWithTree(x, y, 70)) continue;
+      if (this.isInWater(x, y)) continue;
+      if (this.isOverPlateau(x, y, 70) || this.isOnPlateauRamp(x, y, 70)) continue;
+      if (this.collidesWithTree(x, y, 70)) continue;
       return { x, y };
     }
 
@@ -411,6 +432,127 @@ export class WorldSystem {
         break;
     }
     return offset + Math.sin(tree.animTimer * 2.2) * 2;
+  }
+
+  private generatePlateaus(): void {
+    // Three hand-placed hills around the centre of the map. Each one has a
+    // single dirt ramp at a different side, so the player and the animals must
+    // walk around the rim and climb through that opening.
+    this.plateaus = [
+      {
+        x: -2200,
+        y: 1900,
+        rx: 860,
+        ry: 640,
+        rampAngle: 0.18,
+        rampHalfWidth: 122,
+        rampLength: 520,
+      },
+      {
+        x: 2100,
+        y: -1900,
+        rx: 800,
+        ry: 600,
+        rampAngle: Math.PI - 0.22,
+        rampHalfWidth: 112,
+        rampLength: 470,
+      },
+      {
+        x: 300,
+        y: 2900,
+        rx: 820,
+        ry: 640,
+        rampAngle: Math.PI / 2 + 0.2,
+        rampHalfWidth: 118,
+        rampLength: 500,
+      },
+    ];
+  }
+
+  /** Distance from the plateau centre to its ellipse rim along a direction. */
+  private getPlateauBoundaryRadius(plateau: PlateauProp, dirX: number, dirY: number): number {
+    const nx = dirX / plateau.rx;
+    const ny = dirY / plateau.ry;
+    return 1 / Math.sqrt(nx * nx + ny * ny);
+  }
+
+  private isInsidePlateauTop(plateau: PlateauProp, x: number, y: number): boolean {
+    const nx = (x - plateau.x) / plateau.rx;
+    const ny = (y - plateau.y) / plateau.ry;
+    return nx * nx + ny * ny <= 1;
+  }
+
+  /** True when (x, y) lies anywhere on the hilltop, dilated by padding. */
+  private isOverPlateau(x: number, y: number, padding: number = 0): boolean {
+    for (let i = 0; i < this.plateaus.length; i++) {
+      const plateau = this.plateaus[i];
+      const nx = (x - plateau.x) / (plateau.rx + padding);
+      const ny = (y - plateau.y) / (plateau.ry + padding);
+      if (nx * nx + ny * ny <= 1) return true;
+    }
+    return false;
+  }
+
+  /** True when (x, y) is inside the cut of the plateau's dirt ramp. */
+  private isInsidePlateauRamp(
+    plateau: PlateauProp,
+    x: number,
+    y: number,
+    padding: number = 0
+  ): boolean {
+    const dirX = Math.cos(plateau.rampAngle);
+    const dirY = Math.sin(plateau.rampAngle);
+    const relX = x - plateau.x;
+    const relY = y - plateau.y;
+    const along = relX * dirX + relY * dirY;
+    const lateral = -relX * dirY + relY * dirX;
+    const boundary = this.getPlateauBoundaryRadius(plateau, dirX, dirY);
+    const inner = boundary - PLATEAU_RAMP_INSET;
+    const outer = boundary + plateau.rampLength;
+    return (
+      along >= inner &&
+      along <= outer &&
+      Math.abs(lateral) <= plateau.rampHalfWidth + padding
+    );
+  }
+
+  /** True when (x, y) falls on any plateau ramp, including its outside slope. */
+  private isOnPlateauRamp(x: number, y: number, padding: number = 0): boolean {
+    for (let i = 0; i < this.plateaus.length; i++) {
+      if (this.isInsidePlateauRamp(this.plateaus[i], x, y, padding)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * The raised rim is only crossable through the ramp. Jumping lets the hero
+   * leave the hilltop (down the cliff), but never climb it from below.
+   */
+  private blocksOnPlateauRim(
+    fromX: number,
+    fromY: number,
+    toX: number,
+    toY: number,
+    allowDescent: boolean,
+    bodyRadius: number
+  ): boolean {
+    for (let i = 0; i < this.plateaus.length; i++) {
+      const plateau = this.plateaus[i];
+      const fromInside = this.isInsidePlateauTop(plateau, fromX, fromY);
+      const toInside = this.isInsidePlateauTop(plateau, toX, toY);
+      if (fromInside === toInside) continue;
+
+      if (
+        this.isInsidePlateauRamp(plateau, fromX, fromY, -bodyRadius) &&
+        this.isInsidePlateauRamp(plateau, toX, toY, -bodyRadius)
+      ) {
+        continue;
+      }
+
+      if (allowDescent && fromInside && !toInside) continue;
+      return true;
+    }
+    return false;
   }
 
   private generateForest(): void {
@@ -620,6 +762,28 @@ export class WorldSystem {
         rotation: random() * Math.PI * 2,
       });
     });
+
+    // Keep the hills and their ramps clear: base-level trees and ground clutter
+    // would otherwise be drawn as if they grew out of the cliff or blocked the
+    // only climbable passage.
+    const clearOfPlateaus = (x: number, y: number, padding: number): boolean =>
+      !this.isOverPlateau(x, y, padding) && !this.isOnPlateauRamp(x, y, padding);
+
+    this.trees = this.trees.filter((tree) =>
+      clearOfPlateaus(tree.x, tree.y, tree.size * 0.32)
+    );
+    this.groundTufts = this.groundTufts.filter((tuft) =>
+      clearOfPlateaus(tuft.x, tuft.y, tuft.size + 8)
+    );
+    this.palms = this.palms.filter((palm) =>
+      clearOfPlateaus(palm.x, palm.y, palm.size)
+    );
+    this.ferns = this.ferns.filter((fern) =>
+      clearOfPlateaus(fern.x, fern.y, fern.size)
+    );
+    this.rocks = this.rocks.filter((rock) =>
+      clearOfPlateaus(rock.x, rock.y, rock.size)
+    );
   }
 
   private riverCenterY(x: number): number {
@@ -1096,6 +1260,39 @@ export class WorldSystem {
     }
 
     ctx.restore();
+
+    // Elevated plateaus: dark earth rim around a lighter green hilltop.
+    for (let i = 0; i < this.plateaus.length; i++) {
+      const plateau = this.plateaus[i];
+      if (Math.abs(plateau.x - centerX) > viewRadius + plateau.rx) continue;
+      if (Math.abs(plateau.y - centerY) > viewRadius + plateau.ry) continue;
+
+      ctx.fillStyle = 'rgba(74, 53, 34, 0.95)';
+      ctx.beginPath();
+      ctx.ellipse(
+        toX(plateau.x),
+        toY(plateau.y),
+        (plateau.rx + PLATEAU_RIM_WIDTH) * scale,
+        (plateau.ry + PLATEAU_RIM_WIDTH) * scale,
+        0,
+        0,
+        Math.PI * 2
+      );
+      ctx.fill();
+
+      ctx.fillStyle = 'rgba(47, 109, 61, 0.95)';
+      ctx.beginPath();
+      ctx.ellipse(
+        toX(plateau.x),
+        toY(plateau.y),
+        plateau.rx * scale,
+        plateau.ry * scale,
+        0,
+        0,
+        Math.PI * 2
+      );
+      ctx.fill();
+    }
 
     // Dense wall of trees around the map limit.
     const borderTrees = this.trees;
@@ -1760,7 +1957,8 @@ export class WorldSystem {
     fromY: number,
     dx: number,
     dy: number,
-    radius: number
+    radius: number,
+    airborne: boolean = false
   ): { x: number; y: number } {
     const distance = Math.sqrt(dx * dx + dy * dy);
     if (distance < 0.0001) return { x: fromX, y: fromY };
@@ -1775,10 +1973,51 @@ export class WorldSystem {
     for (let i = 0; i < steps; i++) {
       // Resolve each axis independently so the player can slide along props.
       const nextX = Math.max(-limit, Math.min(limit, x + stepX));
-      if (!this.collidesWithTree(nextX, y, radius)) x = nextX;
+      if (!this.collidesWithTree(nextX, y, radius)) {
+        if (!this.blocksOnPlateauRim(x, y, nextX, y, airborne, radius)) x = nextX;
+      }
 
       const nextY = Math.max(-limit, Math.min(limit, y + stepY));
-      if (!this.collidesWithTree(x, nextY, radius)) y = nextY;
+      if (!this.collidesWithTree(x, nextY, radius)) {
+        if (!this.blocksOnPlateauRim(x, y, x, nextY, airborne, radius)) y = nextY;
+      }
+    }
+
+    return { x, y };
+  }
+
+  /**
+   * Constrains a ground animal to the plateau geometry. Unlike the hero they
+   * cannot jump, so both the climb and the descent must use a dirt ramp.
+   */
+  public resolveLandMovement(
+    fromX: number,
+    fromY: number,
+    toX: number,
+    toY: number,
+    radius: number
+  ): { x: number; y: number } {
+    if (this.mapId !== 'amazon_forest' || this.plateaus.length === 0) {
+      return { x: toX, y: toY };
+    }
+
+    const dx = toX - fromX;
+    const dy = toY - fromY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    if (distance < 0.0001) return { x: fromX, y: fromY };
+
+    const steps = Math.max(1, Math.ceil(distance / COLLISION_STEP));
+    const stepX = dx / steps;
+    const stepY = dy / steps;
+    let x = fromX;
+    let y = fromY;
+
+    for (let i = 0; i < steps; i++) {
+      const nextX = x + stepX;
+      if (!this.blocksOnPlateauRim(x, y, nextX, y, false, radius)) x = nextX;
+
+      const nextY = y + stepY;
+      if (!this.blocksOnPlateauRim(x, y, x, nextY, false, radius)) y = nextY;
     }
 
     return { x, y };
@@ -2242,6 +2481,8 @@ export class WorldSystem {
         ctx.restore();
       }
 
+      this.renderPlateaus(ctx, camera);
+
       ctx.restore();
 
       this.renderAmazonWater(ctx, camera);
@@ -2276,6 +2517,191 @@ export class WorldSystem {
 
     ctx.fillStyle = '#1f2b1f';
     ctx.fillRect(0, 0, camera.viewportWidth, camera.viewportHeight);
+  }
+
+  /**
+   * Draws the raised forest plateaus: a dark earth/rock cliff ring around a
+   * grassy hilltop, cut by one wide dirt ramp that marks the only crossing.
+   */
+  private renderPlateaus(ctx: CanvasRenderingContext2D, camera: Camera): void {
+    if (this.mapId !== 'amazon_forest' || this.plateaus.length === 0) return;
+
+    for (let i = 0; i < this.plateaus.length; i++) {
+      const plateau = this.plateaus[i];
+      const margin = Math.max(plateau.rx, plateau.ry) + plateau.rampLength + 180;
+      if (!camera.isInView(plateau.x, plateau.y, margin)) continue;
+
+      const screen = camera.worldToScreen(plateau.x, plateau.y);
+      const dirX = Math.cos(plateau.rampAngle);
+      const dirY = Math.sin(plateau.rampAngle);
+      const boundary = this.getPlateauBoundaryRadius(plateau, dirX, dirY);
+      const rim = PLATEAU_RIM_WIDTH;
+      const rampInner = boundary - PLATEAU_RAMP_INSET;
+      const rampOuter = boundary + plateau.rampLength;
+
+      ctx.save();
+      ctx.translate(screen.x, screen.y);
+
+      // Soft mass shadow, slightly below the footprint.
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.34)';
+      ctx.beginPath();
+      ctx.ellipse(0, 14, plateau.rx + rim + 24, plateau.ry + rim + 18, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Vertical earth/stone wall around the whole hilltop.
+      const cliffGradient = ctx.createLinearGradient(0, -plateau.ry, 0, plateau.ry);
+      cliffGradient.addColorStop(0, '#4a3522');
+      cliffGradient.addColorStop(0.45, '#5c4229');
+      cliffGradient.addColorStop(1, '#291b10');
+      ctx.fillStyle = cliffGradient;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, plateau.rx + rim, plateau.ry + rim, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Broken strata on the exposed wall band.
+      ctx.save();
+      ctx.beginPath();
+      ctx.ellipse(0, 0, plateau.rx + rim, plateau.ry + rim, 0, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.strokeStyle = 'rgba(26, 16, 9, 0.55)';
+      ctx.lineWidth = 3;
+      for (let s = 0; s < 10; s++) {
+        const angle = (s / 10) * Math.PI * 2;
+        const rx = plateau.rx + rim - 2;
+        const ry = plateau.ry + rim - 2;
+        const ax = Math.cos(angle) * rx;
+        const ay = Math.sin(angle) * ry;
+        const bx = Math.cos(angle + 0.14) * (rx - 11);
+        const by = Math.sin(angle + 0.14) * (ry - 11);
+        ctx.beginPath();
+        ctx.moveTo(ax, ay);
+        ctx.lineTo(bx, by);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // Grassy top surface, kept at the plateau's real world coordinates so
+      // characters and animals stand exactly on it.
+      const topGradient = ctx.createLinearGradient(0, -plateau.ry, 0, plateau.ry);
+      topGradient.addColorStop(0, '#2f6d3d');
+      topGradient.addColorStop(0.5, '#255a33');
+      topGradient.addColorStop(1, '#1b4528');
+      ctx.fillStyle = topGradient;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, plateau.rx, plateau.ry, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Deterministic moss/soil patches so the hilltop does not look flat.
+      ctx.save();
+      ctx.beginPath();
+      ctx.ellipse(0, 0, plateau.rx, plateau.ry, 0, 0, Math.PI * 2);
+      ctx.clip();
+      let seed = Math.floor(Math.abs(plateau.x * 13 + plateau.y * 7)) % 2147483647;
+      const random = () => {
+        seed = (seed * 16807) % 2147483647;
+        return (seed - 1) / 2147483646;
+      };
+      for (let p = 0; p < 16; p++) {
+        ctx.fillStyle =
+          p % 3 === 0 ? 'rgba(112, 78, 45, 0.3)' : 'rgba(70, 120, 62, 0.28)';
+        ctx.beginPath();
+        ctx.ellipse(
+          (random() - 0.5) * plateau.rx * 1.5,
+          (random() - 0.5) * plateau.ry * 1.5,
+          20 + random() * 58,
+          12 + random() * 34,
+          random() * Math.PI,
+          0,
+          Math.PI * 2
+        );
+        ctx.fill();
+      }
+      ctx.restore();
+
+      // Lower lip shadow and a lighter upper rim to sell the height.
+      ctx.strokeStyle = 'rgba(8, 14, 9, 0.55)';
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.ellipse(
+        0,
+        0,
+        plateau.rx - 4,
+        plateau.ry - 4,
+        0,
+        Math.PI * 0.08,
+        Math.PI * 0.92
+      );
+      ctx.stroke();
+
+      ctx.strokeStyle = 'rgba(126, 174, 108, 0.5)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, plateau.rx - 3, plateau.ry - 3, 0, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Dirt ramp: it starts inside the hilltop, cuts through the cliff ring
+      // and blends into the forest floor at its outer end.
+      ctx.save();
+      ctx.rotate(plateau.rampAngle);
+      const rampGradient = ctx.createLinearGradient(rampInner, 0, rampOuter, 0);
+      rampGradient.addColorStop(0, '#7b5734');
+      rampGradient.addColorStop(0.5, '#68462a');
+      rampGradient.addColorStop(1, '#4a3220');
+      ctx.fillStyle = rampGradient;
+      ctx.beginPath();
+      ctx.moveTo(rampInner, -plateau.rampHalfWidth);
+      ctx.lineTo(rampOuter, -plateau.rampHalfWidth * 1.2);
+      ctx.lineTo(rampOuter, plateau.rampHalfWidth * 1.2);
+      ctx.lineTo(rampInner, plateau.rampHalfWidth);
+      ctx.closePath();
+      ctx.fill();
+
+      // Eroded ramp edges.
+      ctx.strokeStyle = 'rgba(42, 27, 14, 0.85)';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(rampInner, -plateau.rampHalfWidth);
+      ctx.lineTo(rampOuter, -plateau.rampHalfWidth * 1.2);
+      ctx.moveTo(rampInner, plateau.rampHalfWidth);
+      ctx.lineTo(rampOuter, plateau.rampHalfWidth * 1.2);
+      ctx.stroke();
+
+      // Traction ribs across the dirt.
+      ctx.strokeStyle = 'rgba(38, 23, 11, 0.5)';
+      ctx.lineWidth = 2.5;
+      for (let d = rampInner + 34; d < rampOuter - 14; d += 44) {
+        const t = (d - rampInner) / (rampOuter - rampInner);
+        const half = plateau.rampHalfWidth * (1 + 0.2 * t);
+        ctx.beginPath();
+        ctx.moveTo(d, -half);
+        ctx.lineTo(d, half);
+        ctx.stroke();
+      }
+
+      // Loose pebbles on the slope.
+      ctx.fillStyle = 'rgba(190, 160, 116, 0.4)';
+      for (let s = 0; s < 10; s++) {
+        const t = (s + 0.5) / 10;
+        const d = rampInner + (rampOuter - rampInner) * t;
+        const lateral = ((s % 3) - 1) * plateau.rampHalfWidth * 0.45;
+        ctx.fillRect(d, lateral, 3, 2);
+      }
+      ctx.restore();
+
+      // A few boulders embedded in the rim.
+      ctx.fillStyle = 'rgba(120, 112, 96, 0.75)';
+      for (let s = 0; s < 14; s++) {
+        const angle = (s / 14) * Math.PI * 2;
+        const sx = Math.cos(angle) * (plateau.rx + rim * 0.5);
+        const sy = Math.sin(angle) * (plateau.ry + rim * 0.5);
+        const size = 3 + (s % 3) * 2;
+        ctx.beginPath();
+        ctx.ellipse(sx, sy, size, size * 0.65, angle, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.restore();
+    }
   }
 
   private renderAmazonWater(ctx: CanvasRenderingContext2D, camera: Camera): void {

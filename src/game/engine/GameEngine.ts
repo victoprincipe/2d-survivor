@@ -339,8 +339,8 @@ export class GameEngine {
     this.beginAmazonTurn(0);
 
     this.player = new Player(character, savedData.powerUps);
-    this.player.setCollisionResolver((fromX, fromY, dx, dy, radius) =>
-      this.worldProps.resolvePlayerMovement(fromX, fromY, dx, dy, radius)
+    this.player.setCollisionResolver((fromX, fromY, dx, dy, radius, airborne) =>
+      this.worldProps.resolvePlayerMovement(fromX, fromY, dx, dy, radius, airborne)
     );
     this.weaponSystem = new WeaponSystem(character.startingWeapon);
     this.weaponSystem.recalculatePlayerStats(this.player);
@@ -522,6 +522,18 @@ export class GameEngine {
         e.y = resolved.y;
       } else if (e.isAquatic) {
         const resolved = this.worldProps.resolveAquaticMovement(
+          previousX,
+          previousY,
+          e.x,
+          e.y,
+          e.radius
+        );
+        e.x = resolved.x;
+        e.y = resolved.y;
+      } else {
+        // Land animals cannot cross the plateau cliffs either: they must use
+        // the dirt ramps, just like the hero.
+        const resolved = this.worldProps.resolveLandMovement(
           previousX,
           previousY,
           e.x,
