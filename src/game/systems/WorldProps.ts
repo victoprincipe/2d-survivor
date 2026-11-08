@@ -16,7 +16,7 @@ const COLLISION_STEP = 8;
 // somewhere else on the map.
 const FRUIT_TREE_RESPAWN = 45;
 const FRUIT_TREE_PICKUP_RADIUS = 34;
-const FRUIT_TREE_PROMPT_WIDTH = 190;
+const FRUIT_TREE_PROMPT_WIDTH = 210;
 const FRUIT_TREE_PROMPT_HEIGHT = 42;
 const FRUIT_TREE_PROMPT_PADDING = 10;
 
@@ -120,6 +120,16 @@ export interface CollectedFruit {
   x: number;
   y: number;
 }
+
+// Fruit name shown in the collect prompt for each Amazon fruit tree.
+const FRUIT_TREE_NAMES: Record<FruitTreeKind, string> = {
+  acai: 'Açaí',
+  cupuacu: 'Cupuaçu',
+  castanha: 'Castanha-do-Pará',
+  buriti: 'Buriti',
+  pupunha: 'Pupunha',
+  araca: 'Araçá',
+};
 
 // Short benefit shown under the collect prompt for each Amazon fruit tree.
 const FRUIT_TREE_BENEFITS: Record<FruitTreeKind, string> = {
@@ -5669,7 +5679,7 @@ export class WorldSystem {
     ctx.textBaseline = 'middle';
     ctx.font = 'bold 12px system-ui, -apple-system, sans-serif';
     ctx.fillStyle = '#fef9c3';
-    ctx.fillText('[E] Coletar', x, y - 8);
+    ctx.fillText(`[E] Coletar ${FRUIT_TREE_NAMES[kind]}`, x, y - 8);
 
     ctx.font = 'bold 9px system-ui, -apple-system, sans-serif';
     ctx.fillStyle = '#facc15';
