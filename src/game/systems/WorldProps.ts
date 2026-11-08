@@ -1565,19 +1565,21 @@ export class WorldSystem {
       if (Math.abs(tree.x - centerX) > viewRadius) continue;
       if (Math.abs(tree.y - centerY) > viewRadius) continue;
 
+      const drawSize = ACAI_MINIMAP_ICON_DRAW_SIZE;
+      const drawX = Math.round(toX(tree.x) - drawSize / 2);
+      const drawY = Math.round(toY(tree.y) - drawSize / 2);
+
+      if (tree.kind === 'cupuacu') {
+        this.drawCupuacuMinimapIcon(ctx, drawX, drawY);
+        continue;
+      }
+
       const icon = this.getFruitMinimapIcon(tree.kind);
       if (!icon) continue;
 
-      const drawSize = ACAI_MINIMAP_ICON_DRAW_SIZE;
       ctx.save();
       ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(
-        icon,
-        Math.round(toX(tree.x) - drawSize / 2),
-        Math.round(toY(tree.y) - drawSize / 2),
-        drawSize,
-        drawSize
-      );
+      ctx.drawImage(icon, drawX, drawY, drawSize, drawSize);
       ctx.restore();
     }
   }
@@ -2112,6 +2114,91 @@ export class WorldSystem {
   }
 
   /**
+   * Draws the Cupuaçu minimap marker: a compact 16x16 pixel-art capsule that
+   * follows the reference fruit — velvety brown oval, thin dark outline and a
+   * small lighter highlight on the upper-left skin. It is painted with
+   * smoothing disabled so every pixel stays crisp on the radar.
+   */
+  private drawCupuacuMinimapIcon(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number
+  ): void {
+    const size = ACAI_MINIMAP_ICON_SIZE;
+    const pixels: (string | null)[] = new Array(size * size).fill(null);
+
+    const setPixel = (px: number, py: number, color: string): void => {
+      if (px < 0 || px >= size || py < 0 || py >= size) return;
+      pixels[py * size + px] = color;
+    };
+
+    const outline = '#140a06';
+    const body = '#8a5731';
+    const bodyLight = '#a86f3f';
+    const bodyDark = '#5c3a21';
+    const shine = '#c58d59';
+    const stem = '#4a2a14';
+
+    const cx = 7.5;
+    const cy = 8.4;
+    const rx = 4.8;
+    const ry = 5.8;
+
+    // Velvety capsule: warm light on the upper-left and a darker lower-right
+    // side give the flat oval some volume.
+    for (let py = 0; py < size; py++) {
+      for (let px = 0; px < size; px++) {
+        const dx = (px - cx) / rx;
+        const dy = (py - cy) / ry;
+        if (dx * dx + dy * dy > 1) continue;
+
+        let color = body;
+        const shade = dx * 0.55 + dy * 0.85;
+        if (shade > 0.42) color = bodyDark;
+        else if (shade < -0.4) color = bodyLight;
+
+        const hx = (px - (cx - 1.5)) / 1.5;
+        const hy = (py - (cy - 2.1)) / 1.3;
+        if (hx * hx + hy * hy <= 1) color = shine;
+
+        setPixel(px, py, color);
+      }
+    }
+
+    // Tiny stem nub at the top-right, like the reference fruit.
+    setPixel(10, 2, stem);
+    setPixel(11, 2, stem);
+    setPixel(10, 3, stem);
+
+    // One-pixel dark contour around the whole shape so the marker keeps a
+    // crisp silhouette on the dark minimap panel.
+    const filled = pixels.slice();
+    for (let py = 0; py < size; py++) {
+      for (let px = 0; px < size; px++) {
+        if (filled[py * size + px]) continue;
+        const nearFilled =
+          (py > 0 && Boolean(filled[(py - 1) * size + px])) ||
+          (py < size - 1 && Boolean(filled[(py + 1) * size + px])) ||
+          (px > 0 && Boolean(filled[py * size + (px - 1)])) ||
+          (px < size - 1 && Boolean(filled[py * size + (px + 1)]));
+        if (nearFilled) pixels[py * size + px] = outline;
+      }
+    }
+
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    for (let py = 0; py < size; py++) {
+      for (let px = 0; px < size; px++) {
+        const color = pixels[py * size + px];
+        if (!color) continue;
+        ctx.fillStyle = color;
+        ctx.fillRect(x + px, y + py, 1, 1);
+      }
+    }
+    ctx.restore();
+  }
+
+  /**
    * Builds (once) the 16x16 pixel-art minimap icon for a fruit tree kind.
    * Each fruit is plotted pixel by pixel with a thin dark contour and then
    * blitted with smoothing disabled, so the radar stays crisp and readable.
@@ -2184,24 +2271,6 @@ export class WorldSystem {
     const outline = '#140a06';
 
     switch (kind) {
-      case 'cupuacu': {
-        // Short stem and one little leaf above the capsule.
-        drawLine(8, 2, 8, 5, '#5a3a1c');
-        fillEllipse(10.8, 2.4, 2.4, 1.2, outline);
-        fillEllipse(10.8, 2.4, 1.9, 0.8, '#1d6b34');
-        fillEllipse(10.5, 2.1, 1.3, 0.5, '#4fb867');
-
-        // Large velvety brown capsule with darker bottom-right shading.
-        fillEllipse(8, 9.2, 4.9, 5.9, outline);
-        fillEllipse(8, 9.2, 4.2, 5.2, '#7a4a2b');
-        fillEllipse(6.5, 7.2, 1.4, 1.8, '#a06a3d');
-        fillEllipse(9.4, 10, 1.4, 2.4, '#4f2c18');
-        drawLine(6, 6, 6.4, 12, '#5b3520');
-        drawLine(10, 6, 9.6, 12, '#5b3520');
-        setPixel(6.2, 6.5, '#c08a58');
-        setPixel(7, 5.8, '#c08a58');
-        break;
-      }
       case 'castanha': {
         // Rounded dark-brown shell with a lighter rim.
         fillCircle(8, 8.2, 6.4, outline);
