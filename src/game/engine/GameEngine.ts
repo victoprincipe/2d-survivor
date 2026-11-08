@@ -1932,6 +1932,13 @@ export class GameEngine {
 
     // 1. Clear & Render Floor Tile Pattern
     this.worldProps.renderFloor(ctx, camera);
+
+    // 1.2. Aquatic ambushers stay invisible until the hero enters the river,
+    // but a faint dark silhouette hints at them below the surface.
+    for (let i = 0; i < this.enemies.length; i++) {
+      this.enemies[i].renderSubmergedSilhouette(ctx, camera);
+    }
+
     this.worldProps.renderTrees(ctx, camera);
     this.worldProps.renderFruitTrees(ctx, camera, this.player);
 

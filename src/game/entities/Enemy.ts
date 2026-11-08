@@ -975,6 +975,89 @@ export class Enemy {
     return this.hp <= 0;
   }
 
+  /**
+   * Draws the faint shadow of an aquatic ambusher while it is hidden below
+   * the surface. This is purely cosmetic: the enemy stays out of the spatial
+   * grid and is intangible until the hero enters the water.
+   */
+  public renderSubmergedSilhouette(
+    ctx: CanvasRenderingContext2D,
+    camera: Camera
+  ): void {
+    if (!this.isSubmerged) return;
+    if (!camera.isInView(this.x, this.y, 120)) return;
+
+    const screen = camera.worldToScreen(this.x, this.y);
+    const flip = this.x > camera.x ? -1 : 1;
+    const bob = Math.sin(this.animTimer * 1.4) * 1.5;
+
+    ctx.save();
+    ctx.translate(screen.x, screen.y);
+    if (this.growthScale !== 1) {
+      ctx.scale(this.growthScale, this.growthScale);
+    }
+    ctx.scale(flip, 1);
+    ctx.globalAlpha = 0.3;
+    ctx.fillStyle = '#031a1e';
+    ctx.shadowColor = 'rgba(2, 14, 18, 0.55)';
+    ctx.shadowBlur = 7;
+
+    if (this.type === 'piranha') {
+      const tailWag = Math.sin(this.animTimer * 3.4) * 2;
+      ctx.beginPath();
+      ctx.moveTo(-8, 0);
+      ctx.lineTo(-17, -6 + tailWag);
+      ctx.lineTo(-14, 0);
+      ctx.lineTo(-17, 6 + tailWag);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.ellipse(0, bob, 10, 6, 0, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (this.type === 'pink_river_dolphin') {
+      ctx.beginPath();
+      ctx.ellipse(-2, bob, 19, 8, -0.06, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(16, 2 + bob, 8, 4.2, 0.08, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Dorsal fin.
+      ctx.beginPath();
+      ctx.moveTo(-2, -6 + bob);
+      ctx.lineTo(-7, -16 + bob);
+      ctx.lineTo(6, -5 + bob);
+      ctx.closePath();
+      ctx.fill();
+
+      // Tail flukes.
+      ctx.beginPath();
+      ctx.moveTo(-17, 1 + bob);
+      ctx.lineTo(-27, -5 + bob);
+      ctx.lineTo(-24, 1 + bob);
+      ctx.lineTo(-27, 7 + bob);
+      ctx.closePath();
+      ctx.fill();
+    } else if (this.type === 'giant_otter') {
+      const paddle = Math.sin(this.animTimer * 2.8) * 1.8;
+      ctx.beginPath();
+      ctx.ellipse(-2, 1 + bob, 18, 9, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(-15, 0);
+      ctx.quadraticCurveTo(-27, -4 + paddle + bob, -35, 1 + paddle + bob);
+      ctx.quadraticCurveTo(-27, 3 + paddle + bob, -15, 5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(15, -2 + bob, 8, 7, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
   render(ctx: CanvasRenderingContext2D, camera: Camera): void {
     if (this.isSubmerged) return;
     if (!camera.isInView(this.x, this.y, 160)) return;

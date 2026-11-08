@@ -39,6 +39,11 @@ const RIVER_WIDTH = 980;
 const RIVER_BANK = 260;
 const RIVER_HALF_WIDTH = RIVER_WIDTH / 2;
 
+// Repeating pixel-art tiles used by the Amazon ground/beach/water textures.
+const FOREST_GROUND_TILE = 320;
+const SAND_GRAIN_TILE = 160;
+const WATER_SHIMMER_TILE = 192;
+
 export interface TorchProp {
   id: number;
   x: number;
@@ -89,6 +94,8 @@ interface TreeProp {
   tone: number;
 }
 
+type FloorPatchKind = 'dirt' | 'moss' | 'wet';
+
 interface FloorPatch {
   x: number;
   y: number;
@@ -96,6 +103,34 @@ interface FloorPatch {
   ry: number;
   tone: number;
   rotation: number;
+  kind: FloorPatchKind;
+}
+
+// Small fixed vegetation and forest-floor details. They are scattered once
+// with the deterministic forest seed and never move, so the ground keeps a
+// stable pixel-art look between frames.
+interface GroundTuftProp {
+  x: number;
+  y: number;
+  size: number;
+  tone: number;
+  rotation: number;
+}
+
+interface BeachStoneProp {
+  x: number;
+  y: number;
+  size: number;
+  tone: number;
+  rotation: number;
+}
+
+interface BeachBranchProp {
+  x: number;
+  y: number;
+  length: number;
+  tone: number;
+  angle: number;
 }
 
 interface LakeProp {
@@ -166,9 +201,15 @@ export class WorldSystem {
   private ferns: FernProp[] = [];
   private rocks: RockProp[] = [];
   private bankPlants: BankPlantProp[] = [];
+  private groundTufts: GroundTuftProp[] = [];
+  private beachStones: BeachStoneProp[] = [];
+  private beachBranches: BeachBranchProp[] = [];
 
   private floorImage: HTMLImageElement | null = null;
   private floorPattern: CanvasPattern | null = null;
+  private forestGroundPattern: CanvasPattern | null = null;
+  private sandGrainPattern: CanvasPattern | null = null;
+  private waterShimmerPattern: CanvasPattern | null = null;
   private acaiPixelSprite: HTMLCanvasElement | null = null;
   private acaiMinimapIcon: HTMLCanvasElement | null = null;
   private fruitMinimapIcons: Partial<Record<FruitTreeKind, HTMLCanvasElement>> = {};
@@ -414,8 +455,9 @@ export class WorldSystem {
       }
     }
 
-    // Dirt patches over the dark green grass floor.
+    // Dirt, moss and damp-soil patches over the dark green grass floor.
     for (let i = 0; i < 140; i++) {
+      const kindRoll = random();
       this.floorPatches.push({
         x: (random() - 0.5) * FOREST_SIZE,
         y: (random() - 0.5) * FOREST_SIZE,
@@ -423,6 +465,7 @@ export class WorldSystem {
         ry: 18 + random() * 80,
         tone: random(),
         rotation: random() * Math.PI,
+        kind: kindRoll < 0.55 ? 'dirt' : kindRoll < 0.82 ? 'moss' : 'wet',
       });
     }
 
@@ -487,6 +530,53 @@ export class WorldSystem {
         tone: random(),
         rotation: random() * Math.PI * 2,
         kind: random() < 0.62 ? 'tuft' : 'leafy',
+      });
+    }
+
+    // Small stones and dry branches resting on the river margin.
+    for (let i = 0; i < 460; i++) {
+      const x = (random() - 0.5) * FOREST_SIZE * 0.95;
+      const side = random() < 0.5 ? -1 : 1;
+      const offset = bankMin + random() * (bankMax - bankMin);
+      const y = this.riverCenterY(x) + side * offset;
+      if (
+        Math.abs(x) > FOREST_HALF_SIZE - 140 ||
+        Math.abs(y) > FOREST_HALF_SIZE - 140
+      ) {
+        continue;
+      }
+      if (random() < 0.62) {
+        this.beachStones.push({
+          x,
+          y,
+          size: 2.5 + random() * 5,
+          tone: random(),
+          rotation: random() * Math.PI * 2,
+        });
+      } else {
+        this.beachBranches.push({
+          x,
+          y,
+          length: 8 + random() * 18,
+          tone: random(),
+          angle: random() * Math.PI * 2,
+        });
+      }
+    }
+
+    // Fixed grass tufts spread over the dry forest floor. The tiled ground
+    // texture already carries fine noise; these add 2.5D volume up close.
+    for (let i = 0; i < 6200; i++) {
+      const x = (random() - 0.5) * FOREST_SIZE * 0.94;
+      const y = (random() - 0.5) * FOREST_SIZE * 0.94;
+      if (Math.abs(x) < 90 && Math.abs(y) < 90) continue;
+      if (this.isInWater(x, y)) continue;
+      this.groundTufts.push({
+        x,
+        y,
+        size: 3 + random() * 6,
+        tone: random(),
+        rotation: (random() - 0.5) * 0.7,
       });
     }
 
@@ -1769,16 +1859,286 @@ export class WorldSystem {
     }
   }
 
+  /**
+   * Builds the repeating pixel-art forest-floor tile once: dark grass base,
+   * mossy and muddy blotches, grass blades, loose soil and tiny fixed tufts.
+   */
+  private getForestGroundPattern(ctx: CanvasRenderingContext2D): CanvasPattern | null {
+    if (this.forestGroundPattern) return this.forestGroundPattern;
+    if (typeof document === 'undefined') return null;
+
+    const size = FOREST_GROUND_TILE;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const pctx = canvas.getContext('2d');
+    if (!pctx) return null;
+
+    let seed = 92731;
+    const random = () => {
+      seed = (seed * 16807) % 2147483647;
+      return (seed - 1) / 2147483646;
+    };
+    const pick = (items: string[]): string =>
+      items[Math.floor(random() * items.length)];
+
+    pctx.fillStyle = '#14351d';
+    pctx.fillRect(0, 0, size, size);
+
+    // Broad mossy and damp-soil blotches break up the flat green base.
+    for (let i = 0; i < 26; i++) {
+      pctx.fillStyle = pick([
+        'rgba(31, 74, 40, 0.55)',
+        'rgba(24, 58, 31, 0.5)',
+        'rgba(52, 78, 37, 0.35)',
+        'rgba(62, 47, 28, 0.28)',
+        'rgba(18, 46, 27, 0.55)',
+      ]);
+      pctx.beginPath();
+      pctx.ellipse(
+        random() * size,
+        random() * size,
+        16 + random() * 56,
+        10 + random() * 34,
+        random() * Math.PI,
+        0,
+        Math.PI * 2
+      );
+      pctx.fill();
+    }
+
+    // Fine grass blades in a limited pixel-art palette.
+    const grassColors = [
+      '#173d21',
+      '#1c4727',
+      '#21512c',
+      '#276033',
+      '#2c6b38',
+      '#163a1f',
+      '#326f3a',
+    ];
+    for (let i = 0; i < 1900; i++) {
+      pctx.fillStyle = pick(grassColors);
+      pctx.fillRect(
+        Math.floor(random() * size),
+        Math.floor(random() * size),
+        1,
+        1 + Math.floor(random() * 4)
+      );
+    }
+
+    // Loose soil, root fibres and tiny pebbles.
+    const soilColors = ['#3a2b1a', '#4a3722', '#5a4329', '#2f2417', '#66502f'];
+    for (let i = 0; i < 460; i++) {
+      pctx.fillStyle = pick(soilColors);
+      pctx.fillRect(
+        Math.floor(random() * size),
+        Math.floor(random() * size),
+        1 + Math.floor(random() * 2),
+        1 + Math.floor(random() * 2)
+      );
+    }
+
+    // Shallow roots snaking across the topsoil.
+    pctx.lineCap = 'round';
+    for (let i = 0; i < 14; i++) {
+      const x = random() * size;
+      const y = random() * size;
+      const length = 16 + random() * 42;
+      const bend = (random() - 0.5) * 18;
+      pctx.strokeStyle =
+        random() < 0.55 ? 'rgba(56, 40, 24, 0.55)' : 'rgba(44, 58, 30, 0.5)';
+      pctx.lineWidth = 1 + random();
+      pctx.beginPath();
+      pctx.moveTo(x, y);
+      pctx.quadraticCurveTo(
+        x + length * 0.45,
+        y + bend,
+        x + length,
+        y + bend * 0.4
+      );
+      pctx.stroke();
+
+      // A short side root branching off the main one.
+      pctx.lineWidth = 1;
+      pctx.beginPath();
+      pctx.moveTo(x + length * 0.5, y + bend * 0.6);
+      pctx.lineTo(x + length * 0.62, y + bend * 0.6 - 5 - random() * 5);
+      pctx.stroke();
+    }
+    pctx.lineCap = 'butt';
+
+    // Small fixed tufts: a few blades sharing a root.
+    for (let i = 0; i < 120; i++) {
+      const x = random() * size;
+      const y = random() * size;
+      const blades = 2 + Math.floor(random() * 3);
+      pctx.strokeStyle = pick(['#2c6b38', '#367a42', '#245c2e', '#3f8447']);
+      pctx.lineWidth = 1;
+      for (let b = 0; b < blades; b++) {
+        const spread = (b - (blades - 1) / 2) * 2.4;
+        pctx.beginPath();
+        pctx.moveTo(x, y);
+        pctx.lineTo(x + spread, y - 3 - random() * 4);
+        pctx.stroke();
+      }
+    }
+
+    // Dark organic specks give the tile a damp, earthy depth.
+    pctx.fillStyle = 'rgba(8, 20, 11, 0.45)';
+    for (let i = 0; i < 320; i++) {
+      pctx.fillRect(Math.floor(random() * size), Math.floor(random() * size), 1, 1);
+    }
+
+    this.forestGroundPattern = ctx.createPattern(canvas, 'repeat');
+    return this.forestGroundPattern;
+  }
+
+  /** Repeating transparent grain used to texture the sandy river banks. */
+  private getSandGrainPattern(ctx: CanvasRenderingContext2D): CanvasPattern | null {
+    if (this.sandGrainPattern) return this.sandGrainPattern;
+    if (typeof document === 'undefined') return null;
+
+    const size = SAND_GRAIN_TILE;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const pctx = canvas.getContext('2d');
+    if (!pctx) return null;
+
+    let seed = 48311;
+    const random = () => {
+      seed = (seed * 16807) % 2147483647;
+      return (seed - 1) / 2147483646;
+    };
+
+    // Fine light and dark grains.
+    for (let i = 0; i < 1400; i++) {
+      pctx.fillStyle =
+        random() < 0.55 ? 'rgba(250, 236, 200, 0.4)' : 'rgba(120, 92, 54, 0.34)';
+      pctx.fillRect(
+        Math.floor(random() * size),
+        Math.floor(random() * size),
+        1,
+        1
+      );
+    }
+
+    // A few slightly larger shell/pebble flecks.
+    for (let i = 0; i < 80; i++) {
+      pctx.fillStyle =
+        random() < 0.5 ? 'rgba(255, 247, 222, 0.32)' : 'rgba(90, 68, 40, 0.3)';
+      pctx.fillRect(
+        Math.floor(random() * size),
+        Math.floor(random() * size),
+        1 + Math.floor(random() * 2),
+        1
+      );
+    }
+
+    // Tiny wavy sand ripples.
+    pctx.strokeStyle = 'rgba(112, 86, 50, 0.22)';
+    pctx.lineWidth = 1;
+    for (let i = 0; i < 18; i++) {
+      const y = random() * size;
+      const x = random() * size;
+      pctx.beginPath();
+      pctx.moveTo(x, y);
+      pctx.quadraticCurveTo(x + 5, y - 2, x + 11, y);
+      pctx.stroke();
+    }
+
+    this.sandGrainPattern = ctx.createPattern(canvas, 'repeat');
+    return this.sandGrainPattern;
+  }
+
+  /** Repeating transparent shimmer/foam used to texture the river water. */
+  private getWaterShimmerPattern(ctx: CanvasRenderingContext2D): CanvasPattern | null {
+    if (this.waterShimmerPattern) return this.waterShimmerPattern;
+    if (typeof document === 'undefined') return null;
+
+    const size = WATER_SHIMMER_TILE;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const pctx = canvas.getContext('2d');
+    if (!pctx) return null;
+
+    let seed = 73189;
+    const random = () => {
+      seed = (seed * 16807) % 2147483647;
+      return (seed - 1) / 2147483646;
+    };
+
+    // Soft foam streaks following the current.
+    pctx.lineCap = 'round';
+    for (let i = 0; i < 16; i++) {
+      const y = random() * size;
+      const x = random() * size;
+      const length = 12 + random() * 34;
+      pctx.strokeStyle =
+        random() < 0.55
+          ? 'rgba(212, 244, 250, 0.34)'
+          : 'rgba(8, 58, 76, 0.28)';
+      pctx.lineWidth = random() < 0.5 ? 1 : 1.6;
+      pctx.beginPath();
+      pctx.moveTo(x, y);
+      pctx.quadraticCurveTo(x + length * 0.5, y - 2.5, x + length, y);
+      pctx.stroke();
+    }
+
+    // Small highlights and darker undertow specks.
+    for (let i = 0; i < 220; i++) {
+      pctx.fillStyle =
+        random() < 0.6 ? 'rgba(214, 244, 250, 0.28)' : 'rgba(6, 48, 64, 0.24)';
+      pctx.fillRect(
+        Math.floor(random() * size),
+        Math.floor(random() * size),
+        1 + Math.floor(random() * 2),
+        1
+      );
+    }
+
+    this.waterShimmerPattern = ctx.createPattern(canvas, 'repeat');
+    return this.waterShimmerPattern;
+  }
+
   renderFloor(ctx: CanvasRenderingContext2D, camera: Camera): void {
     if (this.mapId === 'amazon_forest') {
       // Deep darkness outside the finite map bounds.
       ctx.fillStyle = '#08120b';
       ctx.fillRect(0, 0, camera.viewportWidth, camera.viewportHeight);
 
-      // Dark green grass base restricted to the 14000x14000 playable square.
+      // Everything below stays inside the 14000x14000 playable square.
       const origin = camera.worldToScreen(-FOREST_HALF_SIZE, -FOREST_HALF_SIZE);
-      ctx.fillStyle = '#14351d';
-      ctx.fillRect(origin.x, origin.y, FOREST_SIZE, FOREST_SIZE);
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(origin.x, origin.y, FOREST_SIZE, FOREST_SIZE);
+      ctx.clip();
+
+      // Rich pixel-art ground texture: grass, moss, damp soil and roots.
+      const groundPattern = this.getForestGroundPattern(ctx);
+      if (groundPattern) {
+        const tile = FOREST_GROUND_TILE;
+        const offsetX =
+          (-camera.x + camera.viewportWidth / 2 + camera.shakeOffsetX) % tile;
+        const offsetY =
+          (-camera.y + camera.viewportHeight / 2 + camera.shakeOffsetY) % tile;
+
+        ctx.save();
+        ctx.translate(offsetX, offsetY);
+        ctx.fillStyle = groundPattern;
+        ctx.fillRect(
+          -tile,
+          -tile,
+          camera.viewportWidth + tile * 2,
+          camera.viewportHeight + tile * 2
+        );
+        ctx.restore();
+      } else {
+        ctx.fillStyle = '#14351d';
+        ctx.fillRect(origin.x, origin.y, FOREST_SIZE, FOREST_SIZE);
+      }
 
       for (let i = 0; i < this.floorPatches.length; i++) {
         const patch = this.floorPatches[i];
@@ -1790,27 +2150,99 @@ export class WorldSystem {
         ctx.translate(screen.x, screen.y);
         ctx.rotate(patch.rotation);
 
-        ctx.fillStyle = patch.tone > 0.5 ? '#5a3a20' : '#69482a';
-        ctx.beginPath();
-        ctx.ellipse(0, 0, patch.rx, patch.ry, 0, 0, Math.PI * 2);
-        ctx.fill();
+        if (patch.kind === 'moss') {
+          // Older, greener ground where moss crept over the soil.
+          ctx.fillStyle = patch.tone > 0.5 ? '#1d4a28' : '#214f2b';
+          ctx.beginPath();
+          ctx.ellipse(0, 0, patch.rx, patch.ry, 0, 0, Math.PI * 2);
+          ctx.fill();
 
-        // Lighter, drier center gives the dirt some depth.
-        ctx.fillStyle = 'rgba(126, 88, 50, 0.55)';
-        ctx.beginPath();
-        ctx.ellipse(
-          patch.rx * 0.08,
-          -patch.ry * 0.12,
-          patch.rx * 0.55,
-          patch.ry * 0.5,
-          0,
-          0,
-          Math.PI * 2
-        );
-        ctx.fill();
+          ctx.fillStyle = 'rgba(74, 124, 62, 0.42)';
+          ctx.beginPath();
+          ctx.ellipse(
+            patch.rx * 0.08,
+            -patch.ry * 0.12,
+            patch.rx * 0.58,
+            patch.ry * 0.52,
+            0,
+            0,
+            Math.PI * 2
+          );
+          ctx.fill();
+        } else if (patch.kind === 'wet') {
+          // Damp, almost black soil with a faint moisture sheen.
+          ctx.fillStyle = patch.tone > 0.5 ? '#2c2317' : '#3a2d1c';
+          ctx.beginPath();
+          ctx.ellipse(0, 0, patch.rx, patch.ry, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = 'rgba(126, 150, 126, 0.16)';
+          ctx.beginPath();
+          ctx.ellipse(
+            patch.rx * 0.12,
+            -patch.ry * 0.2,
+            patch.rx * 0.48,
+            patch.ry * 0.34,
+            0,
+            0,
+            Math.PI * 2
+          );
+          ctx.fill();
+
+          ctx.fillStyle = 'rgba(10, 18, 12, 0.35)';
+          ctx.beginPath();
+          ctx.ellipse(
+            -patch.rx * 0.16,
+            patch.ry * 0.18,
+            patch.rx * 0.3,
+            patch.ry * 0.24,
+            0,
+            0,
+            Math.PI * 2
+          );
+          ctx.fill();
+        } else {
+          // Regular earth patch with a lighter, drier centre.
+          ctx.fillStyle = patch.tone > 0.5 ? '#5a3a20' : '#69482a';
+          ctx.beginPath();
+          ctx.ellipse(0, 0, patch.rx, patch.ry, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = 'rgba(126, 88, 50, 0.55)';
+          ctx.beginPath();
+          ctx.ellipse(
+            patch.rx * 0.08,
+            -patch.ry * 0.12,
+            patch.rx * 0.55,
+            patch.ry * 0.5,
+            0,
+            0,
+            Math.PI * 2
+          );
+          ctx.fill();
+
+          // Small pebbles and root fibres scattered over the bare soil.
+          let seed = Math.floor(Math.abs(patch.x * 17 + patch.y * 31)) % 2147483647;
+          const random = () => {
+            seed = (seed * 16807) % 2147483647;
+            return (seed - 1) / 2147483646;
+          };
+          for (let k = 0; k < 7; k++) {
+            ctx.fillStyle =
+              k % 3 === 0 ? 'rgba(92, 66, 38, 0.7)' : 'rgba(150, 112, 68, 0.5)';
+            ctx.fillRect(
+              (random() - 0.5) * patch.rx * 1.5,
+              (random() - 0.5) * patch.ry * 1.35,
+              1.5,
+              1.5
+            );
+          }
+        }
 
         ctx.restore();
       }
+
+      ctx.restore();
 
       this.renderAmazonWater(ctx, camera);
       return;
@@ -1874,57 +2306,181 @@ export class WorldSystem {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    // Sandy banks around the river.
+    // Sandy banks with a soft, mossy transition into the forest.
+    traceRiver();
+    ctx.strokeStyle = '#2b4524';
+    ctx.lineWidth = RIVER_WIDTH + RIVER_BANK * 2 + 96;
+    ctx.stroke();
+
+    traceRiver();
+    ctx.strokeStyle = '#6f5a34';
+    ctx.lineWidth = RIVER_WIDTH + RIVER_BANK * 2 + 40;
+    ctx.stroke();
+
+    traceRiver();
+    ctx.strokeStyle = '#a17f4a';
+    ctx.lineWidth = RIVER_WIDTH + RIVER_BANK * 2 + 12;
+    ctx.stroke();
+
     traceRiver();
     ctx.strokeStyle = '#b89355';
     ctx.lineWidth = RIVER_WIDTH + RIVER_BANK * 2;
     ctx.stroke();
 
     traceRiver();
-    ctx.strokeStyle = '#d8bc82';
-    ctx.lineWidth = RIVER_WIDTH + RIVER_BANK * 0.85;
+    ctx.strokeStyle = '#cdb079';
+    ctx.lineWidth = RIVER_WIDTH + RIVER_BANK * 1.35;
     ctx.stroke();
 
-    // Water surface with a lighter current down the middle.
     traceRiver();
-    ctx.strokeStyle = '#1b6b82';
+    ctx.strokeStyle = '#dcc28b';
+    ctx.lineWidth = RIVER_WIDTH + RIVER_BANK * 0.78;
+    ctx.stroke();
+
+    // Granulated sand over the whole beach band.
+    const sandGrain = this.getSandGrainPattern(ctx);
+    if (sandGrain) {
+      traceRiver();
+      ctx.strokeStyle = sandGrain;
+      ctx.lineWidth = RIVER_WIDTH + RIVER_BANK * 1.85;
+      ctx.globalAlpha = 0.7;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
+    // Water surface: dark edge, base water, lighter current and shimmer.
+    traceRiver();
+    ctx.strokeStyle = '#145466';
     ctx.lineWidth = RIVER_WIDTH;
     ctx.stroke();
 
     traceRiver();
-    ctx.strokeStyle = '#2b8ba1';
-    ctx.lineWidth = RIVER_WIDTH - 160;
+    ctx.strokeStyle = '#1b6b82';
+    ctx.lineWidth = RIVER_WIDTH - 24;
     ctx.stroke();
 
-    // Two lakes, each with its own sand rim.
+    traceRiver();
+    ctx.strokeStyle = '#2b8ba1';
+    ctx.lineWidth = RIVER_WIDTH - 170;
+    ctx.stroke();
+
+    const waterShimmer = this.getWaterShimmerPattern(ctx);
+    if (waterShimmer) {
+      traceRiver();
+      ctx.strokeStyle = waterShimmer;
+      ctx.lineWidth = RIVER_WIDTH - 30;
+      ctx.globalAlpha = 0.55;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
+    // Two lakes, each with its own sand rim and water texture.
     for (let i = 0; i < this.lakes.length; i++) {
       const lake = this.lakes[i];
-      const margin = Math.max(lake.rx, lake.ry) + RIVER_BANK + 30;
+      const margin = Math.max(lake.rx, lake.ry) + RIVER_BANK + 80;
       if (!camera.isInView(lake.x, lake.y, margin)) continue;
 
       ctx.save();
       ctx.translate(lake.x, lake.y);
       ctx.rotate(lake.rotation);
 
+      ctx.fillStyle = '#2b4524';
+      ctx.beginPath();
+      ctx.ellipse(
+        0,
+        0,
+        lake.rx + RIVER_BANK + 44,
+        lake.ry + RIVER_BANK * 0.85 + 36,
+        0,
+        0,
+        Math.PI * 2
+      );
+      ctx.fill();
+
+      ctx.fillStyle = '#6f5a34';
+      ctx.beginPath();
+      ctx.ellipse(
+        0,
+        0,
+        lake.rx + RIVER_BANK + 18,
+        lake.ry + RIVER_BANK * 0.85 + 14,
+        0,
+        0,
+        Math.PI * 2
+      );
+      ctx.fill();
+
       ctx.fillStyle = '#b89355';
       ctx.beginPath();
       ctx.ellipse(0, 0, lake.rx + RIVER_BANK, lake.ry + RIVER_BANK * 0.85, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = '#d8bc82';
+      ctx.fillStyle = '#cdb079';
       ctx.beginPath();
-      ctx.ellipse(0, 0, lake.rx + RIVER_BANK * 0.5, lake.ry + RIVER_BANK * 0.42, 0, 0, Math.PI * 2);
+      ctx.ellipse(
+        0,
+        0,
+        lake.rx + RIVER_BANK * 0.62,
+        lake.ry + RIVER_BANK * 0.54,
+        0,
+        0,
+        Math.PI * 2
+      );
+      ctx.fill();
+
+      ctx.fillStyle = '#dcc28b';
+      ctx.beginPath();
+      ctx.ellipse(
+        0,
+        0,
+        lake.rx + RIVER_BANK * 0.3,
+        lake.ry + RIVER_BANK * 0.26,
+        0,
+        0,
+        Math.PI * 2
+      );
+      ctx.fill();
+
+      if (sandGrain) {
+        ctx.fillStyle = sandGrain;
+        ctx.globalAlpha = 0.7;
+        ctx.beginPath();
+        ctx.ellipse(
+          0,
+          0,
+          lake.rx + RIVER_BANK * 0.85,
+          lake.ry + RIVER_BANK * 0.72,
+          0,
+          0,
+          Math.PI * 2
+        );
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+
+      ctx.fillStyle = '#145466';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, lake.rx, lake.ry, 0, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.fillStyle = '#1b6b82';
       ctx.beginPath();
-      ctx.ellipse(0, 0, lake.rx, lake.ry, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, 0, lake.rx - 10, lake.ry - 8, 0, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.fillStyle = '#2b8ba1';
       ctx.beginPath();
       ctx.ellipse(0, 0, lake.rx * 0.82, lake.ry * 0.82, 0, 0, Math.PI * 2);
       ctx.fill();
+
+      if (waterShimmer) {
+        ctx.fillStyle = waterShimmer;
+        ctx.globalAlpha = 0.55;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, lake.rx * 0.97, lake.ry * 0.96, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
 
       // Soft highlight on the water.
       ctx.strokeStyle = 'rgba(170, 230, 240, 0.22)';
@@ -2038,6 +2594,113 @@ export class WorldSystem {
   }
 
   private renderAmazonDecorations(ctx: CanvasRenderingContext2D, camera: Camera): void {
+    // Fixed grass tufts scattered across the dry forest floor.
+    for (let i = 0; i < this.groundTufts.length; i++) {
+      const tuft = this.groundTufts[i];
+      if (!camera.isInView(tuft.x, tuft.y, tuft.size * 2 + 8)) continue;
+
+      const screen = camera.worldToScreen(tuft.x, tuft.y);
+      ctx.save();
+      ctx.translate(screen.x, screen.y);
+      ctx.rotate(tuft.rotation);
+
+      // Dark base blade gives the tuft a little 2.5D volume.
+      ctx.strokeStyle = 'rgba(10, 30, 16, 0.65)';
+      ctx.lineWidth = 1.6;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-1, 1);
+      ctx.lineTo(-1.5, -tuft.size);
+      ctx.stroke();
+
+      const blades = tuft.tone > 0.5 ? 3 : 4;
+      for (let b = 0; b < blades; b++) {
+        const spread = (b - (blades - 1) / 2) * (tuft.size * 0.32);
+        const height = tuft.size * (0.75 + (b % 2) * 0.3);
+        ctx.strokeStyle =
+          tuft.tone > 0.55
+            ? b % 2 === 0
+              ? '#2f7d3a'
+              : '#3f9a48'
+            : b % 2 === 0
+              ? '#276b33'
+              : '#357f3d';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.quadraticCurveTo(spread * 0.5, -height * 0.6, spread, -height);
+        ctx.stroke();
+      }
+      ctx.lineCap = 'butt';
+      ctx.restore();
+    }
+
+    // Small stones resting on the river margin.
+    for (let i = 0; i < this.beachStones.length; i++) {
+      const stone = this.beachStones[i];
+      if (!camera.isInView(stone.x, stone.y, stone.size + 12)) continue;
+
+      const screen = camera.worldToScreen(stone.x, stone.y);
+      ctx.save();
+      ctx.translate(screen.x, screen.y);
+      ctx.rotate(stone.rotation);
+
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
+      ctx.beginPath();
+      ctx.ellipse(0, stone.size * 0.35, stone.size * 1.15, stone.size * 0.4, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = stone.tone > 0.5 ? '#7d7f74' : '#65685d';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, stone.size, stone.size * 0.7, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = 'rgba(222, 219, 196, 0.45)';
+      ctx.beginPath();
+      ctx.ellipse(
+        -stone.size * 0.22,
+        -stone.size * 0.2,
+        stone.size * 0.45,
+        stone.size * 0.26,
+        0,
+        0,
+        Math.PI * 2
+      );
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    // Dry branches and twigs washed up beside the sand.
+    for (let i = 0; i < this.beachBranches.length; i++) {
+      const branch = this.beachBranches[i];
+      if (!camera.isInView(branch.x, branch.y, branch.length + 8)) continue;
+
+      const screen = camera.worldToScreen(branch.x, branch.y);
+      ctx.save();
+      ctx.translate(screen.x, screen.y);
+      ctx.rotate(branch.angle);
+
+      const half = branch.length / 2;
+      ctx.strokeStyle = branch.tone > 0.5 ? '#5b4228' : '#6b4f2e';
+      ctx.lineWidth = Math.max(1, branch.length * 0.09);
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-half, 0);
+      ctx.quadraticCurveTo(0, -branch.length * 0.12, half, 0);
+      ctx.stroke();
+
+      // A short side twig.
+      ctx.lineWidth = Math.max(1, branch.length * 0.06);
+      ctx.beginPath();
+      ctx.moveTo(branch.length * 0.05, 0);
+      ctx.lineTo(branch.length * 0.2, -branch.length * 0.22);
+      ctx.stroke();
+      ctx.lineCap = 'butt';
+
+      ctx.restore();
+    }
+
     // Small grass tufts and creeping plants on the sandy river beach.
     for (let i = 0; i < this.bankPlants.length; i++) {
       const plant = this.bankPlants[i];
@@ -2237,6 +2900,25 @@ export class WorldSystem {
       // Trunk
       ctx.fillStyle = '#4a2f1b';
       ctx.fillRect(-size * 0.08, -size * 0.5, size * 0.16, size * 0.6);
+
+      // Surface roots crawling out over the forest floor.
+      ctx.strokeStyle = tree.tone > 0.5 ? '#3f2a16' : '#4a2f1b';
+      ctx.lineWidth = Math.max(1.5, size * 0.045);
+      ctx.lineCap = 'round';
+      for (let r = 0; r < 5; r++) {
+        const spread = -1.15 + (r / 4) * 2.3;
+        const length = size * (0.2 + (r % 2) * 0.08);
+        ctx.beginPath();
+        ctx.moveTo(0, size * 0.02);
+        ctx.quadraticCurveTo(
+          spread * length * 0.5,
+          size * 0.075,
+          spread * length,
+          size * 0.12
+        );
+        ctx.stroke();
+      }
+      ctx.lineCap = 'butt';
 
       // Canopy
       ctx.fillStyle = tree.tone > 0.5 ? '#14532d' : '#166534';
