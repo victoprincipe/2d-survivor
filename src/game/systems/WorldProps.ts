@@ -469,28 +469,164 @@ export class WorldSystem {
     ];
   }
 
-  /** Distance from the plateau centre to its ellipse rim along a direction. */
+  /**
+   * Deterministic organic wobble applied to a plateau's footprint. The low
+   * frequency terms push the cliff in and out in broad lobes, while the higher
+   * ones break the silhouette into small rocky irregularities.
+   */
+  private getPlateauEdgeScale(dirX: number, dirY: number, plateau: PlateauProp): number {
+    const angle = Math.atan2(dirY, dirX);
+    const phase = plateau.x * 0.0067 + plateau.y * 0.0081;
+    return (
+      1 +
+      Math.sin(angle * 3 + phase) * 0.06 +
+      Math.sin(angle * 5 - phase * 1.3) * 0.035 +
+      Math.sin(angle * 8 + phase * 0.7) * 0.02
+    );
+  }
+
+  /** Distance from the plateau centre to its organic rim along a direction. */
   private getPlateauBoundaryRadius(plateau: PlateauProp, dirX: number, dirY: number): number {
     const nx = dirX / plateau.rx;
     const ny = dirY / plateau.ry;
-    return 1 / Math.sqrt(nx * nx + ny * ny);
+    const ellipseRadius = 1 / Math.sqrt(nx * nx + ny * ny);
+    return ellipseRadius * this.getPlateauEdgeScale(dirX, dirY, plateau);
   }
 
   private isInsidePlateauTop(plateau: PlateauProp, x: number, y: number): boolean {
-    const nx = (x - plateau.x) / plateau.rx;
-    const ny = (y - plateau.y) / plateau.ry;
-    return nx * nx + ny * ny <= 1;
+    const dx = x - plateau.x;
+    const dy = y - plateau.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    if (distance < 0.0001) return true;
+    return distance <= this.getPlateauBoundaryRadius(plateau, dx / distance, dy / distance);
   }
 
   /** True when (x, y) lies anywhere on the hilltop, dilated by padding. */
   private isOverPlateau(x: number, y: number, padding: number = 0): boolean {
     for (let i = 0; i < this.plateaus.length; i++) {
       const plateau = this.plateaus[i];
-      const nx = (x - plateau.x) / (plateau.rx + padding);
-      const ny = (y - plateau.y) / (plateau.ry + padding);
-      if (nx * nx + ny * ny <= 1) return true;
+      const dx = x - plateau.x;
+      const dy = y - plateau.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      if (distance < 0.0001) return true;
+      const boundary =
+        this.getPlateauBoundaryRadius(plateau, dx / distance, dy / distance) + padding;
+      if (distance <= boundary) return true;
     }
     return false;
+  }
+
+  /** Traces the irregular hilltop/wall silhouette using organic radii. */
+  private tracePlateauShape(
+    ctx: CanvasRenderingContext2D,
+    plateau: PlateauProp,
+    extraRadius: number = 0,
+    startAngle: number = 0,
+    endAngle: number = Math.PI * 2
+  ): void {
+    const steps = Math.max(12, Math.ceil(((endAngle - startAngle) / (Math.PI * 2)) * 96));
+    for (let i = 0; i <= steps; i++) {
+      const angle = startAngle + ((endAngle - startAngle) * i) / steps;
+      const dirX = Math.cos(angle);
+      const dirY = Math.sin(angle);
+      const radius =
+        this.getPlateauBoundaryRadius(plateau, dirX, dirY) + extraRadius;
+      const x = dirX * radius;
+      const y = dirY * radius;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+  }
+
+  /**
+   * Ramp cross-section. Its centre meanders and its banks widen/narrow along
+   * the slope so the passage reads as an eroded organic valley instead of a
+   * straight rectangular cut.
+   */
+  private getPlateauRampProfile(
+    plateau: PlateauProp,
+    along: number,
+    inner: number,
+    outer: number
+  ): { center: number; halfWidth: number } {
+    const t = Math.max(0, Math.min(1, (along - inner) / Math.max(1, outer - inner)));
+    const phase = plateau.x * 0.0031 + plateau.y * 0.0017;
+    const center = Math.sin(t * Math.PI * 1.25 + phase) * plateau.rampHalfWidth * 0.14;
+    const wobble =
+      1 +
+      Math.sin(t * 9.3 + phase * 1.6) * 0.06 +
+      Math.sin(t * 17.1 - phase) * 0.03;
+    return {
+      center,
+      halfWidth: plateau.rampHalfWidth * (1 + 0.18 * t) * wobble,
+    };
+  }
+
+  /** Traces one winding edge of the dirt ramp. */
+  private tracePlateauRampEdge(
+    ctx: CanvasRenderingContext2D,
+    plateau: PlateauProp,
+    inner: number,
+    outer: number,
+    side: -1 | 1
+  ): void {
+    const steps = 28;
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const along = inner + (outer - inner) * t;
+      const profile = this.getPlateauRampProfile(plateau, along, inner, outer);
+      const y = profile.center + side * profile.halfWidth;
+      if (i === 0) ctx.moveTo(along, y);
+      else ctx.lineTo(along, y);
+    }
+  }
+
+  /** Traces the winding dirt ramp between its inner and outer ends. */
+  private tracePlateauRamp(
+    ctx: CanvasRenderingContext2D,
+    plateau: PlateauProp,
+    inner: number,
+    outer: number
+  ): void {
+    const steps = 28;
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const along = inner + (outer - inner) * t;
+      const profile = this.getPlateauRampProfile(plateau, along, inner, outer);
+      const y = profile.center - profile.halfWidth;
+      if (i === 0) ctx.moveTo(along, y);
+      else ctx.lineTo(along, y);
+    }
+
+    // Irregular outer lip so the slope melts into the forest instead of
+    // ending on a perfectly straight cut.
+    const outerProfile = this.getPlateauRampProfile(plateau, outer, inner, outer);
+    const capSteps = 6;
+    for (let i = 1; i < capSteps; i++) {
+      const f = i / capSteps;
+      ctx.lineTo(
+        outer + Math.sin(f * Math.PI) * 10,
+        outerProfile.center - outerProfile.halfWidth + f * 2 * outerProfile.halfWidth
+      );
+    }
+
+    for (let i = steps; i >= 0; i--) {
+      const t = i / steps;
+      const along = inner + (outer - inner) * t;
+      const profile = this.getPlateauRampProfile(plateau, along, inner, outer);
+      ctx.lineTo(along, profile.center + profile.halfWidth);
+    }
+
+    // Soft, uneven inner throat where the ramp meets the hilltop.
+    const innerProfile = this.getPlateauRampProfile(plateau, inner, inner, outer);
+    for (let i = 1; i < capSteps; i++) {
+      const f = i / capSteps;
+      ctx.lineTo(
+        inner - Math.sin(f * Math.PI) * 8,
+        innerProfile.center + innerProfile.halfWidth - f * 2 * innerProfile.halfWidth
+      );
+    }
+    ctx.closePath();
   }
 
   /** True when (x, y) is inside the cut of the plateau's dirt ramp. */
@@ -509,10 +645,11 @@ export class WorldSystem {
     const boundary = this.getPlateauBoundaryRadius(plateau, dirX, dirY);
     const inner = boundary - PLATEAU_RAMP_INSET;
     const outer = boundary + plateau.rampLength;
+    const profile = this.getPlateauRampProfile(plateau, along, inner, outer);
     return (
       along >= inner &&
       along <= outer &&
-      Math.abs(lateral) <= plateau.rampHalfWidth + padding
+      Math.abs(lateral - profile.center) <= profile.halfWidth + padding
     );
   }
 
@@ -620,7 +757,8 @@ export class WorldSystem {
     // Floating water lilies along the river...
     for (let i = 0; i < 55; i++) {
       const x = (random() - 0.5) * FOREST_SIZE * 0.92;
-      const y = this.riverCenterY(x) + (random() - 0.5) * RIVER_WIDTH * 0.78;
+      const riverHalf = this.getRiverHalfWidth(x, RIVER_HALF_WIDTH);
+      const y = this.riverCenterY(x) + (random() - 0.5) * riverHalf * 1.56;
       this.lilies.push({
         x,
         y,
@@ -652,12 +790,13 @@ export class WorldSystem {
 
     // Low grass tufts and creeping plants scattered across the wider river
     // beach. They stay inside the sandy band, between the water and the forest.
-    const bankMin = RIVER_HALF_WIDTH + 12;
-    const bankMax = RIVER_HALF_WIDTH + RIVER_BANK - 18;
+    const bankMin = 12;
+    const bankSpan = RIVER_BANK - 30;
     for (let i = 0; i < 620; i++) {
       const x = (random() - 0.5) * FOREST_SIZE * 0.95;
       const side = random() < 0.5 ? -1 : 1;
-      const offset = bankMin + random() * (bankMax - bankMin);
+      const waterEdge = this.getRiverHalfWidth(x, RIVER_HALF_WIDTH);
+      const offset = waterEdge + bankMin + random() * bankSpan;
       const y = this.riverCenterY(x) + side * offset;
       if (
         Math.abs(x) > FOREST_HALF_SIZE - 140 ||
@@ -679,7 +818,8 @@ export class WorldSystem {
     for (let i = 0; i < 460; i++) {
       const x = (random() - 0.5) * FOREST_SIZE * 0.95;
       const side = random() < 0.5 ? -1 : 1;
-      const offset = bankMin + random() * (bankMax - bankMin);
+      const waterEdge = this.getRiverHalfWidth(x, RIVER_HALF_WIDTH);
+      const offset = waterEdge + bankMin + random() * bankSpan;
       const y = this.riverCenterY(x) + side * offset;
       if (
         Math.abs(x) > FOREST_HALF_SIZE - 140 ||
@@ -789,15 +929,78 @@ export class WorldSystem {
   private riverCenterY(x: number): number {
     return (
       Math.sin((x / FOREST_SIZE) * Math.PI * 1.6) * 1450 +
-      Math.sin(x / 1600) * 240
+      Math.sin(x / 1600) * 240 +
+      Math.sin(x / 620) * 58
     );
+  }
+
+  /**
+   * Organic widening/narrowing of the river along its course. Multiplying the
+   * whole bank profile by this factor carves small bays and sharper bends while
+   * keeping every water/collision check in sync with the painted shore.
+   */
+  private getRiverWidthScale(x: number): number {
+    return (
+      1 +
+      Math.sin(x * 0.0011 + 0.7) * 0.075 +
+      Math.sin(x * 0.0027 - 1.1) * 0.045 +
+      Math.sin(x * 0.0061 + 2.3) * 0.02
+    );
+  }
+
+  private getRiverHalfWidth(x: number, halfWidth: number): number {
+    return halfWidth * this.getRiverWidthScale(x);
+  }
+
+  /**
+   * Deterministic irregular lake outline. The noise is a function of the
+   * normalized ellipse angle, so painting and the collision checks agree.
+   */
+  private getLakeEdgeScale(lake: LakeProp, angle: number): number {
+    const phase = lake.x * 0.0043 + lake.y * 0.0059;
+    return (
+      1 +
+      Math.sin(angle * 3 + phase) * 0.09 +
+      Math.sin(angle * 5 - phase * 1.4) * 0.045 +
+      Math.sin(angle * 7 + phase * 0.8) * 0.025
+    );
+  }
+
+  private getLakeNormalizedAngle(lake: LakeProp, x: number, y: number): number {
+    const dx = x - lake.x;
+    const dy = y - lake.y;
+    const cos = Math.cos(-lake.rotation);
+    const sin = Math.sin(-lake.rotation);
+    const lx = dx * cos - dy * sin;
+    const ly = dx * sin + dy * cos;
+    return Math.atan2(ly / Math.max(1, lake.ry), lx / Math.max(1, lake.rx));
+  }
+
+  /** Traces an organic lake/beach outline in the lake's local space. */
+  private traceLakeShape(
+    ctx: CanvasRenderingContext2D,
+    lake: LakeProp,
+    rx: number,
+    ry: number
+  ): void {
+    const steps = 80;
+    for (let i = 0; i <= steps; i++) {
+      const angle = (i / steps) * Math.PI * 2;
+      const scale = this.getLakeEdgeScale(lake, angle);
+      const x = Math.cos(angle) * rx * scale;
+      const y = Math.sin(angle) * ry * scale;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
   }
 
   private isInWater(x: number, y: number): boolean {
     // River band, including the whole sandy beach so land props stay clear of it.
-    if (Math.abs(y - this.riverCenterY(x)) < RIVER_HALF_WIDTH + RIVER_BANK) return true;
+    const riverHalf = this.getRiverHalfWidth(x, RIVER_HALF_WIDTH + RIVER_BANK);
+    if (Math.abs(y - this.riverCenterY(x)) < riverHalf) return true;
 
-    // Lakes (rotated ellipses).
+    // Lakes (rotated organic ellipses).
     for (let i = 0; i < this.lakes.length; i++) {
       const lake = this.lakes[i];
       const dx = x - lake.x;
@@ -806,7 +1009,11 @@ export class WorldSystem {
       const sin = Math.sin(-lake.rotation);
       const lx = dx * cos - dy * sin;
       const ly = dx * sin + dy * cos;
-      if ((lx * lx) / (lake.rx * lake.rx) + (ly * ly) / (lake.ry * lake.ry) <= 1.08) {
+      const rho = Math.sqrt(
+        (lx * lx) / (lake.rx * lake.rx) + (ly * ly) / (lake.ry * lake.ry)
+      );
+      const angle = this.getLakeNormalizedAngle(lake, x, y);
+      if (rho <= 1.08 * this.getLakeEdgeScale(lake, angle)) {
         return true;
       }
     }
@@ -824,10 +1031,11 @@ export class WorldSystem {
     if (Math.abs(x) > FOREST_HALF_SIZE || Math.abs(y) > FOREST_HALF_SIZE) return false;
 
     // River band.
-    const riverHalf = RIVER_HALF_WIDTH - 16 - radius;
+    const riverHalf = this.getRiverHalfWidth(x, RIVER_HALF_WIDTH - 16 - radius);
     if (riverHalf > 0 && Math.abs(y - this.riverCenterY(x)) < riverHalf) return true;
 
-    // Lakes (rotated ellipses), inset by the creature's body so it stays wet.
+    // Lakes (rotated organic ellipses), inset by the creature's body so it
+    // stays wet.
     const inset = 18 + radius;
     for (let i = 0; i < this.lakes.length; i++) {
       const lake = this.lakes[i];
@@ -841,7 +1049,9 @@ export class WorldSystem {
       const sin = Math.sin(-lake.rotation);
       const lx = dx * cos - dy * sin;
       const ly = dx * sin + dy * cos;
-      if ((lx * lx) / (rx * rx) + (ly * ly) / (ry * ry) <= 1) {
+      const rho = Math.sqrt((lx * lx) / (rx * rx) + (ly * ly) / (ry * ry));
+      const angle = this.getLakeNormalizedAngle(lake, x, y);
+      if (rho <= this.getLakeEdgeScale(lake, angle)) {
         return true;
       }
     }
@@ -859,9 +1069,10 @@ export class WorldSystem {
     if (Math.abs(x) > FOREST_HALF_SIZE || Math.abs(y) > FOREST_HALF_SIZE) return false;
 
     // River band.
-    if (Math.abs(y - this.riverCenterY(x)) < RIVER_HALF_WIDTH) return true;
+    const riverHalf = this.getRiverHalfWidth(x, RIVER_HALF_WIDTH);
+    if (Math.abs(y - this.riverCenterY(x)) < riverHalf) return true;
 
-    // Lakes (rotated ellipses).
+    // Lakes (rotated organic ellipses).
     for (let i = 0; i < this.lakes.length; i++) {
       const lake = this.lakes[i];
       const dx = x - lake.x;
@@ -870,7 +1081,11 @@ export class WorldSystem {
       const sin = Math.sin(-lake.rotation);
       const lx = dx * cos - dy * sin;
       const ly = dx * sin + dy * cos;
-      if ((lx * lx) / (lake.rx * lake.rx) + (ly * ly) / (lake.ry * lake.ry) <= 1) {
+      const rho = Math.sqrt(
+        (lx * lx) / (lake.rx * lake.rx) + (ly * ly) / (lake.ry * lake.ry)
+      );
+      const angle = this.getLakeNormalizedAngle(lake, x, y);
+      if (rho <= this.getLakeEdgeScale(lake, angle)) {
         return true;
       }
     }
@@ -888,7 +1103,10 @@ export class WorldSystem {
     if (this.mapId !== 'amazon_forest') return false;
     if (Math.abs(x) > FOREST_HALF_SIZE || Math.abs(y) > FOREST_HALF_SIZE) return false;
 
-    const riverHalf = RIVER_HALF_WIDTH + RIVER_BANK - 10 - radius;
+    const riverHalf = this.getRiverHalfWidth(
+      x,
+      RIVER_HALF_WIDTH + RIVER_BANK - 10 - radius
+    );
     if (riverHalf > 0 && Math.abs(y - this.riverCenterY(x)) < riverHalf) return true;
 
     const inset = 10 + radius;
@@ -904,7 +1122,9 @@ export class WorldSystem {
       const sin = Math.sin(-lake.rotation);
       const lx = dx * cos - dy * sin;
       const ly = dx * sin + dy * cos;
-      if ((lx * lx) / (rx * rx) + (ly * ly) / (ry * ry) <= 1) return true;
+      const rho = Math.sqrt((lx * lx) / (rx * rx) + (ly * ly) / (ry * ry));
+      const angle = this.getLakeNormalizedAngle(lake, x, y);
+      if (rho <= this.getLakeEdgeScale(lake, angle)) return true;
     }
 
     return false;
@@ -926,7 +1146,8 @@ export class WorldSystem {
     const riverX = Math.max(-limit, Math.min(limit, x));
     const riverCenterY = this.riverCenterY(riverX);
     const side = y >= riverCenterY ? 1 : -1;
-    const riverY = riverCenterY + side * bankOffset;
+    const riverY =
+      riverCenterY + side * this.getRiverHalfWidth(riverX, bankOffset);
     if (Math.abs(riverY) <= limit) {
       const dx = riverX - x;
       const dy = riverY - y;
@@ -934,7 +1155,7 @@ export class WorldSystem {
       bestDistance = dx * dx + dy * dy;
     }
 
-    // Lake banks follow the ellipse rim, expanded past the water surface.
+    // Lake banks follow the organic rim, expanded past the water surface.
     for (let i = 0; i < this.lakes.length; i++) {
       const lake = this.lakes[i];
       const cos = Math.cos(-lake.rotation);
@@ -947,8 +1168,9 @@ export class WorldSystem {
       const rx = lake.rx + RIVER_BANK * 0.55;
       const ry = lake.ry + RIVER_BANK * 0.55;
       const angle = Math.atan2(ly / Math.max(1, ry), lx / Math.max(1, rx));
-      const localX = Math.cos(angle) * rx;
-      const localY = Math.sin(angle) * ry;
+      const edgeScale = this.getLakeEdgeScale(lake, angle);
+      const localX = Math.cos(angle) * rx * edgeScale;
+      const localY = Math.sin(angle) * ry * edgeScale;
 
       const cosR = Math.cos(lake.rotation);
       const sinR = Math.sin(lake.rotation);
@@ -2543,10 +2765,13 @@ export class WorldSystem {
       ctx.translate(screen.x, screen.y);
 
       // Soft mass shadow, slightly below the footprint.
+      ctx.save();
+      ctx.translate(0, 14);
       ctx.fillStyle = 'rgba(0, 0, 0, 0.34)';
       ctx.beginPath();
-      ctx.ellipse(0, 14, plateau.rx + rim + 24, plateau.ry + rim + 18, 0, 0, Math.PI * 2);
+      this.tracePlateauShape(ctx, plateau, rim + 24);
       ctx.fill();
+      ctx.restore();
 
       // Vertical earth/stone wall around the whole hilltop.
       const cliffGradient = ctx.createLinearGradient(0, -plateau.ry, 0, plateau.ry);
@@ -2555,24 +2780,26 @@ export class WorldSystem {
       cliffGradient.addColorStop(1, '#291b10');
       ctx.fillStyle = cliffGradient;
       ctx.beginPath();
-      ctx.ellipse(0, 0, plateau.rx + rim, plateau.ry + rim, 0, 0, Math.PI * 2);
+      this.tracePlateauShape(ctx, plateau, rim);
       ctx.fill();
 
       // Broken strata on the exposed wall band.
       ctx.save();
       ctx.beginPath();
-      ctx.ellipse(0, 0, plateau.rx + rim, plateau.ry + rim, 0, 0, Math.PI * 2);
+      this.tracePlateauShape(ctx, plateau, rim);
       ctx.clip();
       ctx.strokeStyle = 'rgba(26, 16, 9, 0.55)';
       ctx.lineWidth = 3;
       for (let s = 0; s < 10; s++) {
         const angle = (s / 10) * Math.PI * 2;
-        const rx = plateau.rx + rim - 2;
-        const ry = plateau.ry + rim - 2;
-        const ax = Math.cos(angle) * rx;
-        const ay = Math.sin(angle) * ry;
-        const bx = Math.cos(angle + 0.14) * (rx - 11);
-        const by = Math.sin(angle + 0.14) * (ry - 11);
+        const dirX = Math.cos(angle);
+        const dirY = Math.sin(angle);
+        const outer = this.getPlateauBoundaryRadius(plateau, dirX, dirY) + rim - 2;
+        const inner = outer - 11;
+        const ax = dirX * outer;
+        const ay = dirY * outer;
+        const bx = Math.cos(angle + 0.14) * inner;
+        const by = Math.sin(angle + 0.14) * inner;
         ctx.beginPath();
         ctx.moveTo(ax, ay);
         ctx.lineTo(bx, by);
@@ -2588,13 +2815,13 @@ export class WorldSystem {
       topGradient.addColorStop(1, '#1b4528');
       ctx.fillStyle = topGradient;
       ctx.beginPath();
-      ctx.ellipse(0, 0, plateau.rx, plateau.ry, 0, 0, Math.PI * 2);
+      this.tracePlateauShape(ctx, plateau);
       ctx.fill();
 
       // Deterministic moss/soil patches so the hilltop does not look flat.
       ctx.save();
       ctx.beginPath();
-      ctx.ellipse(0, 0, plateau.rx, plateau.ry, 0, 0, Math.PI * 2);
+      this.tracePlateauShape(ctx, plateau);
       ctx.clip();
       let seed = Math.floor(Math.abs(plateau.x * 13 + plateau.y * 7)) % 2147483647;
       const random = () => {
@@ -2622,21 +2849,13 @@ export class WorldSystem {
       ctx.strokeStyle = 'rgba(8, 14, 9, 0.55)';
       ctx.lineWidth = 5;
       ctx.beginPath();
-      ctx.ellipse(
-        0,
-        0,
-        plateau.rx - 4,
-        plateau.ry - 4,
-        0,
-        Math.PI * 0.08,
-        Math.PI * 0.92
-      );
+      this.tracePlateauShape(ctx, plateau, -4, Math.PI * 0.08, Math.PI * 0.92);
       ctx.stroke();
 
       ctx.strokeStyle = 'rgba(126, 174, 108, 0.5)';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.ellipse(0, 0, plateau.rx - 3, plateau.ry - 3, 0, 0, Math.PI * 2);
+      this.tracePlateauShape(ctx, plateau, -3);
       ctx.stroke();
 
       // Dirt ramp: it starts inside the hilltop, cuts through the cliff ring
@@ -2649,32 +2868,25 @@ export class WorldSystem {
       rampGradient.addColorStop(1, '#4a3220');
       ctx.fillStyle = rampGradient;
       ctx.beginPath();
-      ctx.moveTo(rampInner, -plateau.rampHalfWidth);
-      ctx.lineTo(rampOuter, -plateau.rampHalfWidth * 1.2);
-      ctx.lineTo(rampOuter, plateau.rampHalfWidth * 1.2);
-      ctx.lineTo(rampInner, plateau.rampHalfWidth);
-      ctx.closePath();
+      this.tracePlateauRamp(ctx, plateau, rampInner, rampOuter);
       ctx.fill();
 
       // Eroded ramp edges.
       ctx.strokeStyle = 'rgba(42, 27, 14, 0.85)';
       ctx.lineWidth = 4;
       ctx.beginPath();
-      ctx.moveTo(rampInner, -plateau.rampHalfWidth);
-      ctx.lineTo(rampOuter, -plateau.rampHalfWidth * 1.2);
-      ctx.moveTo(rampInner, plateau.rampHalfWidth);
-      ctx.lineTo(rampOuter, plateau.rampHalfWidth * 1.2);
+      this.tracePlateauRampEdge(ctx, plateau, rampInner, rampOuter, -1);
+      this.tracePlateauRampEdge(ctx, plateau, rampInner, rampOuter, 1);
       ctx.stroke();
 
       // Traction ribs across the dirt.
       ctx.strokeStyle = 'rgba(38, 23, 11, 0.5)';
       ctx.lineWidth = 2.5;
       for (let d = rampInner + 34; d < rampOuter - 14; d += 44) {
-        const t = (d - rampInner) / (rampOuter - rampInner);
-        const half = plateau.rampHalfWidth * (1 + 0.2 * t);
+        const profile = this.getPlateauRampProfile(plateau, d, rampInner, rampOuter);
         ctx.beginPath();
-        ctx.moveTo(d, -half);
-        ctx.lineTo(d, half);
+        ctx.moveTo(d, profile.center - profile.halfWidth);
+        ctx.lineTo(d, profile.center + profile.halfWidth);
         ctx.stroke();
       }
 
@@ -2683,7 +2895,9 @@ export class WorldSystem {
       for (let s = 0; s < 10; s++) {
         const t = (s + 0.5) / 10;
         const d = rampInner + (rampOuter - rampInner) * t;
-        const lateral = ((s % 3) - 1) * plateau.rampHalfWidth * 0.45;
+        const profile = this.getPlateauRampProfile(plateau, d, rampInner, rampOuter);
+        const lateral =
+          profile.center + ((s % 3) - 1) * profile.halfWidth * 0.45;
         ctx.fillRect(d, lateral, 3, 2);
       }
       ctx.restore();
@@ -2692,8 +2906,12 @@ export class WorldSystem {
       ctx.fillStyle = 'rgba(120, 112, 96, 0.75)';
       for (let s = 0; s < 14; s++) {
         const angle = (s / 14) * Math.PI * 2;
-        const sx = Math.cos(angle) * (plateau.rx + rim * 0.5);
-        const sy = Math.sin(angle) * (plateau.ry + rim * 0.5);
+        const dirX = Math.cos(angle);
+        const dirY = Math.sin(angle);
+        const radius =
+          this.getPlateauBoundaryRadius(plateau, dirX, dirY) + rim * 0.5;
+        const sx = dirX * radius;
+        const sy = dirY * radius;
         const size = 3 + (s % 3) * 2;
         ctx.beginPath();
         ctx.ellipse(sx, sy, size, size * 0.65, angle, 0, Math.PI * 2);
@@ -2720,83 +2938,86 @@ export class WorldSystem {
     ctx.rect(-FOREST_HALF_SIZE, -FOREST_HALF_SIZE, FOREST_SIZE, FOREST_SIZE);
     ctx.clip();
 
-    const traceRiver = () => {
+    const riverXs: number[] = [];
+    for (let x = start; x <= end; x += step) riverXs.push(x);
+
+    /**
+     * Filled river band with an independently wobbling shoreline on each
+     * cross-section. Unlike a constant-width stroke, this carves small bays,
+     * narrowing channels and irregular sand margins along the course.
+     */
+    const traceRiverBand = (halfWidth: number) => {
       ctx.beginPath();
-      for (let x = start; x <= end; x += step) {
+      for (let i = 0; i < riverXs.length; i++) {
+        const x = riverXs[i];
         const y = this.riverCenterY(x);
-        if (x === start) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
+        const half = this.getRiverHalfWidth(x, halfWidth);
+        if (i === 0) ctx.moveTo(x, y - half);
+        else ctx.lineTo(x, y - half);
       }
+      for (let i = riverXs.length - 1; i >= 0; i--) {
+        const x = riverXs[i];
+        const y = this.riverCenterY(x);
+        const half = this.getRiverHalfWidth(x, halfWidth);
+        ctx.lineTo(x, y + half);
+      }
+      ctx.closePath();
     };
 
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-
     // Sandy banks with a soft, mossy transition into the forest.
-    traceRiver();
-    ctx.strokeStyle = '#2b4524';
-    ctx.lineWidth = RIVER_WIDTH + RIVER_BANK * 2 + 96;
-    ctx.stroke();
+    traceRiverBand((RIVER_WIDTH + RIVER_BANK * 2 + 96) / 2);
+    ctx.fillStyle = '#2b4524';
+    ctx.fill();
 
-    traceRiver();
-    ctx.strokeStyle = '#6f5a34';
-    ctx.lineWidth = RIVER_WIDTH + RIVER_BANK * 2 + 40;
-    ctx.stroke();
+    traceRiverBand((RIVER_WIDTH + RIVER_BANK * 2 + 40) / 2);
+    ctx.fillStyle = '#6f5a34';
+    ctx.fill();
 
-    traceRiver();
-    ctx.strokeStyle = '#a17f4a';
-    ctx.lineWidth = RIVER_WIDTH + RIVER_BANK * 2 + 12;
-    ctx.stroke();
+    traceRiverBand((RIVER_WIDTH + RIVER_BANK * 2 + 12) / 2);
+    ctx.fillStyle = '#a17f4a';
+    ctx.fill();
 
-    traceRiver();
-    ctx.strokeStyle = '#b89355';
-    ctx.lineWidth = RIVER_WIDTH + RIVER_BANK * 2;
-    ctx.stroke();
+    traceRiverBand((RIVER_WIDTH + RIVER_BANK * 2) / 2);
+    ctx.fillStyle = '#b89355';
+    ctx.fill();
 
-    traceRiver();
-    ctx.strokeStyle = '#cdb079';
-    ctx.lineWidth = RIVER_WIDTH + RIVER_BANK * 1.35;
-    ctx.stroke();
+    traceRiverBand((RIVER_WIDTH + RIVER_BANK * 1.35) / 2);
+    ctx.fillStyle = '#cdb079';
+    ctx.fill();
 
-    traceRiver();
-    ctx.strokeStyle = '#dcc28b';
-    ctx.lineWidth = RIVER_WIDTH + RIVER_BANK * 0.78;
-    ctx.stroke();
+    traceRiverBand((RIVER_WIDTH + RIVER_BANK * 0.78) / 2);
+    ctx.fillStyle = '#dcc28b';
+    ctx.fill();
 
     // Granulated sand over the whole beach band.
     const sandGrain = this.getSandGrainPattern(ctx);
     if (sandGrain) {
-      traceRiver();
-      ctx.strokeStyle = sandGrain;
-      ctx.lineWidth = RIVER_WIDTH + RIVER_BANK * 1.85;
+      traceRiverBand((RIVER_WIDTH + RIVER_BANK * 1.85) / 2);
+      ctx.fillStyle = sandGrain;
       ctx.globalAlpha = 0.7;
-      ctx.stroke();
+      ctx.fill();
       ctx.globalAlpha = 1;
     }
 
     // Water surface: dark edge, base water, lighter current and shimmer.
-    traceRiver();
-    ctx.strokeStyle = '#145466';
-    ctx.lineWidth = RIVER_WIDTH;
-    ctx.stroke();
+    traceRiverBand(RIVER_WIDTH / 2);
+    ctx.fillStyle = '#145466';
+    ctx.fill();
 
-    traceRiver();
-    ctx.strokeStyle = '#1b6b82';
-    ctx.lineWidth = RIVER_WIDTH - 24;
-    ctx.stroke();
+    traceRiverBand((RIVER_WIDTH - 24) / 2);
+    ctx.fillStyle = '#1b6b82';
+    ctx.fill();
 
-    traceRiver();
-    ctx.strokeStyle = '#2b8ba1';
-    ctx.lineWidth = RIVER_WIDTH - 170;
-    ctx.stroke();
+    traceRiverBand((RIVER_WIDTH - 170) / 2);
+    ctx.fillStyle = '#2b8ba1';
+    ctx.fill();
 
     const waterShimmer = this.getWaterShimmerPattern(ctx);
     if (waterShimmer) {
-      traceRiver();
-      ctx.strokeStyle = waterShimmer;
-      ctx.lineWidth = RIVER_WIDTH - 30;
+      traceRiverBand((RIVER_WIDTH - 30) / 2);
+      ctx.fillStyle = waterShimmer;
       ctx.globalAlpha = 0.55;
-      ctx.stroke();
+      ctx.fill();
       ctx.globalAlpha = 1;
     }
 
@@ -2812,58 +3033,51 @@ export class WorldSystem {
 
       ctx.fillStyle = '#2b4524';
       ctx.beginPath();
-      ctx.ellipse(
-        0,
-        0,
+      this.traceLakeShape(
+        ctx,
+        lake,
         lake.rx + RIVER_BANK + 44,
-        lake.ry + RIVER_BANK * 0.85 + 36,
-        0,
-        0,
-        Math.PI * 2
+        lake.ry + RIVER_BANK * 0.85 + 36
       );
       ctx.fill();
 
       ctx.fillStyle = '#6f5a34';
       ctx.beginPath();
-      ctx.ellipse(
-        0,
-        0,
+      this.traceLakeShape(
+        ctx,
+        lake,
         lake.rx + RIVER_BANK + 18,
-        lake.ry + RIVER_BANK * 0.85 + 14,
-        0,
-        0,
-        Math.PI * 2
+        lake.ry + RIVER_BANK * 0.85 + 14
       );
       ctx.fill();
 
       ctx.fillStyle = '#b89355';
       ctx.beginPath();
-      ctx.ellipse(0, 0, lake.rx + RIVER_BANK, lake.ry + RIVER_BANK * 0.85, 0, 0, Math.PI * 2);
+      this.traceLakeShape(
+        ctx,
+        lake,
+        lake.rx + RIVER_BANK,
+        lake.ry + RIVER_BANK * 0.85
+      );
       ctx.fill();
 
       ctx.fillStyle = '#cdb079';
       ctx.beginPath();
-      ctx.ellipse(
-        0,
-        0,
+      this.traceLakeShape(
+        ctx,
+        lake,
         lake.rx + RIVER_BANK * 0.62,
-        lake.ry + RIVER_BANK * 0.54,
-        0,
-        0,
-        Math.PI * 2
+        lake.ry + RIVER_BANK * 0.54
       );
       ctx.fill();
 
       ctx.fillStyle = '#dcc28b';
       ctx.beginPath();
-      ctx.ellipse(
-        0,
-        0,
+      this.traceLakeShape(
+        ctx,
+        lake,
         lake.rx + RIVER_BANK * 0.3,
-        lake.ry + RIVER_BANK * 0.26,
-        0,
-        0,
-        Math.PI * 2
+        lake.ry + RIVER_BANK * 0.26
       );
       ctx.fill();
 
@@ -2871,14 +3085,11 @@ export class WorldSystem {
         ctx.fillStyle = sandGrain;
         ctx.globalAlpha = 0.7;
         ctx.beginPath();
-        ctx.ellipse(
-          0,
-          0,
+        this.traceLakeShape(
+          ctx,
+          lake,
           lake.rx + RIVER_BANK * 0.85,
-          lake.ry + RIVER_BANK * 0.72,
-          0,
-          0,
-          Math.PI * 2
+          lake.ry + RIVER_BANK * 0.72
         );
         ctx.fill();
         ctx.globalAlpha = 1;
@@ -2886,24 +3097,24 @@ export class WorldSystem {
 
       ctx.fillStyle = '#145466';
       ctx.beginPath();
-      ctx.ellipse(0, 0, lake.rx, lake.ry, 0, 0, Math.PI * 2);
+      this.traceLakeShape(ctx, lake, lake.rx, lake.ry);
       ctx.fill();
 
       ctx.fillStyle = '#1b6b82';
       ctx.beginPath();
-      ctx.ellipse(0, 0, lake.rx - 10, lake.ry - 8, 0, 0, Math.PI * 2);
+      this.traceLakeShape(ctx, lake, lake.rx - 10, lake.ry - 8);
       ctx.fill();
 
       ctx.fillStyle = '#2b8ba1';
       ctx.beginPath();
-      ctx.ellipse(0, 0, lake.rx * 0.82, lake.ry * 0.82, 0, 0, Math.PI * 2);
+      this.traceLakeShape(ctx, lake, lake.rx * 0.82, lake.ry * 0.82);
       ctx.fill();
 
       if (waterShimmer) {
         ctx.fillStyle = waterShimmer;
         ctx.globalAlpha = 0.55;
         ctx.beginPath();
-        ctx.ellipse(0, 0, lake.rx * 0.97, lake.ry * 0.96, 0, 0, Math.PI * 2);
+        this.traceLakeShape(ctx, lake, lake.rx * 0.97, lake.ry * 0.96);
         ctx.fill();
         ctx.globalAlpha = 1;
       }
