@@ -2683,28 +2683,29 @@ export class WorldSystem {
 
     switch (kind) {
       case 'castanha': {
-        // Rounded dark-brown shell with a lighter rim.
-        fillCircle(8, 8.2, 6.4, outline);
-        fillCircle(8, 8.2, 5.7, '#5c341b');
-        fillCircle(8, 8.2, 5.0, '#7a4a27');
+        // Whole dark-brown pod on the upper left, with its pointed stem nub.
+        fillCircle(5.0, 4.7, 4.4, outline);
+        fillCircle(5.0, 4.7, 3.8, '#5c341b');
+        fillCircle(4.3, 4.0, 2.2, '#7a4a27');
+        fillCircle(6.0, 5.6, 2.0, '#4a2714');
+        setPixel(3.2, 2.9, '#9b6538');
+        setPixel(3.9, 2.4, '#9b6538');
+        setPixel(2.6, 3.9, '#9b6538');
 
-        // Cracked opening showing three pale Brazil nuts.
-        fillEllipse(8, 8.6, 4.3, 3.0, '#3a1d0e');
-        fillEllipse(8, 8.6, 3.7, 2.5, '#241108');
-        const nuts = [5.6, 8, 10.4];
-        for (let i = 0; i < nuts.length; i++) {
-          const nutX = nuts[i];
-          fillCircle(nutX, 8.6, 1.45, outline);
-          fillCircle(nutX, 8.6, 1.05, '#e9cf9a');
-          fillCircle(nutX - 0.2, 8.3, 0.55, '#f7e8c4');
-          setPixel(nutX - 0.6, 8.2, '#fff6de');
-        }
+        fillEllipse(5.0, 0.7, 1.3, 1.1, outline);
+        fillEllipse(5.0, 0.8, 0.8, 0.6, '#6b3d20');
 
-        // Shell grain and highlights.
-        drawLine(3.6, 5.4, 5.2, 3.8, '#9b6538');
-        drawLine(10.5, 3.9, 12.2, 5.7, '#9b6538');
-        setPixel(4.2, 11.2, '#9b6538');
-        setPixel(11.8, 11, '#9b6538');
+        // Cracked half in the lower right: dark shell rim around a pale beige
+        // nut, drawn last so it sits in front of the whole pod.
+        fillEllipse(10.7, 11.0, 4.2, 3.2, outline);
+        fillEllipse(10.7, 11.0, 3.6, 2.7, '#5c341b');
+        fillEllipse(11.2, 11.7, 2.8, 1.9, '#43220f');
+        fillEllipse(10.5, 10.3, 3.1, 1.9, '#c9a46d');
+        fillEllipse(10.5, 10.4, 2.4, 1.3, '#2a1509');
+        fillEllipse(10.3, 10.2, 1.9, 0.95, '#e0c08c');
+        fillEllipse(9.7, 9.9, 1.0, 0.45, '#f7e8c6');
+        setPixel(9.0, 9.7, '#fff6de');
+        setPixel(9.6, 9.5, '#fff6de');
         break;
       }
       case 'buriti': {
