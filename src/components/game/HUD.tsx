@@ -31,6 +31,14 @@ export const HUD: React.FC<HUDProps> = ({ hud, onPause, isMuted, onToggleMute, d
 
   const hpPercent = Math.min(100, Math.max(0, (hud.playerHp / Math.max(1, hud.playerMaxHp)) * 100));
   const staminaPercent = Math.min(100, Math.max(0, (hud.stamina / Math.max(1, hud.maxStamina)) * 100));
+  const objectives = hud.objectives;
+
+  const objectiveCardClass = (complete: boolean, active: boolean) =>
+    complete
+      ? 'border-emerald-500/60 bg-emerald-950/50 text-emerald-200'
+      : active
+        ? 'border-amber-400/70 bg-slate-900/90 text-slate-100'
+        : 'border-slate-700/70 bg-slate-900/60 text-slate-400';
 
   return (
     <div className="pointer-events-none absolute inset-0 select-none flex flex-col justify-between p-3 font-sans text-white">
@@ -44,6 +52,75 @@ export const HUD: React.FC<HUDProps> = ({ hud, onPause, isMuted, onToggleMute, d
 
       {/* Top Section */}
       <div className="flex flex-col gap-2 pt-24">
+        {/* Amazon Forest Mission Objectives */}
+        {objectives && (
+          <div className="w-full max-w-2xl mx-auto rounded-xl border border-emerald-800/60 bg-slate-950/80 px-3 py-2 shadow-lg backdrop-blur-sm">
+            <div className="mb-1.5 flex items-center justify-between gap-2 text-[10px] font-bold uppercase tracking-widest">
+              <span className="text-emerald-300">Objetivos da Missão</span>
+              <span className="text-slate-400">Floresta Amazônica</span>
+            </div>
+            <div className="grid gap-1.5 sm:grid-cols-3">
+              <div
+                className={`rounded-lg border px-2 py-1 text-[10px] ${objectiveCardClass(
+                  objectives.act1Complete,
+                  objectives.currentAct === 1
+                )}`}
+              >
+                <div className="flex items-center justify-between gap-1 font-black uppercase tracking-wide">
+                  <span>Ato 1 · Início</span>
+                  <span>{objectives.act1Complete ? '✓' : ''}</span>
+                </div>
+                <p>
+                  Frutas {objectives.fruitsCollected}/{objectives.fruitsRequired} · Nível{' '}
+                  {objectives.level}/{objectives.levelRequired}
+                </p>
+                <p className="text-emerald-400/80">+10% velocidade</p>
+              </div>
+
+              <div
+                className={`rounded-lg border px-2 py-1 text-[10px] ${objectiveCardClass(
+                  objectives.act2Complete,
+                  objectives.currentAct === 2
+                )}`}
+              >
+                <div className="flex items-center justify-between gap-1 font-black uppercase tracking-wide">
+                  <span>Ato 2 · Meio</span>
+                  <span>{objectives.act2Complete ? '✓' : ''}</span>
+                </div>
+                <p>
+                  Chefes {objectives.folkloreBossesDefeated}/
+                  {objectives.folkloreBossesRequired} · Predadores{' '}
+                  {objectives.evolvedPredatorsDefeated}/{objectives.evolvedPredatorsRequired}
+                </p>
+                <p className="text-emerald-400/80">+20% dano · regeneração</p>
+              </div>
+
+              <div
+                className={`rounded-lg border px-2 py-1 text-[10px] ${objectiveCardClass(
+                  objectives.act3Complete,
+                  objectives.currentAct === 3
+                )}`}
+              >
+                <div className="flex items-center justify-between gap-1 font-black uppercase tracking-wide">
+                  <span>Ato 3 · Fim</span>
+                  <span>{objectives.act3Complete ? '✓' : ''}</span>
+                </div>
+                <p className="flex flex-wrap gap-x-2">
+                  <span className={objectives.cobraGrandeDefeated ? 'text-emerald-400' : ''}>
+                    {objectives.cobraGrandeDefeated ? '✓' : '○'} Cobra-Grande
+                  </span>
+                  <span className={objectives.boitataDefeated ? 'text-emerald-400' : ''}>
+                    {objectives.boitataDefeated ? '✓' : '○'} Boitatá
+                  </span>
+                </p>
+                <p className={objectives.survivedToEnd ? 'text-emerald-400/80' : ''}>
+                  {objectives.survivedToEnd ? '✓' : '○'} Sobreviver até 20:00
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Boss Health Bar (if active) */}
         {hud.activeBoss && (
           <div className="w-full max-w-lg mx-auto bg-slate-950/90 border-2 border-red-700 rounded-xl p-2 shadow-2xl backdrop-blur-md">

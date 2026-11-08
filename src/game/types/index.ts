@@ -238,6 +238,24 @@ export type DropType =
   | 'chest'
   | 'coin';
 
+export interface MissionObjectivesHUD {
+  currentAct: 1 | 2 | 3;
+  fruitsCollected: number;
+  fruitsRequired: number;
+  level: number;
+  levelRequired: number;
+  act1Complete: boolean;
+  folkloreBossesDefeated: number;
+  folkloreBossesRequired: number;
+  evolvedPredatorsDefeated: number;
+  evolvedPredatorsRequired: number;
+  act2Complete: boolean;
+  cobraGrandeDefeated: boolean;
+  boitataDefeated: boolean;
+  survivedToEnd: boolean;
+  act3Complete: boolean;
+}
+
 export interface HUDState {
   playerHp: number;
   playerMaxHp: number;
@@ -267,6 +285,7 @@ export interface HUDState {
     maxHp: number;
   };
   eventAlert?: string;
+  objectives?: MissionObjectivesHUD;
 }
 
 export interface GameEndSummary {

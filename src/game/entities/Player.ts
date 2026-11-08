@@ -82,6 +82,10 @@ export class Player {
   public xpMultiplier: number = 1.0;
   public goldMultiplier: number = 1.0;
   public recoveryPerSec: number = 0;
+  // Permanent-for-the-run bonuses granted by Amazon Forest mission objectives.
+  public objectiveSpeedBonus: number = 0;
+  public objectiveMightBonus: number = 0;
+  public objectiveRecoveryBonus: number = 0;
   public speedBoostTimer: number = 0;
   public slowTimer: number = 0;
   public slowFactor: number = 0;

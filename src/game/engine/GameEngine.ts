@@ -5,6 +5,7 @@ import {
   GameEndSummary,
   HUDState,
   MapId,
+  MissionObjectivesHUD,
   UpgradeOption,
   SavedGameData,
   WeaponId,
@@ -69,6 +70,28 @@ const ECOLOGY_FRUIT_EAT_RADIUS = 54;
 const ECOLOGY_RIVER_PREDATOR_RANGE = 320;
 const ECOLOGY_JAGUAR_RANGE = 360;
 const ECOLOGY_FRUIT_FEED_COOLDOWN = 8;
+
+// Amazon Forest mission objectives.
+const OBJECTIVE_ACT1_FRUITS = 3;
+const OBJECTIVE_ACT1_LEVEL = 10;
+const OBJECTIVE_ACT2_BOSSES = 5;
+const OBJECTIVE_ACT2_PREDATORS = 2;
+const OBJECTIVE_ACT2_START = 300;
+const OBJECTIVE_ACT3_START = 900;
+const OBJECTIVE_MAP_END = 1200;
+
+interface AmazonObjectivesState {
+  fruitsCollected: number;
+  folkloreBossesDefeated: number;
+  evolvedPredatorsDefeated: number;
+  cobraGrandeDefeated: boolean;
+  boitataDefeated: boolean;
+  act1Complete: boolean;
+  act2Complete: boolean;
+  act3Complete: boolean;
+  act1RewardApplied: boolean;
+  act2RewardApplied: boolean;
+}
 
 const RIVER_PREDATOR_PREY: EnemyType[] = [
   'capybara',
@@ -137,6 +160,18 @@ export class GameEngine {
   private itemSpawnTimer: number = 0;
   private processedEnemyDeaths = new WeakSet<Enemy>();
   private missionSnapshot = { kills: 0, survivalSeconds: 0, goldCollected: 0, bossesDefeated: 0 };
+  private amazonObjectives: AmazonObjectivesState = {
+    fruitsCollected: 0,
+    folkloreBossesDefeated: 0,
+    evolvedPredatorsDefeated: 0,
+    cobraGrandeDefeated: false,
+    boitataDefeated: false,
+    act1Complete: false,
+    act2Complete: false,
+    act3Complete: false,
+    act1RewardApplied: false,
+    act2RewardApplied: false,
+  };
 
   private callbacks: GameEngineCallbacks;
 
@@ -778,6 +813,9 @@ export class GameEngine {
       return;
     }
 
+    // 8.7. Amazon Forest mission objectives (rewards + final victory)
+    if (this.updateAmazonObjectives()) return;
+
     // 9. Update VFX
     this.vfx.update(dt);
 
@@ -952,6 +990,106 @@ export class GameEngine {
     }
   }
 
+  private trackAmazonObjectiveKill(enemy: Enemy): void {
+    if (!this.waveDirector.isAmazonForest) return;
+    if (this.waveDirector.survivalTime < OBJECTIVE_ACT2_START) return;
+
+    if (enemy.type === 'boss_cobra_grande') {
+      this.amazonObjectives.cobraGrandeDefeated = true;
+    } else if (enemy.type === 'boss_boitata') {
+      this.amazonObjectives.boitataDefeated = true;
+    } else if (enemy.isBoss) {
+      this.amazonObjectives.folkloreBossesDefeated += 1;
+    }
+
+    if (enemy.isEcologyPredator && enemy.ecologyFedCount > 0) {
+      this.amazonObjectives.evolvedPredatorsDefeated += 1;
+    }
+  }
+
+  private updateAmazonObjectives(): boolean {
+    if (!this.waveDirector.isAmazonForest) return false;
+
+    const objectives = this.amazonObjectives;
+
+    if (
+      !objectives.act1Complete &&
+      objectives.fruitsCollected >= OBJECTIVE_ACT1_FRUITS &&
+      this.player.level >= OBJECTIVE_ACT1_LEVEL
+    ) {
+      objectives.act1Complete = true;
+    }
+
+    if (objectives.act1Complete && !objectives.act1RewardApplied) {
+      objectives.act1RewardApplied = true;
+      this.player.objectiveSpeedBonus = Math.max(this.player.objectiveSpeedBonus, 0.1);
+      this.weaponSystem.recalculatePlayerStats(this.player);
+    }
+
+    if (
+      !objectives.act2Complete &&
+      objectives.folkloreBossesDefeated >= OBJECTIVE_ACT2_BOSSES &&
+      objectives.evolvedPredatorsDefeated >= OBJECTIVE_ACT2_PREDATORS
+    ) {
+      objectives.act2Complete = true;
+    }
+
+    if (objectives.act2Complete && !objectives.act2RewardApplied) {
+      objectives.act2RewardApplied = true;
+      this.player.objectiveMightBonus = Math.max(this.player.objectiveMightBonus, 0.2);
+      this.player.objectiveRecoveryBonus = Math.max(this.player.objectiveRecoveryBonus, 1);
+      this.weaponSystem.recalculatePlayerStats(this.player);
+    }
+
+    if (
+      !objectives.act3Complete &&
+      objectives.cobraGrandeDefeated &&
+      objectives.boitataDefeated &&
+      this.waveDirector.survivalTime >= OBJECTIVE_MAP_END
+    ) {
+      objectives.act3Complete = true;
+      this.handleVictory();
+      return true;
+    }
+
+    return false;
+  }
+
+  private buildObjectivesHUD(): MissionObjectivesHUD {
+    const objectives = this.amazonObjectives;
+    const survivalTime = this.waveDirector.survivalTime;
+    let currentAct: 1 | 2 | 3 = 1;
+    if (objectives.act2Complete || survivalTime >= OBJECTIVE_ACT3_START) {
+      currentAct = 3;
+    } else if (objectives.act1Complete || survivalTime >= OBJECTIVE_ACT2_START) {
+      currentAct = 2;
+    }
+
+    return {
+      currentAct,
+      fruitsCollected: Math.min(OBJECTIVE_ACT1_FRUITS, objectives.fruitsCollected),
+      fruitsRequired: OBJECTIVE_ACT1_FRUITS,
+      level: this.player.level,
+      levelRequired: OBJECTIVE_ACT1_LEVEL,
+      act1Complete: objectives.act1Complete,
+      folkloreBossesDefeated: Math.min(
+        OBJECTIVE_ACT2_BOSSES,
+        objectives.folkloreBossesDefeated
+      ),
+      folkloreBossesRequired: OBJECTIVE_ACT2_BOSSES,
+      evolvedPredatorsDefeated: Math.min(
+        OBJECTIVE_ACT2_PREDATORS,
+        objectives.evolvedPredatorsDefeated
+      ),
+      evolvedPredatorsRequired: OBJECTIVE_ACT2_PREDATORS,
+      act2Complete: objectives.act2Complete,
+      cobraGrandeDefeated: objectives.cobraGrandeDefeated,
+      boitataDefeated: objectives.boitataDefeated,
+      survivedToEnd: survivalTime >= OBJECTIVE_MAP_END,
+      act3Complete: objectives.act3Complete,
+    };
+  }
+
   private updateBossEffects(dt: number): boolean {
     for (let i = this.bossProjectiles.length - 1; i >= 0; i--) {
       const p = this.bossProjectiles[i];
@@ -1034,6 +1172,8 @@ export class GameEngine {
   private onEnemyKilled(enemy: Enemy): void {
     if (this.processedEnemyDeaths.has(enemy)) return;
     this.processedEnemyDeaths.add(enemy);
+
+    this.trackAmazonObjectiveKill(enemy);
 
     this.kills += 1;
     this.vfx.addDeathBurst(
@@ -1188,6 +1328,10 @@ export class GameEngine {
   }
 
   private handleFruitCollected(fruit: CollectedFruit): void {
+    if (this.waveDirector.isAmazonForest) {
+      this.amazonObjectives.fruitsCollected += 1;
+    }
+
     if (fruit.kind === 'acai') {
       // Açaí: magnet every XP gem on the map toward the hero.
       this.sound.playLevelUp();
@@ -1430,6 +1574,7 @@ export class GameEngine {
       passives: passivesList,
       activeBoss,
       eventAlert: this.waveDirector.eventAlert || undefined,
+      objectives: this.waveDirector.isAmazonForest ? this.buildObjectivesHUD() : undefined,
     });
   }
 

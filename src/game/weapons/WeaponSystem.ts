@@ -319,10 +319,12 @@ export class WeaponSystem {
     const perm = player.powerUps;
 
     // Reset player modifiers to character base + permanent shop bonuses
-    player.might = 1.0 + (b.might || 0) + (perm.might || 0) * 0.05;
+    player.might =
+      1.0 + (b.might || 0) + (perm.might || 0) * 0.05 + player.objectiveMightBonus;
     player.armor = (b.armor || 0) + (perm.armor || 0) * 1;
     player.maxHp = 100 + (b.maxHp || 0) + (perm.maxHp || 0) * 10;
-    player.recoveryPerSec = (b.recovery || 0) + (perm.recovery || 0) * 0.5;
+    player.recoveryPerSec =
+      (b.recovery || 0) + (perm.recovery || 0) * 0.5 + player.objectiveRecoveryBonus;
     player.cooldownReduction = b.cooldownReduction || 0;
     player.projectileSpeedMultiplier = 1.0;
     player.areaMultiplier = 1.0 + (b.area || 0);
@@ -337,7 +339,7 @@ export class WeaponSystem {
     player.pickupRadius = 65 + (b.pickupRadius || 0);
     player.xpMultiplier = 1.0 + (b.xpMultiplier || 0);
     player.goldMultiplier = 1.0 + (perm.greed || 0) * 0.15;
-    player.speed = player.baseSpeed;
+    player.speed = player.baseSpeed * (1 + player.objectiveSpeedBonus);
 
     // Apply all 12 passives
     const spinach = this.passives.get('spinach');
