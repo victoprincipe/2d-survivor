@@ -3,6 +3,7 @@ import { DifficultyConfig, DifficultyId } from '../types';
 export const DIFFICULTIES: DifficultyConfig[] = [
   {
     id: 'easy',
+    levelUpHealFraction: 0.6,
     name: 'Fácil',
     description: 'Inimigos mais frágeis e menos numerosos. Ideal para conhecer o arsenal.',
     color: '#4ade80',
@@ -15,6 +16,7 @@ export const DIFFICULTIES: DifficultyConfig[] = [
   },
   {
     id: 'normal',
+    levelUpHealFraction: 0.4,
     name: 'Normal',
     description: 'A experiência equilibrada padrão do jogo (100% recompensas).',
     color: '#38bdf8',
@@ -27,6 +29,7 @@ export const DIFFICULTIES: DifficultyConfig[] = [
   },
   {
     id: 'hard',
+    levelUpHealFraction: 0.2,
     name: 'Difícil',
     description: 'Hordas densas e monstros resistentes (+15% XP, +35% Ouro).',
     color: '#f59e0b',
@@ -39,6 +42,7 @@ export const DIFFICULTIES: DifficultyConfig[] = [
   },
   {
     id: 'nightmare',
+    levelUpHealFraction: 0.05,
     name: 'Pesadelo',
     description: 'Sobrevivência implacável contra enxames letais (+30% XP, +75% Ouro).',
     color: '#a855f7',
@@ -51,6 +55,7 @@ export const DIFFICULTIES: DifficultyConfig[] = [
   },
   {
     id: 'infernal',
+    levelUpHealFraction: 0,
     name: 'Infernal',
     description: 'O caos absoluto. Apenas builds sinérgicas sobrevivem (+50% XP, +125% Ouro).',
     color: '#ef4444',

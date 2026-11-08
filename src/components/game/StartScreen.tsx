@@ -9,6 +9,7 @@ import { DIFFICULTIES, getDifficulty } from '@/game/data/difficulties';
 import { GAME_MAPS } from '@/game/data/maps';
 import { countClaimableMissions, getAccountLevel } from '@/game/data/missions';
 import { WEAPON_REGISTRY } from '@/game/data/upgrades';
+import { EquipmentModal } from './EquipmentModal';
 import { MissionsTab } from './MissionsTab';
 import { AmazonGuideModal } from './AmazonGuideModal';
 import { renderWeaponIcon, renderNamedIcon } from './GameIcons';
@@ -85,6 +86,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
     savedData.difficulty ?? 'normal'
   );
   const [selectedMap, setSelectedMap] = useState<MapId>('night_plain');
+  const [isEquipmentOpen, setIsEquipmentOpen] = useState(false);
   const [isAmazonGuideOpen, setIsAmazonGuideOpen] = useState(false);
   const [selectionVolume, setSelectionVolume] = useState(1);
   const [isSelectionMusicPlaying, setIsSelectionMusicPlaying] = useState(false);
@@ -429,7 +431,11 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
                 return (
                   <button
                     key={char.id}
-                    onClick={() => handleSelectCharacter(index)}
+                    onClick={() => {
+                      handleSelectCharacter(index);
+                      setIsEquipmentOpen(char.id === 'kayrurururu');
+                    }}
+                    aria-label={char.id === 'kayrurururu' ? `Selecionar ${char.name} e abrir equipamento` : `Selecionar ${char.name}`}
                     className={`char-card ${isSelected ? 'char-card-active' : ''}`}
                   >
                     <div>
@@ -567,6 +573,10 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
         </div>
       </div>
 
+      {isEquipmentOpen && selectedChar.id === 'kayrurururu' && (
+        <EquipmentModal character={selectedChar} savedData={savedData} onUpdateSave={onUpdateSave}
+          onClose={() => setIsEquipmentOpen(false)} />
+      )}
       {isAmazonGuideOpen && <AmazonGuideModal onClose={() => setIsAmazonGuideOpen(false)} />}
     </div>
   );

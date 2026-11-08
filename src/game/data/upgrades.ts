@@ -102,7 +102,7 @@ export const WEAPON_REGISTRY: Record<WeaponId, WeaponMeta> = {
   bow: {
     id: 'bow',
     name: 'Arco do Amazonas',
-    description: 'Balista pesada que prioriza automaticamente o monstro de maior vida máxima ao alcance.',
+    description: 'Balista pesada que prioriza automaticamente os inimigos mais próximos ao alcance.',
     maxLevel: 5,
     iconName: 'BowArrow',
     synergyPassive: 'hunter_mark',
@@ -110,7 +110,7 @@ export const WEAPON_REGISTRY: Record<WeaponId, WeaponMeta> = {
     evolvedName: 'Flecha Titânica',
     evolvedDescription: 'Arpões dourados de perfuração infinita que detonam ondas de choque esmeralda em Elites.',
     levelDescriptions: [
-      'Mira no alvo mais forte e dispara uma flecha pesada que atravessa 4 inimigos.',
+      'Mira no alvo mais próximo e dispara uma flecha pesada que atravessa 4 inimigos.',
       'Dano aumentado em +35% e maior impacto de recuo.',
       'Atravessa até 7 inimigos com +25% de bônus crítico.',
       'Dispara +1 flecha pesada simultânea.',

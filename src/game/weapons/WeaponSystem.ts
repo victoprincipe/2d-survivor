@@ -678,7 +678,8 @@ export class WeaponSystem {
       }
       case 'bow': {
         const baseCd = w.evolved ? 0.72 : w.level >= 5 ? 1.12 : 1.42;
-        w.cooldownTimer = baseCd * cdFactor;
+        const characterCdFactor = player.character.id === 'kayrurururu' ? 0.7 : 1;
+        w.cooldownTimer = baseCd * cdFactor * characterCdFactor;
         this.triggerBow(w, player, grid, sound);
         break;
       }
@@ -974,10 +975,10 @@ export class WeaponSystem {
     grid: SpatialGrid<Enemy>,
     sound: SoundEngine
   ): void {
-    const nearby = grid.queryRadius(player.x, player.y, 580);
-    // Priority Sniper: sort by highest Max HP first, then closest!
+    const nearby = grid.queryRadius(player.x, player.y, 580)
+      .filter(enemy => enemy.hp > 0 && !enemy.isSubmerged);
+    // Aim at the nearest valid enemies, regardless of their health or rank.
     nearby.sort((a, b) => {
-      if (b.maxHp !== a.maxHp) return b.maxHp - a.maxHp;
       const da = (a.x - player.x) ** 2 + (a.y - player.y) ** 2;
       const db = (b.x - player.x) ** 2 + (b.y - player.y) ** 2;
       return da - db;
@@ -1323,7 +1324,7 @@ export class WeaponSystem {
     const count = (w.evolved ? 7 : counts[w.level]) + player.bonusAmount;
     const damage = (w.evolved ? 80 : damages[w.level]) * player.might;
     const radius = (w.evolved ? 80 : w.level >= 7 ? 65 : w.level >= 4 ? 55 : 45) * player.areaMultiplier;
-    const duration = 0.5 / player.projectileSpeedMultiplier;
+    const duration = 1.0 / player.projectileSpeedMultiplier;
 
     for (let i = 0; i < count; i++) {
       const target = targets[i % targets.length];

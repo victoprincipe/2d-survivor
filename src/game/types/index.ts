@@ -130,6 +130,7 @@ export interface DifficultyConfig {
   spawnRate: number;
   xpMultiplier: number;
   goldMultiplier: number;
+  levelUpHealFraction: number;
 }
 
 export type MissionPeriod = 'daily' | 'weekly' | 'secret';
@@ -172,7 +173,15 @@ export interface MissionRunStats {
   wins: number;
 }
 
+export type EquipmentSlot = 'armor' | 'boots' | 'gloves' | 'helmet' | 'weapon';
+
+/** Percent bonuses use fractions: 0.05 means 5%. */
+export type EquipmentStats = Partial<Record<'maxHp' | 'armor' | 'might' | 'speed' | 'recovery' | 'critChance', number>>;
+export interface EquipmentItem { id: string; name: string; slot: EquipmentSlot; stats: EquipmentStats; }
+export interface CharacterInventory { items: EquipmentItem[]; equipped: Partial<Record<EquipmentSlot, string>>; }
+
 export interface SavedGameData {
+  inventories: Record<string, CharacterInventory>;
   gold: number;
   accountXp: number;
   powerUps: Record<string, number>;

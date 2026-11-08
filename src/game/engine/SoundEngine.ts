@@ -25,8 +25,14 @@ export class SoundEngine {
       if (!buffer || ctx.state === 'closed') return;
       const source = ctx.createBufferSource();
       source.buffer = buffer;
-      source.connect(gain);
-      source.onended = () => source.disconnect();
+      const roarGain = ctx.createGain();
+      roarGain.gain.value = 1.3;
+      source.connect(roarGain);
+      roarGain.connect(gain);
+      source.onended = () => {
+        source.disconnect();
+        roarGain.disconnect();
+      };
       source.start();
     });
   }

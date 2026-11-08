@@ -15,6 +15,7 @@ import {
   DevTelemetrySnapshot,
   EnemyType,
 } from '../types';
+import { emptyInventory, withEquipment } from '../data/inventory';
 import { Camera } from './Camera';
 import { InputManager } from './Input';
 import { SoundEngine } from './SoundEngine';
@@ -341,7 +342,8 @@ export class GameEngine {
     this.amazonTurns = this.createAmazonMissionTurns();
     this.beginAmazonTurn(0);
 
-    this.player = new Player(character, savedData.powerUps);
+    this.player = new Player(withEquipment(character, savedData.inventories?.[character.id] ?? emptyInventory()), savedData.powerUps);
+    this.player.levelUpHealFraction = this.difficulty.levelUpHealFraction;
     this.player.setCollisionResolver((fromX, fromY, dx, dy, radius, airborne) =>
       this.worldProps.resolvePlayerMovement(fromX, fromY, dx, dy, radius, airborne)
     );
@@ -2649,6 +2651,7 @@ export class GameEngine {
     for (let i = 0; i < amount; i++) {
       this.player.level += 1;
       this.player.xpToNextLevel = Player.computeXpToNextLevel(this.player.level);
+      this.player.heal(this.player.maxHp * this.player.levelUpHealFraction);
     }
     this.syncHUD();
   }

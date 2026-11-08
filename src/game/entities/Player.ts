@@ -112,6 +112,7 @@ export class Player {
 
   // Progression
   public level: number = 1;
+  public levelUpHealFraction: number = 0;
   public xp: number = 0;
   public xpToNextLevel: number = Player.computeXpToNextLevel(1);
 
@@ -404,6 +405,7 @@ export class Player {
       this.xp -= this.xpToNextLevel;
       this.level += 1;
       this.xpToNextLevel = Player.computeXpToNextLevel(this.level);
+      this.heal(this.maxHp * this.levelUpHealFraction);
       return true;
     }
     return false;

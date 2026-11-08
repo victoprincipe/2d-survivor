@@ -1,5 +1,6 @@
 import { PermanentPowerUp, SavedGameData } from '../types';
 import { DEFAULT_DIFFICULTY, DIFFICULTIES } from './difficulties';
+import { normalizeInventories } from './inventory';
 import { createInitialMissionState, normalizeMissionState } from './missions';
 
 export const POWER_UP_DEFINITIONS: PermanentPowerUp[] = [
@@ -63,6 +64,7 @@ const STORAGE_KEY = 'vampire_survivors_2d_save';
 
 export function getInitialSave(): SavedGameData {
   return {
+    inventories: {},
     gold: 0,
     accountXp: 0,
     powerUps: {},
@@ -93,6 +95,7 @@ export function loadSavedData(): SavedGameData {
 
     return {
       ...parsed,
+      inventories: normalizeInventories(parsed.inventories),
       gold: typeof parsed.gold === 'number' && Number.isFinite(parsed.gold) ? parsed.gold : 0,
       accountXp:
         typeof parsed.accountXp === 'number' && Number.isFinite(parsed.accountXp)
