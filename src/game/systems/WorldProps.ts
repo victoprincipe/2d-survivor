@@ -52,6 +52,15 @@ const BURITI_SPRITE_WIDTH = 48;
 const BURITI_SPRITE_HEIGHT = 64;
 const BURITI_SPRITE_SCALE = 2;
 
+// The pupunheira is a hand-crafted 48x64 palm: a dark contour, a slim
+// segmented grey trunk bristling with black spine rings, a tall crown of
+// arched green fronds, heavy red-and-orange fruit bunches hanging below the
+// crown and a dark oval shadow under the base. It is rasterized once into an
+// offscreen canvas and upscaled with nearest-neighbour.
+const PUPUNHA_SPRITE_WIDTH = 48;
+const PUPUNHA_SPRITE_HEIGHT = 64;
+const PUPUNHA_SPRITE_SCALE = 2;
+
 // Fruit tree minimap markers: hand-drawn 16x16 pixel-art icons, rasterized
 // once into offscreen canvases and blitted at 16x16 with smoothing disabled
 // so every pixel of the art is preserved.
@@ -262,6 +271,7 @@ export class WorldSystem {
   private cupuacuPixelSprite: HTMLCanvasElement | null = null;
   private castanhaPixelSprite: HTMLCanvasElement | null = null;
   private buritiPixelSprite: HTMLCanvasElement | null = null;
+  private pupunhaPixelSprite: HTMLCanvasElement | null = null;
   private acaiMinimapIcon: HTMLCanvasElement | null = null;
   private fruitMinimapIcons: Partial<Record<FruitTreeKind, HTMLCanvasElement>> = {};
   private waterAnimTimer: number = 0;
@@ -452,7 +462,7 @@ export class WorldSystem {
         offset = -142;
         break;
       case 'pupunha':
-        offset = -128;
+        offset = -142;
         break;
       case 'cupuacu':
         offset = -112;
@@ -2804,6 +2814,296 @@ export class WorldSystem {
   }
 
   /**
+   * Builds (once) the Pupunheira sprite. The 48x64 pixel-art canvas follows
+   * the reference: a dark contour, a slim segmented grey trunk covered in
+   * black spine rings, a tall crown of arched green palm fronds, large dense
+   * bunches of round red-and-orange fruits hanging below the fronds and a
+   * dark oval shadow at the base.
+   */
+  private getPupunhaPixelSprite(): HTMLCanvasElement | null {
+    if (this.pupunhaPixelSprite) return this.pupunhaPixelSprite;
+    if (typeof document === 'undefined') return null;
+
+    const width = PUPUNHA_SPRITE_WIDTH;
+    const height = PUPUNHA_SPRITE_HEIGHT;
+    const pixels: (string | null)[] = new Array(width * height).fill(null);
+
+    const setPixel = (x: number, y: number, color: string): void => {
+      const px = Math.round(x);
+      const py = Math.round(y);
+      if (px < 0 || px >= width || py < 0 || py >= height) return;
+      pixels[py * width + px] = color;
+    };
+
+    const fillEllipse = (
+      cx: number,
+      cy: number,
+      rx: number,
+      ry: number,
+      color: string
+    ): void => {
+      const minX = Math.floor(cx - rx);
+      const maxX = Math.ceil(cx + rx);
+      const minY = Math.floor(cy - ry);
+      const maxY = Math.ceil(cy + ry);
+      for (let y = minY; y <= maxY; y++) {
+        for (let x = minX; x <= maxX; x++) {
+          const dx = (x - cx) / rx;
+          const dy = (y - cy) / ry;
+          if (dx * dx + dy * dy <= 1.05) setPixel(x, y, color);
+        }
+      }
+    };
+
+    const drawLine = (
+      x0: number,
+      y0: number,
+      x1: number,
+      y1: number,
+      color: string
+    ): void => {
+      const steps = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+      for (let i = 0; i <= steps; i++) {
+        const t = steps === 0 ? 0 : i / steps;
+        setPixel(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, color);
+      }
+    };
+
+    // Dark oval shadow centred under the trunk base.
+    fillEllipse(24, 61.5, 19.5, 4.1, 'rgba(4, 8, 5, 0.62)');
+    fillEllipse(24, 61.7, 13.5, 2.7, 'rgba(3, 6, 4, 0.45)');
+
+    const frondOutline = '#07180c';
+    const frondDark = '#0f4a24';
+    const frondBody = '#1d7a3a';
+    const frondLight = '#3fa650';
+    const frondGlint = '#78cf6c';
+
+    const drawFrond = (
+      baseX: number,
+      baseY: number,
+      controlX: number,
+      controlY: number,
+      tipX: number,
+      tipY: number,
+      tone: number,
+      litFromLeft: boolean
+    ): void => {
+      const pointX = (t: number): number => {
+        const u = 1 - t;
+        return u * u * baseX + 2 * u * t * controlX + t * t * tipX;
+      };
+      const pointY = (t: number): number => {
+        const u = 1 - t;
+        return u * u * baseY + 2 * u * t * controlY + t * t * tipY;
+      };
+      const tangentX = (t: number): number =>
+        2 * (1 - t) * (controlX - baseX) + 2 * t * (tipX - controlX);
+      const tangentY = (t: number): number =>
+        2 * (1 - t) * (controlY - baseY) + 2 * t * (tipY - controlY);
+
+      // Dark rib running along the full arch.
+      for (let i = 0; i <= 60; i++) {
+        const t = i / 60;
+        setPixel(pointX(t), pointY(t), frondOutline);
+      }
+
+      // Feathery leaflets fan out on both sides of the rib, like the reference.
+      for (let l = 1; l <= 7; l++) {
+        const t = l / 8;
+        const x = pointX(t);
+        const y = pointY(t);
+        const dx = tangentX(t);
+        const dy = tangentY(t);
+        const length = Math.sqrt(dx * dx + dy * dy) || 1;
+        const nx = -dy / length;
+        const ny = dx / length;
+        const leafLength = 2.6 + Math.sin(Math.PI * t) * 3.6;
+        const towardTipX = (dx / length) * leafLength * 0.55;
+        const towardTipY = (dy / length) * leafLength * 0.55;
+
+        const drawLeaflet = (side: number): void => {
+          const endX = x + nx * side * leafLength + towardTipX;
+          const endY = y + ny * side * leafLength + towardTipY;
+
+          let color = frondDark;
+          const lit = litFromLeft ? side < 0 : side > 0;
+          if (lit) color = frondLight;
+          if (tone === 1) color = lit ? frondBody : frondDark;
+          else if (tone === 2) color = lit ? frondGlint : frondLight;
+
+          drawLine(x, y, endX, endY, frondOutline);
+          drawLine(
+            x + (endX - x) * 0.22,
+            y + (endY - y) * 0.22,
+            x + (endX - x) * 0.8,
+            y + (endY - y) * 0.8,
+            color
+          );
+          setPixel(endX, endY, frondLight);
+        };
+
+        drawLeaflet(-1);
+        drawLeaflet(1);
+      }
+
+      // Lit rib on top of the leaflets.
+      for (let i = 0; i <= 60; i++) {
+        const t = i / 60;
+        setPixel(
+          pointX(t),
+          pointY(t),
+          t < 0.35 && litFromLeft ? frondLight : frondBody
+        );
+      }
+      setPixel(tipX, tipY, frondGlint);
+    };
+
+    // Back half of the crown, painted before the trunk so fronds sit behind.
+    drawFrond(24, 23, 17, 8, 9, 2, 0, true);
+    drawFrond(24, 23, 22, 4, 21, 0, 1, true);
+    drawFrond(24, 23, 28, 5, 32, 0, 2, false);
+    drawFrond(24, 23, 35, 8, 42, 2, 1, false);
+    drawFrond(24, 23, 8, 15, 1, 21, 0, true);
+    drawFrond(24, 23, 42, 14, 47, 21, 1, false);
+    drawFrond(24, 23, 13, 8, 13, 1, 1, true);
+    drawFrond(24, 23, 35, 8, 36, 1, 0, false);
+
+    const trunkOutline = '#191510';
+    const trunkLight = '#c3bca8';
+    const trunkBody = '#9c9480';
+    const trunkMid = '#77705e';
+    const trunkShade = '#514b3c';
+    const ringDark = '#2c2820';
+    const spineDark = '#100c08';
+    const spineLight = '#3a3327';
+
+    // Slim segmented grey trunk, slightly flared at the base.
+    for (let y = 22; y <= 61; y++) {
+      const t = (y - 22) / 39;
+      const flare = y >= 57 ? (y - 56) * 0.6 : 0;
+      const halfWidth = 2.2 + t * 0.8 + flare;
+
+      for (
+        let x = Math.floor(24 - halfWidth - 1);
+        x <= Math.ceil(24 + halfWidth + 1);
+        x++
+      ) {
+        setPixel(x, y, trunkOutline);
+      }
+      for (let x = Math.floor(24 - halfWidth); x <= Math.ceil(24 + halfWidth); x++) {
+        const relative = (x - 24) / halfWidth;
+        let color = trunkBody;
+        if (relative < -0.4) color = trunkLight;
+        else if (relative > 0.55) color = trunkShade;
+        else if (relative > 0.1) color = trunkMid;
+        setPixel(x, y, color);
+      }
+
+      // Horizontal growth rings.
+      if (y % 4 === 0) {
+        for (
+          let x = Math.ceil(24 - halfWidth);
+          x <= Math.floor(24 + halfWidth);
+          x++
+        ) {
+          setPixel(x, y, ringDark);
+        }
+      } else if (y % 4 === 2) {
+        setPixel(24 - halfWidth + 0.3, y, trunkShade);
+        setPixel(24 + halfWidth - 0.3, y, trunkShade);
+      }
+
+      // Rows of protruding black spines around the rings.
+      if (y % 3 === 1) {
+        const left = 24 - halfWidth - 1.2;
+        const right = 24 + halfWidth + 1.2;
+        setPixel(left, y, spineDark);
+        setPixel(left - 0.7, y - 0.6, spineDark);
+        setPixel(right, y + 1, spineDark);
+        setPixel(right + 0.7, y + 1.6, spineDark);
+        if ((y - 22) % 6 === 0) {
+          setPixel(left, y - 1, spineLight);
+          setPixel(right, y + 2, spineLight);
+        }
+      }
+    }
+
+    // Crown knob where the fronds and fruit stems meet the trunk.
+    fillEllipse(24, 23.2, 3.6, 2.5, trunkOutline);
+    fillEllipse(24, 23, 2.7, 1.7, trunkBody);
+    fillEllipse(23.1, 22.5, 1.2, 0.7, trunkLight);
+
+    // Front fronds drape down over the top of the trunk for 2.5D depth.
+    drawFrond(24, 25, 15, 27, 5, 34, 0, true);
+    drawFrond(24, 25, 33, 27, 43, 34, 1, false);
+    drawFrond(24, 26, 17, 32, 10, 41, 2, true);
+    drawFrond(24, 26, 31, 32, 38, 41, 0, false);
+
+    const fruitOutline = '#1a0805';
+    const fruitBody = '#d92b1f';
+    const fruitOrange = '#f97316';
+    const fruitLight = '#fb923c';
+    const fruitGlint = '#fde68a';
+    const fruitShade = '#8f1a12';
+    const fruitStem = '#4a2f1a';
+
+    const drawFruit = (
+      cx: number,
+      cy: number,
+      rx: number,
+      ry: number,
+      stemX: number,
+      stemY: number
+    ): void => {
+      drawLine(cx, cy - ry, stemX, stemY, fruitStem);
+      fillEllipse(cx, cy, rx + 0.7, ry + 0.7, fruitOutline);
+      fillEllipse(cx, cy, rx, ry, fruitBody);
+      fillEllipse(cx + rx * 0.35, cy + ry * 0.3, rx * 0.5, ry * 0.5, fruitOrange);
+      fillEllipse(cx - rx * 0.28, cy - ry * 0.32, rx * 0.55, ry * 0.46, fruitLight);
+      fillEllipse(cx + rx * 0.38, cy + ry * 0.42, rx * 0.38, ry * 0.36, fruitShade);
+      setPixel(cx - rx * 0.4, cy - ry * 0.42, fruitGlint);
+      setPixel(cx - rx * 0.15, cy - ry * 0.55, fruitGlint);
+    };
+
+    // Large, dense cluster of round red-and-orange pupunha fruits hanging
+    // right below the crown, plus a smaller bunch tucked to the left.
+    drawFruit(23, 28, 2.3, 2.7, 24, 23.5);
+    drawFruit(27, 29, 2.2, 2.6, 25, 23.5);
+    drawFruit(19.5, 30, 2.1, 2.5, 22.5, 24);
+    drawFruit(24.5, 31.5, 2.4, 2.8, 24, 25);
+    drawFruit(28.5, 32.5, 2.1, 2.5, 26, 25);
+    drawFruit(21, 33.5, 2.2, 2.6, 23, 27);
+    drawFruit(25, 35.5, 2.3, 2.7, 24, 29);
+    drawFruit(29, 36, 2.0, 2.4, 27, 29);
+    drawFruit(17, 32, 1.9, 2.3, 21, 26);
+    drawFruit(15.5, 35.5, 1.8, 2.2, 20, 29);
+    drawFruit(19.5, 38, 2.0, 2.4, 22, 32);
+    drawFruit(23.5, 40, 2.1, 2.5, 24, 34);
+    drawFruit(31.5, 33.5, 1.8, 2.2, 29, 27);
+    drawFruit(33, 37, 1.7, 2.1, 30, 30);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    ctx.imageSmoothingEnabled = false;
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const color = pixels[y * width + x];
+        if (!color) continue;
+        ctx.fillStyle = color;
+        ctx.fillRect(x, y, 1, 1);
+      }
+    }
+
+    this.pupunhaPixelSprite = canvas;
+    return canvas;
+  }
+
+  /**
    * Draws the Cupuaçu minimap marker: a compact 16x16 pixel-art capsule that
    * follows the reference fruit — velvety brown oval, thin dark outline and a
    * small lighter highlight on the upper-left skin. It is painted with
@@ -4733,11 +5033,19 @@ export class WorldSystem {
         tree.kind === 'castanha' ? this.getCastanhaPixelSprite() : null;
       const buritiSprite =
         tree.kind === 'buriti' ? this.getBuritiPixelSprite() : null;
+      const pupunhaSprite =
+        tree.kind === 'pupunha' ? this.getPupunhaPixelSprite() : null;
 
       ctx.save();
       ctx.translate(screen.x, screen.y);
 
-      if (!acaiSprite && !cupuacuSprite && !castanhaSprite && !buritiSprite) {
+      if (
+        !acaiSprite &&
+        !cupuacuSprite &&
+        !castanhaSprite &&
+        !buritiSprite &&
+        !pupunhaSprite
+      ) {
         // Shared ground shadow for the procedurally drawn trees.
         ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
         ctx.beginPath();
@@ -4800,6 +5108,20 @@ export class WorldSystem {
         ctx.imageSmoothingEnabled = false;
         ctx.drawImage(
           buritiSprite,
+          -spriteWidth / 2,
+          -spriteHeight,
+          spriteWidth,
+          spriteHeight
+        );
+        ctx.restore();
+      } else if (pupunhaSprite) {
+        // Nearest-neighbour upscale keeps the hand-placed pixel-art grid crisp.
+        const spriteWidth = PUPUNHA_SPRITE_WIDTH * PUPUNHA_SPRITE_SCALE;
+        const spriteHeight = PUPUNHA_SPRITE_HEIGHT * PUPUNHA_SPRITE_SCALE;
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(
+          pupunhaSprite,
           -spriteWidth / 2,
           -spriteHeight,
           spriteWidth,
