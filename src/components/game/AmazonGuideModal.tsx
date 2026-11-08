@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { BookOpen, Crown, Droplets, Heart, Leaf, MousePointerClick, PawPrint, Shield, Skull, Sparkles, Trees, X, Zap } from 'lucide-react';
+import { BookOpen, Clock, Crown, Droplets, Heart, Leaf, MousePointerClick, PawPrint, Shield, Skull, Sparkles, Trees, X, Zap } from 'lucide-react';
 import { Enemy } from '@/game/entities/Enemy';
 import { Camera } from '@/game/engine/Camera';
 import type { EnemyType } from '@/game/types';
@@ -222,7 +222,79 @@ const FAUNA: FaunaEntry[] = [
   },
 ];
 
-function getFaunaStats(type: EnemyType): FaunaStats {
+interface BossEntry {
+  type: EnemyType;
+  name: string;
+  time: string;
+  ability: string;
+  finalBoss?: boolean;
+}
+
+const BOSSES: BossEntry[] = [
+  {
+    type: 'boss_curupira',
+    name: 'Curupira',
+    time: '05:00',
+    ability: 'Rastros de fogo e bolas de fogo.',
+  },
+  {
+    type: 'boss_saci',
+    name: 'Saci-pererê',
+    time: '06:30',
+    ability: 'Redemoinhos de vento e teleporte.',
+  },
+  {
+    type: 'boss_boto',
+    name: 'Boto-cor-de-rosa',
+    time: '08:00',
+    ability: 'Ondas sonoras encantadas no rio.',
+  },
+  {
+    type: 'boss_iara',
+    name: 'Iara',
+    time: '09:30',
+    ability: 'Jatos de água e poças de lentidão.',
+  },
+  {
+    type: 'boss_caipora',
+    name: 'Caipora',
+    time: '11:00',
+    ability: 'Investida de queixada e invocação de animais.',
+  },
+  {
+    type: 'boss_matinta',
+    name: 'Matinta Pereira',
+    time: '12:30',
+    ability: 'Voo livre, assobios sônicos e aves sombrias.',
+  },
+  {
+    type: 'boss_vitoria_regia',
+    name: 'Vitória-Régia',
+    time: '14:00',
+    ability: 'Anéis de esporos venenosos e raízes espinhosas.',
+  },
+  {
+    type: 'boss_mapinguari',
+    name: 'Mapinguari',
+    time: '15:30',
+    ability: 'Pisões atordoantes e rugido sônico.',
+  },
+  {
+    type: 'boss_cobra_grande',
+    name: 'Cobra-Grande',
+    time: '17:00',
+    ability: 'Arrancadas colossais pela terra e pelo rio.',
+  },
+  {
+    type: 'boss_boitata',
+    name: 'Boitatá',
+    time: '18:30',
+    ability: 'Chefe final; paredes de chamas contínuas e bolas de fogo.',
+    finalBoss: true,
+  },
+];
+
+function getEnemyStats(type: EnemyType): FaunaStats {
   const enemy = new Enemy(0, type, 0, 0, 1);
   return {
     hp: enemy.maxHp,
@@ -233,7 +305,7 @@ function getFaunaStats(type: EnemyType): FaunaStats {
   };
 }
 
-const FaunaSprite: React.FC<{ type: EnemyType; label: string }> = ({ type, label }) => {
+const EnemySprite: React.FC<{ type: EnemyType; label: string }> = ({ type, label }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -250,6 +322,7 @@ const FaunaSprite: React.FC<{ type: EnemyType; label: string }> = ({ type, label
     // Reuse the exact in-game sprite renderer so the guide matches the map.
     const enemy = new Enemy(0, type, 0, 0, 1);
     enemy.isElite = false; // Hide the elite health bar inside the thumbnail.
+    enemy.isBoss = false; // Hide the boss health bar inside the thumbnail.
     const camera = new Camera(size, size);
     camera.x = 0;
     camera.y = 0;
@@ -314,7 +387,7 @@ const FaunaCard: React.FC<{
     <div className="flex h-full flex-col gap-2 rounded-lg border border-[#383e4c] bg-gradient-to-b from-[#1c2027] to-[#121419] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
       <div className="flex items-center gap-2.5">
         <span className="shrink-0 rounded-xl border border-[#2a3a30] bg-gradient-to-b from-[#26362c] to-[#151d18] p-1 shadow-inner">
-          <FaunaSprite type={animal.type} label={animal.name} />
+          <EnemySprite type={animal.type} label={animal.name} />
         </span>
         <div className="min-w-0 flex-1">
           <div className="text-xs font-bold leading-tight text-[#f3f4f6]">{animal.name}</div>
@@ -348,6 +421,57 @@ const FaunaCard: React.FC<{
       </div>
 
       <p className="text-[10.5px] leading-relaxed text-[#9ca3af]">{animal.behavior}</p>
+    </div>
+  );
+};
+
+const BossCard: React.FC<{
+  boss: BossEntry;
+  stats: FaunaStats;
+  maxStats: { hp: number; attack: number; defense: number };
+}> = ({ boss, stats, maxStats }) => {
+  return (
+    <div
+      className={`flex h-full flex-col gap-2 rounded-lg border bg-gradient-to-b from-[#1c2027] to-[#121419] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] ${
+        boss.finalBoss ? 'border-rose-700/70' : 'border-[#383e4c]'
+      }`}
+    >
+      <div className="flex items-center gap-2.5">
+        <span className="shrink-0 rounded-xl border border-[#3a2a2a] bg-gradient-to-b from-[#362626] to-[#1d1515] p-1 shadow-inner">
+          <EnemySprite type={boss.type} label={boss.name} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-xs font-bold leading-tight text-[#f3f4f6]">{boss.name}</span>
+            {boss.finalBoss && (
+              <span className="inline-flex items-center gap-1 rounded border border-rose-700/60 bg-rose-950/50 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-rose-300">
+                <Crown className="h-3 w-3" />
+                Final
+              </span>
+            )}
+          </div>
+          <span className="mt-1 inline-flex items-center gap-1 rounded border border-amber-700/60 bg-amber-950/50 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-300">
+            <Clock className="h-3 w-3" />
+            {boss.time}
+          </span>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <StatBar label="Vida" value={stats.hp} max={maxStats.hp} color="#34d399" />
+        <StatBar label="Ataque" value={stats.attack} max={maxStats.attack} color="#fb923c" />
+        <StatBar
+          label="Defesa"
+          value={stats.defense}
+          max={maxStats.defense}
+          color="#60a5fa"
+          suffix="%"
+        />
+      </div>
+
+      <p className="text-[10.5px] leading-relaxed text-[#9ca3af]">
+        <span className="font-bold text-[#cbd5e1]">Habilidade:</span> {boss.ability}
+      </p>
     </div>
   );
 };
@@ -440,7 +564,7 @@ export const AmazonGuideModal: React.FC<AmazonGuideModalProps> = ({ onClose }) =
   const [activeTab, setActiveTab] = useState<GuideTab>('fruits');
 
   const faunaWithStats = useMemo(
-    () => FAUNA.map((animal) => ({ ...animal, stats: getFaunaStats(animal.type) })),
+    () => FAUNA.map((animal) => ({ ...animal, stats: getEnemyStats(animal.type) })),
     []
   );
   const maxStats = useMemo(
@@ -450,6 +574,19 @@ export const AmazonGuideModal: React.FC<AmazonGuideModalProps> = ({ onClose }) =
       defense: Math.max(...faunaWithStats.map((animal) => animal.stats.defense)),
     }),
     [faunaWithStats]
+  );
+
+  const bossesWithStats = useMemo(
+    () => BOSSES.map((boss) => ({ ...boss, stats: getEnemyStats(boss.type) })),
+    []
+  );
+  const bossMaxStats = useMemo(
+    () => ({
+      hp: Math.max(...bossesWithStats.map((boss) => boss.stats.hp)),
+      attack: Math.max(...bossesWithStats.map((boss) => boss.stats.attack)),
+      defense: Math.max(...bossesWithStats.map((boss) => boss.stats.defense)),
+    }),
+    [bossesWithStats]
   );
 
   useEffect(() => {
@@ -628,13 +765,25 @@ export const AmazonGuideModal: React.FC<AmazonGuideModalProps> = ({ onClose }) =
           )}
 
           {activeTab === 'bosses' && (
-            <div className="flex min-h-40 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-[#383e4c] p-6 text-center">
-              <Crown className="h-8 w-8 text-[#6b7280]" />
-              <p className="text-sm font-bold text-[#cbd5e1]">Chefes da Floresta</p>
-              <p className="max-w-sm text-[11px] text-[#9ca3af]">
-                Os 10 Guardiões serão catalogados nesta aba em uma próxima atualização. Nada da
-                jogabilidade atual foi alterado.
-              </p>
+            <div className="flex flex-col gap-4">
+              <div className="rounded-lg border border-[#383e4c] bg-[#14171c] p-2.5 text-[11px] leading-relaxed text-[#9ca3af]">
+                <span className="font-bold text-[#f3f4f6]">
+                  Surgem a partir de 05:00, a cada 1m30s.
+                </span>{' '}
+                Vida, Ataque e Defesa são os valores-base (1×) do jogo. A Defesa representa a
+                resistência a empurrão: quanto maior, menos o chefe recua.
+              </div>
+
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {bossesWithStats.map((boss) => (
+                  <BossCard
+                    key={boss.type}
+                    boss={boss}
+                    stats={boss.stats}
+                    maxStats={bossMaxStats}
+                  />
+                ))}
+              </div>
             </div>
           )}
         </div>
