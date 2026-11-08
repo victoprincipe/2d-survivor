@@ -77,6 +77,17 @@ const ARACA_SPRITE_SCALE = 2;
 const ACAI_MINIMAP_ICON_SIZE = 16;
 const ACAI_MINIMAP_ICON_DRAW_SIZE = 16;
 
+// Amazon field plants: dangerous thorn bushes and the medicinal São-Caetano
+// herb. Both are scattered over dry land and the herb respawns elsewhere after
+// being harvested, so the player always has a way to cure the wound.
+const THORN_BUSH_COUNT = 56;
+const THORN_BUSH_RADIUS = 24;
+const HERB_COUNT = 14;
+const HERB_RESPAWN = 35;
+const HERB_PICKUP_RADIUS = 34;
+const HERB_PROMPT_WIDTH = 262;
+const HERB_PROMPT_HEIGHT = 44;
+
 // Purely decorative Amazon vegetation. These trees are scattered once with the
 // deterministic forest seed, never move, block the body through their trunk and
 // fade their canopy over characters walking behind them.
@@ -124,6 +135,25 @@ export interface CollectedFruit {
   kind: FruitTreeKind;
   x: number;
   y: number;
+}
+
+/** Low, twisted bush whose thorns wound anyone walking through it. */
+export interface ThornBushProp {
+  id: number;
+  x: number;
+  y: number;
+  radius: number;
+  animTimer: number;
+}
+
+/** São-Caetano herb: heals the thorn slow and bleeding when harvested. */
+export interface HerbProp {
+  id: number;
+  x: number;
+  y: number;
+  active: boolean;
+  respawnTimer: number;
+  animTimer: number;
 }
 
 // Fruit name shown in the collect prompt for each Amazon fruit tree.
@@ -294,6 +324,10 @@ export class WorldSystem {
   private worldHalfSize: number = WORLD_HALF_SIZE;
   public fruitTrees: FruitTreeProp[] = [];
   private nextFruitTreeId: number = 1;
+  public thornBushes: ThornBushProp[] = [];
+  private nextThornBushId: number = 1;
+  public herbs: HerbProp[] = [];
+  private nextHerbId: number = 1;
   private trees: TreeProp[] = [];
   // LRU cache: rasterize only visible trees, with a 16 MiB RGBA budget.
   private treeSprites = new Map<TreeProp, HTMLCanvasElement>();
@@ -336,6 +370,7 @@ export class WorldSystem {
       this.generatePlateaus();
       this.generateForest();
       this.spawnInitialFruitTrees();
+      this.spawnFieldPlants();
     }
     this.loadFloorTexture();
   }
@@ -440,6 +475,142 @@ export class WorldSystem {
       x: (Math.random() * 2 - 1) * limit,
       y: (Math.random() * 2 - 1) * limit,
     };
+  }
+
+  /**
+   * Scatters the Amazon field plants: thorn bushes everywhere on dry ground
+   * and a handful of São-Caetano herbs growing on the forest floor. Positions
+   * are random but always clear of water, hills, ramps, tree trunks and the
+   * other collectible plants.
+   */
+  private spawnFieldPlants(): void {
+    for (let i = 0; i < THORN_BUSH_COUNT; i++) {
+      const spawn = this.findFieldPlantSpawn(26);
+      this.thornBushes.push({
+        id: this.nextThornBushId++,
+        x: spawn.x,
+        y: spawn.y,
+        radius: THORN_BUSH_RADIUS,
+        animTimer: Math.random() * Math.PI * 2,
+      });
+    }
+
+    for (let i = 0; i < HERB_COUNT; i++) {
+      const spawn = this.findFieldPlantSpawn(20);
+      this.herbs.push({
+        id: this.nextHerbId++,
+        x: spawn.x,
+        y: spawn.y,
+        active: true,
+        respawnTimer: 0,
+        animTimer: Math.random() * Math.PI * 2,
+      });
+    }
+  }
+
+  private findFieldPlantSpawn(clearance: number): { x: number; y: number } {
+    const limit = FOREST_HALF_SIZE - 420;
+
+    for (let attempt = 0; attempt < 240; attempt++) {
+      const x = (Math.random() * 2 - 1) * limit;
+      const y = (Math.random() * 2 - 1) * limit;
+
+      if (this.isInWater(x, y)) continue;
+      if (this.isOverPlateau(x, y, clearance + 40)) continue;
+      if (this.isOnPlateauRamp(x, y, clearance + 40)) continue;
+      if (this.collidesWithTree(x, y, clearance + 30)) continue;
+
+      // Keep some breathing room around fruit trees and other field plants.
+      let overlaps = false;
+      for (let i = 0; i < this.fruitTrees.length; i++) {
+        const tree = this.fruitTrees[i];
+        const minDist = clearance + 120;
+        const dx = x - tree.x;
+        const dy = y - tree.y;
+        if (dx * dx + dy * dy < minDist * minDist) {
+          overlaps = true;
+          break;
+        }
+      }
+      if (overlaps) continue;
+      for (let i = 0; i < this.thornBushes.length; i++) {
+        const bush = this.thornBushes[i];
+        const minDist = clearance + 60;
+        const dx = x - bush.x;
+        const dy = y - bush.y;
+        if (dx * dx + dy * dy < minDist * minDist) {
+          overlaps = true;
+          break;
+        }
+      }
+      if (overlaps) continue;
+      for (let i = 0; i < this.herbs.length; i++) {
+        const herb = this.herbs[i];
+        const minDist = clearance + 60;
+        const dx = x - herb.x;
+        const dy = y - herb.y;
+        if (dx * dx + dy * dy < minDist * minDist) {
+          overlaps = true;
+          break;
+        }
+      }
+      if (overlaps) continue;
+
+      return { x, y };
+    }
+
+    return this.findFruitTreeSpawn();
+  }
+
+  /** Returns the thorn bush whose spikes overlap a body at (x, y). */
+  public getThornBushAt(x: number, y: number, radius: number): ThornBushProp | null {
+    if (this.mapId !== 'amazon_forest') return null;
+
+    for (let i = 0; i < this.thornBushes.length; i++) {
+      const bush = this.thornBushes[i];
+      const dx = x - bush.x;
+      const dy = y - bush.y;
+      const minDist = radius + bush.radius * 0.72;
+      if (dx * dx + dy * dy <= minDist * minDist) return bush;
+    }
+    return null;
+  }
+
+  /** Returns the closest active herb within the player's reach. */
+  public getInteractableHerb(player: Player): HerbProp | null {
+    if (this.mapId !== 'amazon_forest') return null;
+
+    const reach = player.radius + HERB_PICKUP_RADIUS;
+    let closest: HerbProp | null = null;
+    let closestDistance = reach * reach;
+
+    for (let i = 0; i < this.herbs.length; i++) {
+      const herb = this.herbs[i];
+      if (!herb.active) continue;
+
+      const dx = player.x - herb.x;
+      const dy = player.y - herb.y;
+      const distance = dx * dx + dy * dy;
+      if (distance <= closestDistance) {
+        closest = herb;
+        closestDistance = distance;
+      }
+    }
+
+    return closest;
+  }
+
+  /** Harvests the nearby herb the player is prompting, if any. */
+  public collectNearbyHerb(player: Player): HerbProp | null {
+    const herb = this.getInteractableHerb(player);
+    if (!herb) return null;
+    herb.active = false;
+    herb.respawnTimer = HERB_RESPAWN;
+    return herb;
+  }
+
+  private getHerbPromptOffsetY(herb: HerbProp): number {
+    return -30 + Math.sin(herb.animTimer * 2.4) * 1.5;
   }
 
   private collectFruitTree(tree: FruitTreeProp): CollectedFruit {
@@ -4254,6 +4425,28 @@ export class WorldSystem {
           continue;
         }
       }
+
+      // Thorn bushes only need their rustle animation.
+      for (let i = 0; i < this.thornBushes.length; i++) {
+        this.thornBushes[i].animTimer += dt * 1.8;
+      }
+
+      // Harvested herbs respawn somewhere else on dry land after a while, so
+      // the map never runs out of antidotes.
+      for (let i = 0; i < this.herbs.length; i++) {
+        const herb = this.herbs[i];
+        herb.animTimer += dt * 2.2;
+        if (!herb.active) {
+          herb.respawnTimer -= dt;
+          if (herb.respawnTimer <= 0) {
+            const spawn = this.findFieldPlantSpawn(20);
+            herb.x = spawn.x;
+            herb.y = spawn.y;
+            herb.active = true;
+            herb.respawnTimer = 0;
+          }
+        }
+      }
     }
   }
 
@@ -6335,6 +6528,248 @@ export class WorldSystem {
         );
       }
     }
+  }
+
+  /**
+   * Low pixel-art thorn bushes: a dark green mound, twisted brown branches
+   * with forks and pale spikes clearly poking out of the leaves.
+   */
+  public renderThornBushes(ctx: CanvasRenderingContext2D, camera: Camera): void {
+    if (this.mapId !== 'amazon_forest') return;
+
+    for (let i = 0; i < this.thornBushes.length; i++) {
+      const bush = this.thornBushes[i];
+      if (!camera.isInView(bush.x, bush.y, 64)) continue;
+
+      const screen = camera.worldToScreen(bush.x, bush.y);
+      const sway = Math.sin(bush.animTimer) * 1.2;
+
+      ctx.save();
+      ctx.translate(Math.round(screen.x), Math.round(screen.y));
+
+      // Ground shadow.
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+      ctx.beginPath();
+      ctx.ellipse(0, 3, 20, 7, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.translate(sway, 0);
+
+      // Layered low mound of leaves.
+      ctx.fillStyle = '#1b3315';
+      ctx.fillRect(-18, -5, 36, 8);
+      ctx.fillRect(-15, -9, 30, 5);
+      ctx.fillRect(-10, -13, 20, 5);
+
+      // Twisted branches.
+      ctx.strokeStyle = '#4a2f18';
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'square';
+      ctx.beginPath();
+      ctx.moveTo(-16, -1);
+      ctx.lineTo(-10, -11);
+      ctx.lineTo(-3, -6);
+      ctx.lineTo(4, -17);
+      ctx.lineTo(10, -8);
+      ctx.lineTo(17, -13);
+      ctx.stroke();
+
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-10, -11);
+      ctx.lineTo(-14, -18);
+      ctx.moveTo(4, -17);
+      ctx.lineTo(1, -23);
+      ctx.moveTo(10, -8);
+      ctx.lineTo(14, -4);
+      ctx.stroke();
+      ctx.lineCap = 'butt';
+
+      // Leaf clusters along the branches.
+      ctx.fillStyle = '#2d541b';
+      ctx.fillRect(-16, -7, 11, 4);
+      ctx.fillRect(3, -10, 13, 4);
+      ctx.fillRect(-7, -15, 13, 4);
+      ctx.fillStyle = '#457a25';
+      ctx.fillRect(-13, -11, 7, 3);
+      ctx.fillRect(6, -6, 9, 3);
+      ctx.fillRect(-2, -16, 6, 3);
+      ctx.fillRect(-15, -19, 5, 4);
+      ctx.fillRect(0, -22, 5, 4);
+      ctx.fillRect(13, -16, 5, 4);
+
+      // Pale thorns poking out in every direction.
+      ctx.fillStyle = '#e7e5e4';
+      const drawThorn = (x: number, y: number, dirX: number, dirY: number): void => {
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + dirX * 2, y + dirY * 6);
+        ctx.lineTo(x + dirX * 4, y);
+        ctx.closePath();
+        ctx.fill();
+      };
+      drawThorn(-13, -9, -1, -1);
+      drawThorn(-6, -8, 1, -1);
+      drawThorn(2, -14, -1, -1);
+      drawThorn(7, -11, 1, 0);
+      drawThorn(-15, -18, -1, -1);
+      drawThorn(2, -21, 0, -1);
+      drawThorn(14, -15, 1, -1);
+      drawThorn(15, -4, 1, 0);
+
+      ctx.restore();
+    }
+  }
+
+  /**
+   * Small creeping São-Caetano herbs with jagged leaves and open yellow
+   * fruits. A floating prompt appears when the hero stands close enough.
+   */
+  public renderHerbs(
+    ctx: CanvasRenderingContext2D,
+    camera: Camera,
+    player?: Player
+  ): void {
+    if (this.mapId !== 'amazon_forest') return;
+
+    const promptHerb = player ? this.getInteractableHerb(player) : null;
+
+    for (let i = 0; i < this.herbs.length; i++) {
+      const herb = this.herbs[i];
+      if (!herb.active) continue;
+      if (!camera.isInView(herb.x, herb.y, 60)) continue;
+
+      const screen = camera.worldToScreen(herb.x, herb.y);
+      const sway = Math.sin(herb.animTimer) * 1;
+
+      ctx.save();
+      ctx.translate(Math.round(screen.x), Math.round(screen.y));
+
+      // Soft ground shadow and a faint medicinal glow.
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.24)';
+      ctx.beginPath();
+      ctx.ellipse(0, 3, 12, 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(190, 242, 100, 0.12)';
+      ctx.beginPath();
+      ctx.ellipse(0, -4, 17, 11, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.translate(sway, 0);
+
+      // Creeping stems.
+      ctx.strokeStyle = '#3f6212';
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-10, 1);
+      ctx.quadraticCurveTo(-14, -3, -17, -6);
+      ctx.moveTo(10, 1);
+      ctx.quadraticCurveTo(14, -4, 17, -7);
+      ctx.moveTo(-6, 0);
+      ctx.quadraticCurveTo(-8, -7, -10, -10);
+      ctx.moveTo(6, 0);
+      ctx.quadraticCurveTo(8, -8, 10, -11);
+      ctx.stroke();
+      ctx.lineCap = 'butt';
+
+      // Jagged (serrated) pixel leaves.
+      const drawLeaf = (
+        x: number,
+        y: number,
+        angle: number,
+        length: number,
+        color: string
+      ): void => {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(length * 0.22, -2);
+        ctx.lineTo(length * 0.38, 0);
+        ctx.lineTo(length * 0.56, -2);
+        ctx.lineTo(length * 0.72, 0);
+        ctx.lineTo(length, 1);
+        ctx.lineTo(length * 0.7, 2.4);
+        ctx.lineTo(length * 0.46, 1.2);
+        ctx.lineTo(length * 0.2, 2.4);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      };
+
+      drawLeaf(-12, -4, -2.7, 10, '#4d7c0f');
+      drawLeaf(-8, -6, -2.1, 11, '#65a30d');
+      drawLeaf(-2, -8, -1.5, 10, '#4d7c0f');
+      drawLeaf(3, -9, -0.7, 11, '#65a30d');
+      drawLeaf(9, -6, 0.1, 10, '#4d7c0f');
+      drawLeaf(13, -3, 0.6, 9, '#65a30d');
+
+      // Open yellow fruits at the tips.
+      const drawOpenFruit = (x: number, y: number): void => {
+        ctx.fillStyle = '#facc15';
+        ctx.beginPath();
+        ctx.arc(x - 1.5, y, 2.7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(x + 2, y + 1, 2.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#fef08a';
+        ctx.fillRect(Math.round(x - 2), Math.round(y - 1), 1, 1);
+        ctx.fillRect(Math.round(x + 2), Math.round(y), 1, 1);
+        ctx.fillStyle = '#78350f';
+        ctx.fillRect(Math.round(x), Math.round(y + 2), 1, 1);
+      };
+      drawOpenFruit(-17, -7);
+      drawOpenFruit(17, -8);
+      drawOpenFruit(-10, -11);
+      drawOpenFruit(10, -12);
+
+      ctx.restore();
+
+      if (herb === promptHerb) {
+        this.renderHerbPrompt(
+          ctx,
+          screen.x,
+          screen.y + this.getHerbPromptOffsetY(herb)
+        );
+      }
+    }
+  }
+
+  private renderHerbPrompt(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number
+  ): void {
+    const halfWidth = HERB_PROMPT_WIDTH / 2;
+    const halfHeight = HERB_PROMPT_HEIGHT / 2;
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(8, 15, 10, 0.88)';
+    ctx.fillRect(x - halfWidth, y - halfHeight, HERB_PROMPT_WIDTH, HERB_PROMPT_HEIGHT);
+
+    ctx.strokeStyle = 'rgba(190, 242, 100, 0.85)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(
+      x - halfWidth + 0.5,
+      y - halfHeight + 0.5,
+      HERB_PROMPT_WIDTH - 1,
+      HERB_PROMPT_HEIGHT - 1
+    );
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = 'bold 12px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = '#f7fee7';
+    ctx.fillText('[E] Coletar Erva de São-Caetano', x, y - 8);
+
+    ctx.font = 'bold 9px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = '#bef264';
+    ctx.fillText('Remove Lentidão e Sangramento', x, y + 10);
+    ctx.restore();
   }
 
   private renderFruitPrompt(

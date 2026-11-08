@@ -585,6 +585,31 @@ const FRUIT_TREES: {
   },
 ];
 
+const FIELD_PLANTS: {
+  name: string;
+  color: string;
+  effect: string;
+  description: string;
+  icon: React.ReactNode;
+}[] = [
+  {
+    name: 'Arbusto de Espinho',
+    color: '#ef4444',
+    effect: 'Perigo · Dano + Lentidão 40% + Sangramento',
+    description:
+      'Arbusto baixo de galhos retorcidos e espinhos claros, espalhado pelo chão da floresta. Ao encostar ou pisar, o herói (ou um inimigo terrestre comum) sofre dano imediato, fica 40% mais lento e abre uma Ferida que causa dano a cada 1 segundo por 10 segundos. Enquanto sangra, gotas de sangue pixeladas caem do herói.',
+    icon: <Skull className="h-4 w-4" />,
+  },
+  {
+    name: 'Erva de São-Caetano',
+    color: '#bef264',
+    effect: 'Cura · Remove Lentidão e Sangramento',
+    description:
+      'Pequena planta rasteira de folhas recortadas e frutos amarelos abertos, nascendo em posições aleatórias na terra. Chegue perto e pressione E no aviso [E] Coletar Erva de São-Caetano para consumir a erva e cancelar instantaneamente a Lentidão e o Sangramento. Cada erva ativa aparece no minimapa como um ponto verde-claro brilhante.',
+    icon: <Leaf className="h-4 w-4" />,
+  },
+];
+
 export const AmazonGuideModal: React.FC<AmazonGuideModalProps> = ({ onClose }) => {
   const [activeTab, setActiveTab] = useState<GuideTab>('fruits');
 
@@ -742,6 +767,47 @@ export const AmazonGuideModal: React.FC<AmazonGuideModalProps> = ({ onClose }) =
                         </div>
                         <p className="text-[11px] leading-relaxed text-[#9ca3af]">
                           {fruit.description}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              {/* Thorn bushes and medicinal herbs */}
+              <section>
+                <h3 className="mb-1 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[#e69f22]">
+                  <Shield className="h-4 w-4 text-rose-400" />
+                  Perigos & Ervas Medicinais
+                </h3>
+                <p className="mb-2 text-[11px] text-[#9ca3af]">
+                  Cuidado com os arbustos de espinho · Cure a Ferida com a erva usando{' '}
+                  <span className="font-bold text-[#f3f4f6]">E</span>.
+                </p>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {FIELD_PLANTS.map((plant) => (
+                    <div
+                      key={plant.name}
+                      className="flex items-start gap-2.5 rounded-lg border border-[#383e4c] bg-gradient-to-b from-[#1c2027] to-[#121419] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+                    >
+                      <span
+                        className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-white shadow-inner"
+                        style={{
+                          backgroundColor: plant.color,
+                          borderColor: plant.color,
+                          boxShadow: `0 0 10px ${plant.color}66`,
+                        }}
+                        aria-hidden="true"
+                      >
+                        {plant.icon}
+                      </span>
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold text-[#f3f4f6]">{plant.name}</div>
+                        <div className="text-[11px] font-semibold" style={{ color: plant.color }}>
+                          {plant.effect}
+                        </div>
+                        <p className="text-[11px] leading-relaxed text-[#9ca3af]">
+                          {plant.description}
                         </p>
                       </div>
                     </div>

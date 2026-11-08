@@ -31,7 +31,7 @@ import { Drop } from '../entities/Drops';
 import { VFXManager } from '../entities/VFX';
 import { WeaponSystem } from '../weapons/WeaponSystem';
 import { WaveDirector } from '../systems/WaveDirector';
-import { CollectedFruit, WorldSystem } from '../systems/WorldProps';
+import { CollectedFruit, HerbProp, WorldSystem } from '../systems/WorldProps';
 import { WEAPON_REGISTRY, PASSIVE_REGISTRY } from '../data/upgrades';
 import { saveGameData, loadSavedData } from '../data/persistence';
 import { getDifficulty } from '../data/difficulties';
@@ -89,6 +89,13 @@ const ECOLOGY_FRUIT_EAT_RADIUS = 54;
 const ECOLOGY_RIVER_PREDATOR_RANGE = 320;
 const ECOLOGY_JAGUAR_RANGE = 360;
 const ECOLOGY_FRUIT_FEED_COOLDOWN = 8;
+
+// Amazon thorn bushes: immediate damage, a 40% slow and a 10s bleeding wound.
+const THORN_BUSH_DAMAGE = 7;
+const THORN_BUSH_BLEED_DPS = 2;
+const THORN_BUSH_BLEED_DURATION = 10;
+const THORN_BUSH_SLOW = 0.4;
+const THORN_BUSH_HIT_COOLDOWN = 2;
 
 // Amazon Forest mission objectives.
 const OBJECTIVE_ACT1_FRUITS = 3;
@@ -357,6 +364,7 @@ export class GameEngine {
   private gemStreakTimer: number = 0;
   private itemSpawnTimer: number = 0;
   private processedEnemyDeaths = new WeakSet<Enemy>();
+  private thornCooldowns = new WeakMap<Enemy, number>();
   private missionSnapshot = { kills: 0, survivalSeconds: 0, goldCollected: 0, bossesDefeated: 0 };
   private amazonObjectives: AmazonObjectivesState = {
     fruitsCollected: 0,
@@ -1114,13 +1122,24 @@ export class GameEngine {
       this.spatialGrid.insert(spawnedMinions[m]);
     }
 
+    // 4.5. Thorn bushes wound the hero and common land enemies that step on them.
+    if (this.updateThornBushHazards(dt)) {
+      this.handlePlayerDeath();
+      return;
+    }
+
     // 5. Update World Props (Torches and fruit trees)
     this.worldProps.update(dt, this.player, (drop) => this.drops.push(drop));
 
-    // 5.1. Fruit trees are harvested only when the player presses E nearby.
+    // 5.1. Fruit trees and herbs are harvested only when the player presses E nearby.
     if (interactRequested) {
-      const fruit = this.worldProps.collectNearbyFruitTree(this.player);
-      if (fruit) this.handleFruitCollected(fruit);
+      const herb = this.worldProps.collectNearbyHerb(this.player);
+      if (herb) {
+        this.handleHerbCollected(herb);
+      } else {
+        const fruit = this.worldProps.collectNearbyFruitTree(this.player);
+        if (fruit) this.handleFruitCollected(fruit);
+      }
     }
 
     // 6. Update Weapons System
@@ -1192,6 +1211,84 @@ export class GameEngine {
       this.hudThrottleTimer = 0;
       this.syncHUD();
     }
+  }
+
+  /**
+   * Thorn bushes hurt the hero and ordinary land animals on contact: immediate
+   * damage, a 40% slow and a 10-second bleeding wound. Airborne heroes clear
+   * the bush without touching it, and bosses/elites/aquatic fauna are immune.
+   */
+  private updateThornBushHazards(dt: number): boolean {
+    if (!this.waveDirector.isAmazonForest) return false;
+
+    if (!this.player.isJumping && this.player.thornCooldown <= 0) {
+      const bush = this.worldProps.getThornBushAt(
+        this.player.x,
+        this.player.y,
+        this.player.radius
+      );
+      if (bush) {
+        this.player.thornCooldown = THORN_BUSH_HIT_COOLDOWN;
+        const damage = Math.max(1, Math.round(THORN_BUSH_DAMAGE * this.difficulty.enemyDamage));
+        const fatal = this.applyPlayerDamage(damage, false, true);
+        this.player.applySlow(THORN_BUSH_SLOW, THORN_BUSH_BLEED_DURATION);
+        this.player.applyBleed(THORN_BUSH_BLEED_DPS, THORN_BUSH_BLEED_DURATION);
+        this.vfx.addSparks(this.player.x, this.player.y, '#dc2626', 7);
+        if (fatal) return true;
+      }
+    }
+
+    for (let i = this.enemies.length - 1; i >= 0; i--) {
+      const enemy = this.enemies[i];
+      if (
+        enemy.hp <= 0 ||
+        enemy.isSubmerged ||
+        enemy.isAquatic ||
+        enemy.isBoss ||
+        enemy.isElite ||
+        enemy.type === 'bat' ||
+        enemy.type === 'ghost'
+      ) {
+        continue;
+      }
+
+      const cooldown = Math.max(0, (this.thornCooldowns.get(enemy) ?? 0) - dt);
+      const bush =
+        cooldown <= 0
+          ? this.worldProps.getThornBushAt(enemy.x, enemy.y, enemy.radius)
+          : null;
+
+      if (!bush) {
+        if (cooldown > 0) this.thornCooldowns.set(enemy, cooldown);
+        continue;
+      }
+
+      this.thornCooldowns.set(enemy, THORN_BUSH_HIT_COOLDOWN);
+      const dead = enemy.takeDamage(THORN_BUSH_DAMAGE);
+      enemy.applySlow(THORN_BUSH_SLOW, THORN_BUSH_BLEED_DURATION);
+      enemy.applyBleed(
+        THORN_BUSH_BLEED_DPS,
+        THORN_BUSH_BLEED_DPS * 4,
+        THORN_BUSH_BLEED_DURATION,
+        'knife'
+      );
+      this.vfx.addSparks(enemy.x, enemy.y, '#dc2626', 4);
+
+      if (dead) {
+        this.onEnemyKilled(enemy);
+        this.thornCooldowns.delete(enemy);
+      }
+    }
+
+    return false;
+  }
+
+  private handleHerbCollected(herb: HerbProp): void {
+    this.player.clearSlow();
+    this.player.clearBleeding();
+    this.sound.playFruitCollect();
+    this.vfx.addSparks(herb.x, herb.y, '#bef264', 14);
+    this.vfx.addSparks(this.player.x, this.player.y, '#65a30d', 8);
   }
 
   /**
@@ -2152,6 +2249,8 @@ export class GameEngine {
     this.worldProps.renderTrees(ctx, camera);
     this.worldProps.renderDecorTrees(ctx, camera, this.player, this.enemies);
     this.worldProps.renderFruitTrees(ctx, camera, this.player);
+    this.worldProps.renderThornBushes(ctx, camera);
+    this.worldProps.renderHerbs(ctx, camera, this.player);
 
     // 2. Render Torches & Props
     this.worldProps.renderTorches(ctx, camera);
@@ -2374,6 +2473,31 @@ export class GameEngine {
 
     const centerX = x + half;
     const centerY = y + half;
+
+    // Active São-Caetano herbs glow light green so the wounded hero can spot
+    // the nearest antidote on the radar.
+    for (let i = 0; i < this.worldProps.herbs.length; i++) {
+      const herb = this.worldProps.herbs[i];
+      if (!herb.active) continue;
+      const dx = herb.x - this.player.x;
+      const dy = herb.y - this.player.y;
+      if (dx * dx + dy * dy > viewRadius * viewRadius) continue;
+
+      const blipX = centerX + dx * scale;
+      const blipY = centerY + dy * scale;
+      ctx.save();
+      ctx.shadowColor = '#d9f99d';
+      ctx.shadowBlur = 7;
+      ctx.fillStyle = '#bef264';
+      ctx.beginPath();
+      ctx.arc(blipX, blipY, 2.4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#f7fee7';
+      ctx.beginPath();
+      ctx.arc(blipX, blipY, 0.9, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
 
     // Nearby enemies as small red blips.
     for (let i = 0; i < this.enemies.length; i++) {

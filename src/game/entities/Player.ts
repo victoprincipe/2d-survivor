@@ -93,6 +93,12 @@ export class Player {
   public stunTimer: number = 0;
   public attackSpeedBoostTimer: number = 0;
   public shieldTimer: number = 0;
+  // Thorn bush wound: damage every second until cured by the São-Caetano herb.
+  public bleedTimer: number = 0;
+  public bleedTickTimer: number = 0;
+  public bleedDamage: number = 0;
+  // Short grace period between thorn bush hits while standing on one.
+  public thornCooldown: number = 0;
 
   // Movement abilities (dash & jump)
   public movementConfig: MovementConfig = { ...DEFAULT_MOVEMENT_CONFIG };
@@ -211,6 +217,26 @@ export class Player {
     this.slowTimer = Math.max(this.slowTimer, duration);
   }
 
+  /** Opens a bleeding wound that ticks a small amount of damage every second. */
+  public applyBleed(damagePerSecond: number, duration: number): void {
+    this.bleedDamage = Math.max(this.bleedDamage, damagePerSecond);
+    if (this.bleedTimer <= 0) this.bleedTickTimer = 1;
+    this.bleedTimer = Math.max(this.bleedTimer, duration);
+  }
+
+  /** Removes the movement slow (thorn bush or other debuffs). */
+  public clearSlow(): void {
+    this.slowTimer = 0;
+    this.slowFactor = 0;
+  }
+
+  /** Closes the thorn wound, stopping the damage over time. */
+  public clearBleeding(): void {
+    this.bleedTimer = 0;
+    this.bleedTickTimer = 0;
+    this.bleedDamage = 0;
+  }
+
   public applyStun(duration: number): void {
     this.stunTimer = Math.max(this.stunTimer, duration);
     this.dashTimer = 0;
@@ -235,6 +261,28 @@ export class Player {
         this.slowTimer = 0;
         this.slowFactor = 0;
       }
+    }
+
+    if (this.thornCooldown > 0) {
+      this.thornCooldown = Math.max(0, this.thornCooldown - dt);
+    }
+
+    // Thorn wound: one small damage tick per second, independent of i-frames.
+    if (this.bleedTimer > 0) {
+      this.bleedTimer = Math.max(0, this.bleedTimer - dt);
+      this.bleedTickTimer -= dt;
+      if (this.bleedTickTimer <= 0) {
+        this.bleedTickTimer += 1;
+        if (!this.godMode && this.bleedDamage > 0) {
+          this.hp = Math.max(0, this.hp - this.bleedDamage);
+        }
+      }
+      if (this.bleedTimer <= 0) {
+        this.bleedTimer = 0;
+        this.bleedTickTimer = 0;
+        this.bleedDamage = 0;
+      }
+      if (this.hp <= 0) return false;
     }
 
     if (this.stunTimer > 0) {
@@ -612,6 +660,23 @@ export class Player {
       ctx.beginPath();
       ctx.arc(screen.x, screen.y - 6, 30, 0, Math.PI * 2);
       ctx.stroke();
+      ctx.restore();
+    }
+
+    // Pixel blood drops falling from the hero while the thorn wound bleeds.
+    if (this.bleedTimer > 0) {
+      ctx.save();
+      for (let drop = 0; drop < 4; drop++) {
+        const cycle = (this.idleAnimTimer * 1.1 + drop * 0.25) % 1;
+        const dropX =
+          screen.x + Math.sin(this.idleAnimTimer * 2.4 + drop * 1.7) * 13;
+        const dropY = screen.y - 16 + cycle * 30;
+        ctx.globalAlpha = 1 - cycle * 0.85;
+        ctx.fillStyle = '#b91c1c';
+        ctx.fillRect(Math.round(dropX), Math.round(dropY), 2, 3);
+        ctx.fillStyle = '#ef4444';
+        ctx.fillRect(Math.round(dropX), Math.round(dropY), 1, 1);
+      }
       ctx.restore();
     }
 
