@@ -1067,6 +1067,12 @@ export class WorldSystem {
       { x: 4100, y: 3500, rx: 1400, ry: 950, rotation: 0.35 },
     ];
 
+    // Trees are scattered before the water bodies exist; clear any trunk that
+    // would otherwise stand on the new open river mouth.
+    this.trees = this.trees.filter(
+      (tree) => !this.isRiverMouthWater(tree.x, tree.y, -tree.size * 0.4)
+    );
+
     // Floating water lilies along the river...
     for (let i = 0; i < 55; i++) {
       const x = (random() - 0.5) * FOREST_SIZE * 0.92;
@@ -1117,6 +1123,7 @@ export class WorldSystem {
       ) {
         continue;
       }
+      if (this.isRiverMouthWater(x, y, -30)) continue;
       this.bankPlants.push({
         x,
         y,
@@ -1140,6 +1147,7 @@ export class WorldSystem {
       ) {
         continue;
       }
+      if (this.isRiverMouthWater(x, y, -30)) continue;
       if (random() < 0.62) {
         this.beachStones.push({
           x,
@@ -1385,6 +1393,74 @@ export class WorldSystem {
     return Math.atan2(ly / Math.max(1, lake.ry), lx / Math.max(1, lake.rx));
   }
 
+  /**
+   * Natural mouth where the lower lake empties into the river. It starts well
+   * inside the lake and ends on the river centreline, so both ends are hidden
+   * under the existing water and only the open channel between them is drawn.
+   */
+  private getRiverMouthGeometry(): { lake: LakeProp; startY: number; endY: number } | null {
+    if (this.lakes.length === 0) return null;
+
+    const lake = this.lakes[0];
+    const startY = lake.y + lake.ry * 0.58;
+    const endY = this.riverCenterY(lake.x);
+    if (startY >= endY - 40) return null;
+
+    return { lake, startY, endY };
+  }
+
+  /**
+   * Meandering centreline and organic half-width of the river mouth. The same
+   * profile feeds the painted foz, the water checks and the animal navigation,
+   * keeping visuals and physics perfectly aligned.
+   */
+  private getRiverMouthProfile(
+    t: number,
+    lake: LakeProp
+  ): { centerX: number; halfWidth: number } {
+    const clamped = Math.max(0, Math.min(1, t));
+    const phase = lake.x * 0.0031 + lake.y * 0.0047;
+    const centerX =
+      lake.x +
+      Math.sin(clamped * Math.PI * 1.7 + phase) * 145 +
+      Math.sin(clamped * Math.PI * 4.3 - phase * 0.6) * 52;
+    const halfWidth =
+      470 *
+      (1 +
+        Math.sin(clamped * 5.2 + phase) * 0.16 +
+        Math.sin(clamped * 10.4 - phase * 1.3) * 0.07 +
+        Math.sin(clamped * 2.1 + phase * 0.5) * 0.1);
+
+    return { centerX, halfWidth: Math.max(180, halfWidth) };
+  }
+
+  /** True when the point lies inside the river mouth, optionally inset. */
+  private isRiverMouthWater(x: number, y: number, inset: number = 0): boolean {
+    const mouth = this.getRiverMouthGeometry();
+    if (!mouth) return false;
+    if (y < mouth.startY || y > mouth.endY) return false;
+
+    const t = (y - mouth.startY) / Math.max(1, mouth.endY - mouth.startY);
+    const profile = this.getRiverMouthProfile(t, mouth.lake);
+    return Math.abs(x - profile.centerX) <= profile.halfWidth - inset;
+  }
+
+  /** Muddy rim hugging the open river mouth. */
+  private isRiverMouthMud(x: number, y: number): boolean {
+    const mouth = this.getRiverMouthGeometry();
+    if (!mouth) return false;
+    if (y < mouth.startY || y > mouth.endY) return false;
+    if (this.isNavigableWater(x, y, 0)) return false;
+
+    const t = (y - mouth.startY) / Math.max(1, mouth.endY - mouth.startY);
+    const profile = this.getRiverMouthProfile(t, mouth.lake);
+    const offset = Math.abs(x - profile.centerX);
+    return (
+      offset > profile.halfWidth &&
+      offset <= profile.halfWidth + this.getMudBandThickness(profile.centerX)
+    );
+  }
+
   /** Traces an organic lake/beach outline in the lake's local space. */
   private traceLakeShape(
     ctx: CanvasRenderingContext2D,
@@ -1413,10 +1489,58 @@ export class WorldSystem {
     ctx.closePath();
   }
 
+  /** Traces the irregular, smoothly widening outline of the river mouth. */
+  private traceRiverMouth(ctx: CanvasRenderingContext2D, extraWidth: number = 0): void {
+    const mouth = this.getRiverMouthGeometry();
+    if (!mouth) return;
+
+    const steps = 48;
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const y = mouth.startY + (mouth.endY - mouth.startY) * t;
+      const profile = this.getRiverMouthProfile(t, mouth.lake);
+      const half = Math.max(0, profile.halfWidth + extraWidth);
+      if (i === 0) ctx.moveTo(profile.centerX - half, y);
+      else ctx.lineTo(profile.centerX - half, y);
+    }
+    for (let i = steps; i >= 0; i--) {
+      const t = i / steps;
+      const y = mouth.startY + (mouth.endY - mouth.startY) * t;
+      const profile = this.getRiverMouthProfile(t, mouth.lake);
+      const half = Math.max(0, profile.halfWidth + extraWidth);
+      ctx.lineTo(profile.centerX + half, y);
+    }
+    ctx.closePath();
+  }
+
+  /** Traces one meandering bank of the river mouth. */
+  private traceRiverMouthEdge(
+    ctx: CanvasRenderingContext2D,
+    extraWidth: number,
+    side: -1 | 1
+  ): void {
+    const mouth = this.getRiverMouthGeometry();
+    if (!mouth) return;
+
+    const steps = 48;
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const y = mouth.startY + (mouth.endY - mouth.startY) * t;
+      const profile = this.getRiverMouthProfile(t, mouth.lake);
+      const half = Math.max(0, profile.halfWidth + extraWidth);
+      const x = profile.centerX + side * half;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+  }
+
   private isInWater(x: number, y: number): boolean {
     // River band, including the whole sandy beach so land props stay clear of it.
     const riverHalf = this.getRiverHalfWidth(x, RIVER_HALF_WIDTH + RIVER_BANK);
     if (Math.abs(y - this.riverCenterY(x)) < riverHalf) return true;
+
+    // Open river mouth, with a small margin so beach clutter stays off it.
+    if (this.isRiverMouthWater(x, y, -60)) return true;
 
     // Lakes (rotated organic ellipses).
     for (let i = 0; i < this.lakes.length; i++) {
@@ -1451,6 +1575,9 @@ export class WorldSystem {
     // River band.
     const riverHalf = this.getRiverHalfWidth(x, RIVER_HALF_WIDTH - 16 - radius);
     if (riverHalf > 0 && Math.abs(y - this.riverCenterY(x)) < riverHalf) return true;
+
+    // The river mouth is fully navigable, including its open throat.
+    if (this.isRiverMouthWater(x, y, 16 + radius)) return true;
 
     // Lakes (rotated organic ellipses), inset by the creature's body so it
     // stays wet.
@@ -1490,6 +1617,9 @@ export class WorldSystem {
     const riverHalf = this.getRiverHalfWidth(x, RIVER_HALF_WIDTH);
     if (Math.abs(y - this.riverCenterY(x)) < riverHalf) return true;
 
+    // Open mouth joining the lower lake to the river.
+    if (this.isRiverMouthWater(x, y)) return true;
+
     // Lakes (rotated organic ellipses).
     for (let i = 0; i < this.lakes.length; i++) {
       const lake = this.lakes[i];
@@ -1525,6 +1655,9 @@ export class WorldSystem {
     const mudHalf = waterHalf + this.getMudBandThickness(x);
     const riverOffset = Math.abs(y - this.riverCenterY(x));
     if (riverOffset >= waterHalf && riverOffset < mudHalf) return true;
+
+    // Muddy rim around the new river mouth.
+    if (this.isRiverMouthMud(x, y)) return true;
 
     // Lakes: an organic ring around each water ellipse.
     for (let i = 0; i < this.lakes.length; i++) {
@@ -1569,6 +1702,9 @@ export class WorldSystem {
     );
     if (riverHalf > 0 && Math.abs(y - this.riverCenterY(x)) < riverHalf) return true;
 
+    // The mouth and its banks are valid terrain for river animals too.
+    if (this.isRiverMouthWater(x, y, -(RIVER_BANK - 10 - radius))) return true;
+
     const inset = 10 + radius;
     for (let i = 0; i < this.lakes.length; i++) {
       const lake = this.lakes[i];
@@ -1608,7 +1744,10 @@ export class WorldSystem {
     const side = y >= riverCenterY ? 1 : -1;
     const riverY =
       riverCenterY + side * this.getRiverHalfWidth(riverX, bankOffset);
-    if (Math.abs(riverY) <= limit) {
+    if (
+      Math.abs(riverY) <= limit &&
+      !this.isRiverMouthWater(riverX, riverY, -60)
+    ) {
       const dx = riverX - x;
       const dy = riverY - y;
       best = { x: riverX, y: riverY };
@@ -1638,6 +1777,7 @@ export class WorldSystem {
       const targetY = lake.y + localX * sinR + localY * cosR;
 
       if (Math.abs(targetX) > limit || Math.abs(targetY) > limit) continue;
+      if (this.isRiverMouthWater(targetX, targetY, -60)) continue;
 
       const tdx = targetX - x;
       const tdy = targetY - y;
@@ -1938,6 +2078,25 @@ export class WorldSystem {
       ctx.fillStyle = 'rgba(43, 139, 161, 0.95)';
       ctx.beginPath();
       ctx.ellipse(0, 0, lake.rx * scale, lake.ry * scale, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    // Continuous mouth between the lower lake and the river.
+    if (this.getRiverMouthGeometry()) {
+      ctx.save();
+      ctx.translate(toX(0), toY(0));
+      ctx.scale(scale, scale);
+
+      ctx.fillStyle = 'rgba(216, 188, 130, 0.65)';
+      ctx.beginPath();
+      this.traceRiverMouth(ctx, 20);
+      ctx.fill();
+
+      ctx.fillStyle = 'rgba(43, 139, 161, 0.95)';
+      ctx.beginPath();
+      this.traceRiverMouth(ctx);
       ctx.fill();
 
       ctx.restore();
@@ -5375,6 +5534,10 @@ export class WorldSystem {
       ctx.restore();
     }
 
+    // Open mouth where the lower lake flows straight into the river. Painting
+    // it after both banks removes the sand strip between the two water bodies.
+    this.renderRiverMouth(ctx);
+
     // Floating water lilies.
     for (let i = 0; i < this.lilies.length; i++) {
       const lily = this.lilies[i];
@@ -5417,6 +5580,62 @@ export class WorldSystem {
     ctx.restore();
   }
 
+  /**
+   * Paints the natural river mouth after both shorelines. The water covers the
+   * old sand/grass divider, while the muddy rim follows the same meandering
+   * profile used by the terrain checks.
+   */
+  private renderRiverMouth(ctx: CanvasRenderingContext2D): void {
+    if (!this.getRiverMouthGeometry()) return;
+
+    // Irregular clay lips blending the mouth into the existing beach. They are
+    // stroked (rather than filled wider) so they only ooze outwards and never
+    // cover the water that joins both bodies.
+    ctx.lineCap = 'butt';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#3a2718';
+    ctx.lineWidth = 30;
+    for (const side of [-1, 1] as const) {
+      ctx.beginPath();
+      this.traceRiverMouthEdge(ctx, 0, side);
+      ctx.stroke();
+    }
+
+    ctx.strokeStyle = '#4a3322';
+    ctx.lineWidth = 14;
+    for (const side of [-1, 1] as const) {
+      ctx.beginPath();
+      this.traceRiverMouthEdge(ctx, 0, side);
+      ctx.stroke();
+    }
+
+    // Flowing water, layered exactly like the river and lakes.
+    ctx.fillStyle = '#145466';
+    ctx.beginPath();
+    this.traceRiverMouth(ctx);
+    ctx.fill();
+
+    ctx.fillStyle = '#1b6b82';
+    ctx.beginPath();
+    this.traceRiverMouth(ctx, -14);
+    ctx.fill();
+
+    ctx.fillStyle = '#2b8ba1';
+    ctx.beginPath();
+    this.traceRiverMouth(ctx, -62);
+    ctx.fill();
+
+    const shimmer = this.getWaterShimmerPattern(ctx);
+    if (shimmer) {
+      ctx.fillStyle = shimmer;
+      ctx.globalAlpha = 0.55;
+      ctx.beginPath();
+      this.traceRiverMouth(ctx, -20);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+  }
+
   /** Soft animated ripples that keep the river and lake surfaces alive. */
   private renderWaterSurfaceRipples(
     ctx: CanvasRenderingContext2D,
@@ -5442,6 +5661,29 @@ export class WorldSystem {
         ctx.globalAlpha = 0.16 + 0.08 * Math.sin(phase + ring * 1.3);
         ctx.beginPath();
         ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+
+    // Ripples carried through the open river mouth.
+    const mouth = this.getRiverMouthGeometry();
+    if (mouth) {
+      for (let i = 1; i <= 4; i++) {
+        const t = i / 5;
+        const y = mouth.startY + (mouth.endY - mouth.startY) * t;
+        const profile = this.getRiverMouthProfile(t, mouth.lake);
+        const drift = Math.sin(time * 0.8 + i * 1.7) * 26;
+        ctx.globalAlpha = 0.12 + 0.07 * Math.sin(time * 0.9 + i * 1.3);
+        ctx.beginPath();
+        ctx.ellipse(
+          profile.centerX + drift,
+          y,
+          34 + (i % 3) * 14,
+          7 + (i % 2) * 3,
+          0,
+          0,
+          Math.PI * 2
+        );
         ctx.stroke();
       }
     }
