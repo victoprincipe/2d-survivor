@@ -21,6 +21,7 @@ import { SoundEngine } from './SoundEngine';
 import { SpatialGrid } from './SpatialGrid';
 import { Player } from '../entities/Player';
 import { Enemy } from '../entities/Enemy';
+import { GorillaNpc } from '../entities/GorillaNpc';
 import { Drop } from '../entities/Drops';
 import { VFXManager } from '../entities/VFX';
 import { WeaponSystem } from '../weapons/WeaponSystem';
@@ -259,6 +260,7 @@ export class GameEngine {
   public difficulty: DifficultyConfig;
 
   public enemies: Enemy[] = [];
+  private readonly gorillaNpc: GorillaNpc | null;
   public drops: Drop[] = [];
   private bossProjectiles: BossProjectile[] = [];
   private bossHazards: BossHazard[] = [];
@@ -333,6 +335,7 @@ export class GameEngine {
     this.spatialGrid = new SpatialGrid<Enemy>(110);
     this.vfx = new VFXManager();
     this.worldProps = new WorldSystem(mapId);
+    this.gorillaNpc = mapId === 'amazon_forest' ? new GorillaNpc() : null;
     this.difficulty = getDifficulty(difficultyId);
     this.waveDirector = new WaveDirector(this.difficulty, mapId, this.worldProps);
     this.amazonTurns = this.createAmazonMissionTurns();
@@ -372,7 +375,7 @@ export class GameEngine {
     if (this.isRunning) return;
     this.isRunning = true;
     this.lastTime = performance.now();
-    this.sound.startBgm();
+    this.sound.startBgm(this.waveDirector.isAmazonForest ? 'amazon_forest' : 'night_plain');
     if (this.waveDirector.isAmazonForest) {
       this.sound.startAmazonAmbient();
     }
@@ -444,6 +447,7 @@ export class GameEngine {
   }
 
   private update(dt: number): void {
+    this.gorillaNpc?.update(dt);
     if (this.gemStreakTimer > 0) {
       this.gemStreakTimer -= dt;
       if (this.gemStreakTimer <= 0) this.gemStreak = 0;
@@ -501,7 +505,34 @@ export class GameEngine {
         : this.spatialGrid.applySeparation(e, e.radius * 2, 0.45);
       const previousX = e.x;
       const previousY = e.y;
+      const previousJaguarState = e.jaguarState;
       const alive = e.update(dt, this.player, sep);
+      if (e.isJaguarPredator && e.jaguarState === 'warning' && e.jaguarAttack !== 'bite' &&
+        (previousJaguarState === 'idle' || (e.jaguarAttack === 'charge' && e.jaguarTimer > 0.15))) {
+        // Keep the displayed corridor terrain-safe while aiming; lock it before launch.
+        const dx = e.jaguarTargetX - e.x;
+        const dy = e.jaguarTargetY - e.y;
+        const steps = Math.max(1, Math.ceil(Math.hypot(dx, dy) / 8));
+        let targetX = e.x;
+        let targetY = e.y;
+        for (let step = 1; step <= steps; step++) {
+          const x = e.x + dx * step / steps;
+          const y = e.y + dy * step / steps;
+          const resolved = this.worldProps.resolveLandMovement(targetX, targetY, x, y, e.radius);
+          if (Math.hypot(resolved.x - x, resolved.y - y) > 0.1) break;
+          targetX = x;
+          targetY = y;
+        }
+        e.jaguarTargetX = targetX;
+        e.jaguarTargetY = targetY;
+        if (e.jaguarAttack === 'charge') {
+          e.jaguarAttackDuration = Math.max(0.001, Math.hypot(targetX - e.x, targetY - e.y) / 1188);
+        }
+      }
+
+      if (e.isJaguarPredator && previousJaguarState === 'idle' && e.jaguarState === 'warning' && e.jaguarAttack === 'charge') {
+        this.sound.playJaguarCharge();
+      }
 
       if (!alive) {
         this.enemies.splice(i, 1);
@@ -531,7 +562,8 @@ export class GameEngine {
         );
         e.x = resolved.x;
         e.y = resolved.y;
-      } else {
+      } else if (!(e.isJaguarPredator && e.jaguarAttack === 'leap' &&
+        (e.jaguarState === 'active' || e.pendingJaguarStrike === 'leap'))) {
         // Land animals cannot cross the plateau cliffs either: they must use
         // the dirt ramps, just like the hero.
         const resolved = this.worldProps.resolveLandMovement(
@@ -574,9 +606,7 @@ export class GameEngine {
         const ndy = this.player.y - e.y;
         if (Math.sqrt(ndx * ndx + ndy * ndy) <= e.novaRadius + this.player.radius) {
           const novaDmg = Math.max(1, Math.round(e.damage * 0.85));
-          const fatal = this.player.takeDamage(novaDmg);
-          this.sound.playPlayerHurt();
-          this.vfx.addDamageNumber(this.player.x, this.player.y, novaDmg, true, false);
+          const fatal = this.applyPlayerDamage(novaDmg, true, false);
           if (fatal) {
             this.handlePlayerDeath();
             return;
@@ -888,9 +918,7 @@ export class GameEngine {
         if (stompDist < 190 + this.player.radius) {
           this.player.applyStun(1.15);
           const stompDamage = Math.max(1, Math.round(e.damage * 0.7));
-          const fatal = this.player.takeDamage(stompDamage);
-          this.sound.playPlayerHurt();
-          this.vfx.addDamageNumber(this.player.x, this.player.y, stompDamage, false, false);
+          const fatal = this.applyPlayerDamage(stompDamage, false, false);
           if (fatal) {
             this.handlePlayerDeath();
             return;
@@ -907,13 +935,21 @@ export class GameEngine {
         const roarDist = Math.sqrt(roarDx * roarDx + roarDy * roarDy);
         if (roarDist < 360 + this.player.radius) {
           const roarDamage = Math.max(1, Math.round(e.damage * 1.1));
-          const fatal = this.player.takeDamage(roarDamage);
-          this.sound.playPlayerHurt();
-          this.vfx.addDamageNumber(this.player.x, this.player.y, roarDamage, true, false);
+          const fatal = this.applyPlayerDamage(roarDamage, true, false);
           if (fatal) {
             this.handlePlayerDeath();
             return;
           }
+        }
+      }
+
+      const jaguarMultiplier = e.consumeJaguarHit(this.player, previousX, previousY);
+      if (jaguarMultiplier > 0 && !this.player.isJumping && !this.player.godMode && this.player.invulnerableTimer <= 0) {
+        const damage = Math.max(1, Math.round(e.damage * jaguarMultiplier));
+        const fatal = this.applyPlayerDamage(damage, false, true);
+        if (fatal) {
+          this.handlePlayerDeath();
+          return;
         }
       }
 
@@ -922,11 +958,8 @@ export class GameEngine {
       const dy = this.player.y - e.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
 
-      if (!e.isSubmerged && !this.player.isJumping && dist < this.player.radius + e.radius) {
-        const fatal = this.player.takeDamage(e.damage);
-        this.sound.playPlayerHurt();
-        this.camera.shake(0.2, 5);
-        this.vfx.addDamageNumber(this.player.x, this.player.y, e.damage, false, false);
+      if (!e.isSubmerged && !e.jaguarBusy && !this.player.isJumping && dist < this.player.radius + e.radius) {
+        const fatal = this.applyPlayerDamage(e.damage, false, true);
 
         if (fatal) {
           this.handlePlayerDeath();
@@ -1187,7 +1220,7 @@ export class GameEngine {
     const devoured = new Set<Enemy>();
     for (let i = 0; i < this.enemies.length; i++) {
       const predator = this.enemies[i];
-      if (!predator.isEcologyPredator || predator.hp <= 0) continue;
+      if (!predator.isEcologyPredator || predator.hp <= 0 || predator.jaguarBusy) continue;
       if (predator.ecologyHuntTimer > 0) continue;
 
       const isJaguar = predator.isJaguarPredator;
@@ -1448,6 +1481,19 @@ export class GameEngine {
     };
   }
 
+  /** Emit hit feedback only when an attack actually removes health. */
+  private applyPlayerDamage(amount: number, critical = false, shake = false): boolean {
+    const previousHp = this.player.hp;
+    const fatal = this.player.takeDamage(amount);
+    const damageTaken = previousHp - this.player.hp;
+    if (damageTaken > 0) {
+      this.sound.playPlayerHurt(this.waveDirector.isAmazonForest ? 'amazon_forest' : 'night_plain');
+      if (shake) this.camera.shake(0.2, 5);
+      this.vfx.addDamageNumber(this.player.x, this.player.y, damageTaken, critical, false);
+    }
+    return fatal;
+  }
+
   private updateBossEffects(dt: number): boolean {
     for (let i = this.bossProjectiles.length - 1; i >= 0; i--) {
       const p = this.bossProjectiles[i];
@@ -1458,9 +1504,7 @@ export class GameEngine {
       const dx = this.player.x - p.x;
       const dy = this.player.y - p.y;
       if (Math.sqrt(dx * dx + dy * dy) <= p.radius + this.player.radius) {
-        const fatal = this.player.takeDamage(p.damage);
-        this.sound.playPlayerHurt();
-        this.vfx.addDamageNumber(this.player.x, this.player.y, p.damage, false, false);
+        const fatal = this.applyPlayerDamage(p.damage, false, false);
         // Vitória-Régia's spores cling to the player as a mild venom slow.
         if (p.kind === 'spore') this.player.applySlow(0.25, 1.5);
         p.life = 0;
@@ -1512,9 +1556,7 @@ export class GameEngine {
         h.tickTimer -= dt;
         if (dist < h.radius + this.player.radius && h.tickTimer <= 0) {
           h.tickTimer = 0.55;
-          const fatal = this.player.takeDamage(h.damage);
-          this.sound.playPlayerHurt();
-          this.vfx.addDamageNumber(this.player.x, this.player.y, h.damage, false, false);
+          const fatal = this.applyPlayerDamage(h.damage, false, false);
           if (fatal) return true;
         }
       }
@@ -1979,7 +2021,14 @@ export class GameEngine {
       this.enemies[i].render(ctx, camera);
     }
 
+    // Match the player's depth at the NPC's feet without adding it to combat.
+    if (this.gorillaNpc && this.player.y >= this.gorillaNpc.y) {
+      this.gorillaNpc.render(ctx, camera);
+    }
     this.player.render(ctx, camera);
+    if (this.gorillaNpc && this.player.y < this.gorillaNpc.y) {
+      this.gorillaNpc.render(ctx, camera);
+    }
     this.renderBossProjectiles();
 
     // 6. Render Aerial Projectiles, Slashes, Orbitals & Lightning

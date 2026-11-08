@@ -120,6 +120,7 @@ export class Player {
   public facingY: number = 0;
   public invulnerableTimer: number = 0;
   public walkAnimTimer: number = 0;
+  private idleAnimTimer: number = 0;
   public isMoving: boolean = false;
   // Set by the engine while the feet are on the Amazon river/lake surface.
   public isWadingInWater: boolean = false;
@@ -131,6 +132,8 @@ export class Player {
   private spriteImage: HTMLImageElement | null = null;
   private walkSpriteImage: HTMLImageElement | null = null;
   private attackSpriteImage: HTMLImageElement | null = null;
+  private animationSpriteImage: HTMLImageElement | null = null;
+  private attackFacingX: number = 1;
 
   public static computeXpToNextLevel(level: number): number {
     const lv = Math.max(0, level - 1);
@@ -155,6 +158,11 @@ export class Player {
   constructor(character: CharacterConfig, initialPowerUps: PermanentPowerUps = {}) {
     this.character = character;
     this.powerUps = initialPowerUps;
+
+    if (character.animationSprite && typeof window !== 'undefined') {
+      this.animationSpriteImage = new Image();
+      this.animationSpriteImage.src = character.animationSprite;
+    }
 
     if (character.sprite && typeof window !== 'undefined') {
       this.spriteImage = new Image();
@@ -209,6 +217,8 @@ export class Player {
   }
 
   update(dt: number, input: InputManager): boolean {
+    // Simulation time keeps animation frozen whenever the engine is paused.
+    this.idleAnimTimer = (this.idleAnimTimer + dt) % 4;
     // Invulnerability timer
     if (this.invulnerableTimer > 0) {
       this.invulnerableTimer -= dt;
@@ -362,7 +372,8 @@ export class Player {
     return this.hp > 0;
   }
 
-  public triggerAttackAnimation(duration: number): void {
+  public triggerAttackAnimation(duration: number, facingX: number = this.facingX): void {
+    this.attackFacingX = facingX;
     this.attackAnimDuration = Math.max(0.01, duration);
     this.attackAnimTimer = this.attackAnimDuration;
   }
@@ -433,9 +444,12 @@ export class Player {
     const isDead = this.hp <= 0;
     const isAttacking = !isDead && this.attackAnimTimer > 0 && hasAttackSheet;
     const isUsingSheet = hasWalkSheet;
+    const animationSheet = this.animationSpriteImage;
+    const hasAnimationSheet = !!animationSheet && animationSheet.complete
+      && animationSheet.naturalWidth > 0;
 
     // Spritesheets already animate the gait, so avoid an extra bounce.
-    const bob = isUsingSheet ? 0 : Math.sin(this.walkAnimTimer) * 3;
+    const bob = isUsingSheet || hasAnimationSheet ? 0 : Math.sin(this.walkAnimTimer) * 3;
 
     // Shadow (shrinks slightly while airborne, but stays on the ground)
     const jumpOffset = this.jumpOffset;
@@ -452,7 +466,39 @@ export class Player {
 
     const flip = this.facingX < 0 ? -1 : 1;
 
-    if (isUsingSheet && walkSheet) {
+    if (hasAnimationSheet && animationSheet) {
+      // Kayrurururu atlas: walk / jump / bow / idle, all facing right.
+      // The engine supplies the jump arc; poses remain anchored to the feet.
+      const attacking = !isDead && this.attackAnimTimer > 0;
+      let row = 3;
+      let frame = isDead ? 0 : Math.floor(this.idleAnimTimer * 2) % 4;
+      if (!isDead && this.isJumping) {
+        row = 1;
+        const progress = 1 - this.jumpTimer / this.movementConfig.jumpDuration;
+        frame = progress < 0.15 ? 0 : progress < 0.35 ? 1 : progress < 0.8 ? 2 : 3;
+      }
+      if (attacking) {
+        row = 2;
+        frame = Math.min(3, Math.max(0, Math.floor(
+          (1 - this.attackAnimTimer / this.attackAnimDuration) * 4
+        )));
+      } else if (!isDead && !this.isJumping && this.isMoving) {
+        row = 0;
+        frame = Math.floor(this.walkAnimTimer) % 4;
+      }
+      const frameWidth = animationSheet.naturalWidth / 4;
+      const frameHeight = animationSheet.naturalHeight / 4;
+      // Atlas cells include transparent padding around the visible body.
+      const drawHeight = 60;
+      const drawWidth = drawHeight * frameWidth / frameHeight;
+      ctx.save();
+      if ((attacking ? this.attackFacingX : this.facingX) < 0) ctx.scale(-1, 1);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(animationSheet, frame * frameWidth, row * frameHeight,
+        frameWidth, frameHeight, -drawWidth / 2, 14 - drawHeight * 0.96,
+        drawWidth, drawHeight);
+      ctx.restore();
+    } else if (isUsingSheet && walkSheet) {
       // Sheet-based animation: 8 walk frames per row, attack frames on a single row.
       const walkFrames = Math.max(1, this.character.walkFrames ?? 8);
       const attackFrames = Math.max(1, this.character.attackFrames ?? 8);
@@ -574,7 +620,7 @@ export class Player {
     const barHeight = HP_BAR_HEIGHT;
     const barX = Math.round(screen.x - barWidth / 2);
     const hasPlayerSprite =
-      isUsingSheet ||
+      hasAnimationSheet || isUsingSheet ||
       (!!this.spriteImage &&
         this.spriteImage.complete &&
         this.spriteImage.naturalWidth > 0);

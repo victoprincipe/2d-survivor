@@ -342,7 +342,38 @@ body {
   }
 }
 
+.kayru-selection-idle {
+  display: block;
+  background-size: 400% 400%;
+  background-position: 0% 100%;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  transform-origin: 50% 94%;
+  animation:
+    kayru-selection-breathe 3.2s ease-in-out infinite,
+    kayru-selection-attack 3s step-end infinite;
+}
+
+/* Hold one idle pose and interpolate breathing, keeping the feet grounded. */
+@keyframes kayru-selection-breathe {
+  0%, 100% { transform: scale(1, 1); }
+  50% { transform: scale(1.012, 1.025); }
+}
+
+/* Brief bow demonstration after breathing; never slide between atlas cells. */
+@keyframes kayru-selection-attack {
+  0%, 96%, 100% { background-position: 0% 100%; }
+  79% { background-position: 0% 66.666667%; }
+  83.25% { background-position: 33.333333% 66.666667%; }
+  87.5% { background-position: 66.666667% 66.666667%; }
+  91.75% { background-position: 100% 66.666667%; }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .kayru-selection-idle {
+    animation: none;
+  }
+
   .torch-glow {
     animation: none;
   }

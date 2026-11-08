@@ -198,7 +198,7 @@ const FAUNA: FaunaEntry[] = [
     name: 'Onça-pintada',
     rank: 'Elite',
     habitat: 'Terra',
-    behavior: 'Elite terrestre que caça outros animais e cresce a cada presa; fica mais rápida e forte sem limite.',
+    behavior: 'Elite terrestre que investe de longe, salta na distância média e morde de perto. Desvie das áreas marcadas e ataque durante a recuperação; cresce ao devorar presas.',
     nightFrenzy: true,
   },
   {
@@ -524,7 +524,7 @@ const RULES: { title: string; icon: React.ReactNode; accent: string; text: strin
     title: 'Onça-pintada',
     icon: <PawPrint className="h-4 w-4" />,
     accent: 'text-yellow-300',
-    text: 'Caça na mata e devora as presas que encontra pela frente. Também fica mais rápida a cada refeição.',
+    text: 'Investe em linha reta, pula até o local marcado e morde em um cone à sua frente. Saia dos avisos ou pule para evitar o golpe; aproveite a recuperação para atacar. Continua caçando e ficando mais rápida e forte a cada refeição.',
   },
   {
     title: 'Anta',

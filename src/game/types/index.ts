@@ -71,6 +71,8 @@ export interface CharacterConfig {
   color: string;
   portraitColor: string;
   sprite?: string;
+  /** Four columns: walk, jump, bow attack and idle on successive rows. */
+  animationSprite?: string;
   walkSprite?: string;
   attackSprite?: string;
   walkFrames?: number;

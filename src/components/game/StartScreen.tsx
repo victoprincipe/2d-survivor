@@ -444,7 +444,14 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
                             : 'inset 0 2px 8px rgba(0,0,0,0.45)',
                         }}
                       >
-                        {char.sprite ? (
+                        {char.id === 'kayrurururu' && char.animationSprite ? (
+                          <span
+                            role="img"
+                            aria-label={char.name}
+                            className="kayru-selection-idle h-full w-full drop-shadow"
+                            style={{ backgroundImage: `url("${char.animationSprite}")` }}
+                          />
+                        ) : char.sprite ? (
                           <Image
                             src={char.sprite}
                             alt={char.name}

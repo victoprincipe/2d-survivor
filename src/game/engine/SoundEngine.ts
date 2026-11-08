@@ -1,6 +1,36 @@
+import type { MapId } from '../types';
+
 const BGM_TRACK_URL = '/audio/job-23-audio-1.mp3';
+const AMAZON_BGM_TRACK_URL = '/audio/amazon-carajas.mp3';
+
+const PLAYER_HURT_VARIANTS = [
+  { pitch: 185, endPitch: 68, duration: 0.16, filter: 1250, wave: 'triangle' },
+  { pitch: 145, endPitch: 52, duration: 0.20, filter: 850, wave: 'sine' },
+  { pitch: 225, endPitch: 82, duration: 0.14, filter: 1750, wave: 'triangle' },
+  { pitch: 165, endPitch: 60, duration: 0.22, filter: 1050, wave: 'triangle' },
+] as const;
 
 export class SoundEngine {
+  private lastPlayerHurtVariant = -1;
+  private playerHurtNoise: AudioBuffer | null = null;
+  private amazonHurtBuffer: AudioBuffer | null = null;
+  private deathBuffer: Promise<AudioBuffer | null> | null = null;
+  private jaguarBuffer: Promise<AudioBuffer | null> | null = null;
+
+  playJaguarCharge(): void {
+    if (!this.initCtx() || !this.ctx || !this.sfxGain) return;
+    const ctx = this.ctx;
+    const gain = this.sfxGain;
+    void this.jaguarBuffer?.then(buffer => {
+      if (!buffer || ctx.state === 'closed') return;
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(gain);
+      source.onended = () => source.disconnect();
+      source.start();
+    });
+  }
+
   private ctx: AudioContext | null = null;
   private sfxGain: GainNode | null = null;
   private bgmGain: GainNode | null = null;
@@ -27,6 +57,21 @@ export class SoundEngine {
       const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       if (!AudioCtx) return false;
       this.ctx = new AudioCtx();
+      const ctx = this.ctx;
+      this.deathBuffer = fetch('/audio/player-death-laugh.mp3')
+        .then(response => { if (!response.ok) throw new Error('Death audio unavailable'); return response.arrayBuffer(); })
+        .then(data => ctx.decodeAudioData(data))
+        .catch(() => null);
+      // Decode at audio initialization so hits never wait for a network request.
+      void fetch('/audio/amazon-player-hurt.mp3')
+        .then(response => { if (!response.ok) throw new Error('Amazon hurt audio unavailable'); return response.arrayBuffer(); })
+        .then(data => ctx.decodeAudioData(data))
+        .then(buffer => { if (this.ctx === ctx && ctx.state !== 'closed') this.amazonHurtBuffer = buffer; })
+        .catch(() => {});
+      this.jaguarBuffer = fetch('/audio/jaguar-charge.mp3')
+        .then(response => { if (!response.ok) throw new Error('Jaguar audio unavailable'); return response.arrayBuffer(); })
+        .then(data => ctx.decodeAudioData(data))
+        .catch(() => null);
 
       this.masterGain = this.ctx.createGain();
       this.masterGain.gain.value = this.muted ? 0 : 1;
@@ -365,26 +410,71 @@ export class SoundEngine {
     osc.stop(now + 0.08);
   }
 
-  playPlayerHurt(): void {
+  playPlayerHurt(mapId: MapId = 'night_plain'): void {
     if (this.muted || !this.initCtx() || !this.ctx || !this.sfxGain) return;
     if (this.shouldRateLimit('playerHurt', 200)) return;
 
+    if (mapId === 'amazon_forest') {
+      if (!this.amazonHurtBuffer) return;
+      const source = this.ctx.createBufferSource();
+      source.buffer = this.amazonHurtBuffer;
+      source.connect(this.sfxGain);
+      source.onended = () => source.disconnect();
+      source.start();
+      return;
+    }
+
+    // Pick a different impact on each accepted hit, with subtle pitch variation.
+    const count = PLAYER_HURT_VARIANTS.length;
+    let index = Math.floor(Math.random() * (this.lastPlayerHurtVariant < 0 ? count : count - 1));
+    if (this.lastPlayerHurtVariant >= 0 && index >= this.lastPlayerHurtVariant) index++;
+    this.lastPlayerHurtVariant = index;
+    const variant = PLAYER_HURT_VARIANTS[index];
+    const pitchScale = 0.96 + Math.random() * 0.08;
     const now = this.ctx.currentTime;
+    const end = now + variant.duration;
+
+    // A low falling tone gives the hit weight without the old harsh buzz.
     const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(260, now);
-    osc.frequency.linearRampToValueAtTime(90, now + 0.15);
-
-    gain.gain.setValueAtTime(0.3, now);
-    gain.gain.linearRampToValueAtTime(0.01, now + 0.15);
-
-    osc.connect(gain);
-    gain.connect(this.sfxGain);
-
+    const toneGain = this.ctx.createGain();
+    osc.type = variant.wave;
+    osc.frequency.setValueAtTime(variant.pitch * pitchScale, now);
+    osc.frequency.exponentialRampToValueAtTime(variant.endPitch * pitchScale, end);
+    toneGain.gain.setValueAtTime(0, now);
+    toneGain.gain.linearRampToValueAtTime(0.26, now + 0.004);
+    toneGain.gain.exponentialRampToValueAtTime(0.001, end);
+    osc.connect(toneGain);
+    toneGain.connect(this.sfxGain);
+    osc.onended = () => {
+      osc.disconnect();
+      toneGain.disconnect();
+    };
     osc.start(now);
-    osc.stop(now + 0.15);
+    osc.stop(end);
+
+    // A filtered noise transient adds a distinct physical impact to each timbre.
+    this.playerHurtNoise ??= this.createNoiseBuffer(0.22);
+    if (!this.playerHurtNoise) return;
+    const noise = this.ctx.createBufferSource();
+    const filter = this.ctx.createBiquadFilter();
+    const noiseGain = this.ctx.createGain();
+    noise.buffer = this.playerHurtNoise;
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(variant.filter, now);
+    filter.frequency.exponentialRampToValueAtTime(350, end);
+    noiseGain.gain.setValueAtTime(0, now);
+    noiseGain.gain.linearRampToValueAtTime(0.16, now + 0.003);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, end);
+    noise.connect(filter);
+    filter.connect(noiseGain);
+    noiseGain.connect(this.sfxGain);
+    noise.onended = () => {
+      noise.disconnect();
+      filter.disconnect();
+      noiseGain.disconnect();
+    };
+    noise.start(now);
+    noise.stop(end);
   }
 
   playGemPickup(streak: number = 0): void {
@@ -526,25 +616,15 @@ export class SoundEngine {
 
   playGameOver(): void {
     if (this.muted || !this.initCtx() || !this.ctx || !this.sfxGain) return;
-
-    const notes = [330, 311.13, 293.66, 261.63]; // Descending mournful tones
-    notes.forEach((freq, idx) => {
-      if (!this.ctx || !this.sfxGain) return;
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      const startTime = this.ctx.currentTime + idx * 0.2;
-
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(freq, startTime);
-
-      gain.gain.setValueAtTime(0.25, startTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.4);
-
-      osc.connect(gain);
-      gain.connect(this.sfxGain);
-
-      osc.start(startTime);
-      osc.stop(startTime + 0.4);
+    const ctx = this.ctx;
+    const gain = this.sfxGain;
+    void this.deathBuffer?.then(buffer => {
+      if (!buffer || this.ctx !== ctx || ctx.state === 'closed' || this.muted) return;
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(gain);
+      source.onended = () => source.disconnect();
+      source.start();
     });
   }
 
@@ -572,14 +652,14 @@ export class SoundEngine {
     });
   }
 
-  startBgm(): void {
+  startBgm(mapId: MapId = 'night_plain'): void {
     if (this.isBgmPlaying) return;
     this.isBgmPlaying = true;
     if (!this.initCtx() || !this.ctx || !this.bgmGain) return;
 
     // Route the soundtrack through bgmGain so mute and volume controls apply.
     if (!this.bgmAudio) {
-      this.bgmAudio = new Audio(BGM_TRACK_URL);
+      this.bgmAudio = new Audio(mapId === 'amazon_forest' ? AMAZON_BGM_TRACK_URL : BGM_TRACK_URL);
       this.bgmAudio.loop = true;
       this.bgmAudio.preload = 'auto';
       const source = this.ctx.createMediaElementSource(this.bgmAudio);
@@ -598,6 +678,8 @@ export class SoundEngine {
   }
 
   destroy(): void {
+    this.deathBuffer = null;
+    this.amazonHurtBuffer = null;
     this.stopBgm();
     this.stopAmazonAmbient();
     this.bgmAudio = null;

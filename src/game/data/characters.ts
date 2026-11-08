@@ -82,7 +82,7 @@ export const CHARACTERS: CharacterConfig[] = [
   },
   {
     id: 'kayrurururu',
-    name: 'Kayrurururu',
+    name: 'Kayru',
     title: 'Fisiculturista do Amazonas',
     description: 'Gigante da selva amazônica. Dispara flechas pesadas que abatem Elites e Chefes à distância.',
     startingWeapon: 'bow',
@@ -90,6 +90,7 @@ export const CHARACTERS: CharacterConfig[] = [
     color: '#2d6a4f',
     portraitColor: '#1b4332',
     sprite: '/kayrurururu.png',
+    animationSprite: '/kayrurururu-animations-v2.png',
     statBonuses: {
       maxHp: 25,
       might: 0.15,

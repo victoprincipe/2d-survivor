@@ -990,6 +990,10 @@ export class WeaponSystem {
     const pierce =
       (w.evolved ? 99 : w.level >= 5 ? 14 : w.level >= 3 ? 7 : 4) + player.bonusPierce;
     const fallbackAngle = Math.atan2(player.facingY, player.facingX);
+    if (player.character.id === 'kayrurururu') {
+      const targetX = nearby[0] ? nearby[0].x - player.x : player.facingX;
+      player.triggerAttackAnimation(0.32, Math.abs(targetX) > 0.01 ? targetX : player.facingX);
+    }
     const life = 1.45 * player.durationMultiplier;
 
     for (let i = 0; i < projectileCount; i++) {

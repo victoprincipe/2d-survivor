@@ -9,6 +9,9 @@ export type BossOrEliteState =
   | 'telegraph_nova'
   | 'telegraph_summon';
 
+export type JaguarAttack = 'bite' | 'leap' | 'charge';
+export type JaguarState = 'idle' | 'warning' | 'active' | 'recovery';
+
 export class Enemy {
   public id: number;
   public type: EnemyType;
@@ -81,6 +84,30 @@ export class Enemy {
   public novaRadius: number = 140;
   public pendingNovaBurst: boolean = false;
   public pendingSummonCount: number = 0;
+
+  public jaguarState: JaguarState = 'idle';
+  public jaguarAttack: JaguarAttack = 'bite';
+  public jaguarTimer = 0;
+  public jaguarAttackDuration = 0.5;
+  public jaguarTargetX = 0;
+  public jaguarTargetY = 0;
+  public jaguarStartX = 0;
+  public jaguarStartY = 0;
+  public jaguarDirX = 1;
+  public jaguarDirY = 0;
+  public jaguarBiteRange = 0;
+  public jaguarHit = false;
+  public pendingJaguarStrike: 'bite' | 'leap' | null = null;
+  public jaguarChargeStep = false;
+
+  public get jaguarBusy(): boolean {
+    return this.isJaguarPredator && this.jaguarState !== 'idle';
+  }
+
+  public get jaguarLeapHeight(): number {
+    return this.isJaguarPredator && this.jaguarState === 'active' && this.jaguarAttack === 'leap'
+      ? Math.sin(Math.PI * (1 - this.jaguarTimer / this.jaguarAttackDuration)) * 45.5 : 0;
+  }
 
   // Amazon Forest boss attacks (resolved by GameEngine).
   public pendingFireballBurst: number = 0;
@@ -265,12 +292,12 @@ export class Enemy {
         this.name = 'Onça-pintada Elite';
         this.radius = 30;
         this.maxHp = Math.round(620 * hpMultiplier);
-        this.speed = 150;
+        this.speed = 165;
         this.damage = 30;
         this.xpValue = 220;
         this.isElite = true;
         this.knockbackResistance = 0.24;
-        this.skillCooldown = 3.2 + Math.random() * 1.5;
+        this.skillCooldown = 2;
         break;
       case 'elite_tapir':
         this.name = 'Anta Elite';
@@ -659,9 +686,16 @@ export class Enemy {
       this.soulEaterMarkTimer -= dt;
     }
 
-    // Knockback decay
-    this.x += this.knockbackX * dt;
-    this.y += this.knockbackY * dt;
+    if (this.isJaguarPredator && this.hp <= 0) {
+      this.pendingJaguarStrike = null;
+      this.jaguarChargeStep = false;
+      return false;
+    }
+    // Committed attacks ignore displacement; debuffs keep ticking.
+    if (!this.jaguarBusy) {
+      this.x += this.knockbackX * dt;
+      this.y += this.knockbackY * dt;
+    }
     this.knockbackX *= Math.pow(0.05, dt);
     this.knockbackY *= Math.pow(0.05, dt);
 
@@ -694,8 +728,10 @@ export class Enemy {
       return this.hp > 0;
     }
 
+    if (this.isJaguarPredator && this.updateJaguar(dt, player, dist)) return this.hp > 0;
+
     // Elite & Boss special skill state machine
-    if (this.isElite || this.isBoss) {
+    if (!this.isJaguarPredator && (this.isElite || this.isBoss)) {
       this.updateSpecialSkills(dt, dx, dy, dist, speedMult);
     }
 
@@ -752,6 +788,101 @@ export class Enemy {
     }
 
     return this.hp > 0;
+  }
+
+  /** Consume an attack once, including encounters dodged by jumping or i-frames. */
+  public consumeJaguarHit(player: Player, previousX: number, previousY: number): number {
+    const strike = this.pendingJaguarStrike;
+    this.pendingJaguarStrike = null;
+    if (!this.isJaguarPredator || this.hp <= 0 || this.jaguarHit || (!strike && !this.jaguarChargeStep)) return 0;
+    const dx = player.x - this.x;
+    const dy = player.y - this.y;
+    const distance = Math.hypot(dx, dy);
+    let hit: boolean;
+    let multiplier: number;
+    if (strike === 'bite') {
+      hit = distance <= this.jaguarBiteRange && (distance === 0 ||
+        (dx * this.jaguarDirX + dy * this.jaguarDirY) / distance >= Math.cos(Math.PI * 5 / 18));
+      multiplier = 1.3;
+    } else if (strike === 'leap') {
+      hit = distance <= 31.5 + player.radius;
+      multiplier = 0.84;
+    } else {
+      const sx = this.x - previousX;
+      const sy = this.y - previousY;
+      const lengthSq = sx * sx + sy * sy;
+      const t = lengthSq > 0 ? Math.max(0, Math.min(1,
+        ((player.x - previousX) * sx + (player.y - previousY) * sy) / lengthSq)) : 0;
+      hit = Math.hypot(player.x - previousX - t * sx,
+        player.y - previousY - t * sy) <= this.radius + player.radius;
+      multiplier = 1.1;
+    }
+    if (!hit) return 0;
+    this.jaguarHit = true;
+    return multiplier;
+  }
+
+  private updateJaguar(dt: number, player: Player, dist: number): boolean {
+    this.jaguarChargeStep = false;
+    if (this.jaguarState === 'idle') {
+      if (dist > 0) {
+        this.jaguarDirX = (player.x - this.x) / dist;
+        this.jaguarDirY = (player.y - this.y) / dist;
+      }
+      this.skillCooldown -= dt;
+      if (this.skillCooldown > 0 || dist > 520) return false;
+      this.jaguarAttack = dist <= this.radius + player.radius + 35 ? 'bite' : dist <= 336 ? 'leap' : 'charge';
+      this.jaguarBiteRange = this.radius + player.radius + 45;
+      this.jaguarStartX = this.x;
+      this.jaguarStartY = this.y;
+      this.jaguarTargetX = this.jaguarAttack === 'charge' ? this.x + this.jaguarDirX * 468 : player.x;
+      this.jaguarTargetY = this.jaguarAttack === 'charge' ? this.y + this.jaguarDirY * 468 : player.y;
+      this.jaguarAttackDuration = this.jaguarAttack === 'leap' ? 0.245 : 468 / 1188;
+      this.jaguarHit = false;
+      this.pendingJaguarStrike = null;
+      this.jaguarState = 'warning';
+      this.jaguarTimer = this.jaguarAttack === 'bite' ? 0.35 : this.jaguarAttack === 'leap' ? 0.3185 : 0.4;
+      return true;
+    }
+    if (this.jaguarState === 'active') {
+      this.jaguarTimer = Math.max(0, this.jaguarTimer - dt);
+      const duration = this.jaguarAttackDuration;
+      const progress = 1 - this.jaguarTimer / duration;
+      this.x = this.jaguarStartX + (this.jaguarTargetX - this.jaguarStartX) * progress;
+      this.y = this.jaguarStartY + (this.jaguarTargetY - this.jaguarStartY) * progress;
+      this.jaguarChargeStep = this.jaguarAttack === 'charge';
+      if (this.jaguarTimer <= 0) {
+        if (this.jaguarAttack === 'leap') this.pendingJaguarStrike = 'leap';
+        this.jaguarState = 'recovery';
+        this.jaguarTimer = this.jaguarAttack === 'leap' ? 0.49 : 0.7;
+      }
+      return true;
+    }
+    // Track early sidesteps, then commit to a visible, fixed corridor before launch.
+    if (this.jaguarState === 'warning' && this.jaguarAttack === 'charge' && this.jaguarTimer - dt > 0.15) {
+      if (dist > 0) {
+        this.jaguarDirX = (player.x - this.x) / dist;
+        this.jaguarDirY = (player.y - this.y) / dist;
+      }
+      this.jaguarTargetX = this.jaguarStartX + this.jaguarDirX * 468;
+      this.jaguarTargetY = this.jaguarStartY + this.jaguarDirY * 468;
+    }
+    this.jaguarTimer -= dt;
+    if (this.jaguarTimer > 0) return true;
+    if (this.jaguarState === 'warning') {
+      if (this.jaguarAttack === 'bite') {
+        this.pendingJaguarStrike = 'bite';
+        this.jaguarState = 'recovery';
+        this.jaguarTimer = 0.5;
+      } else {
+        this.jaguarState = 'active';
+        this.jaguarTimer = this.jaguarAttackDuration;
+      }
+    } else {
+      this.jaguarState = 'idle';
+      this.skillCooldown = this.jaguarAttack === 'charge' ? 3.6 : this.jaguarAttack === 'leap' ? 1.26 : 1.8;
+    }
+    return true;
   }
 
   private updateSpecialSkills(dt: number, dx: number, dy: number, dist: number, speedMult: number): void {
@@ -988,6 +1119,10 @@ export class Enemy {
     this.knockbackX += knockX * knockForce * this.knockbackResistance;
     this.knockbackY += knockY * knockForce * this.knockbackResistance;
 
+    if (this.hp <= 0 && this.isJaguarPredator) {
+      this.pendingJaguarStrike = null;
+      this.jaguarChargeStep = false;
+    }
     return this.hp <= 0;
   }
 
@@ -1081,6 +1216,36 @@ export class Enemy {
     const screen = camera.worldToScreen(this.x, this.y);
     const flip = this.x > camera.x ? -1 : 1;
 
+    if (this.jaguarBusy) {
+      ctx.save();
+      ctx.strokeStyle = '#fbbf24';
+      ctx.fillStyle = this.jaguarState === 'recovery' ? 'rgba(251,191,36,0.08)' : 'rgba(249,115,22,0.25)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      if (this.jaguarState === 'recovery') {
+        ctx.ellipse(screen.x, screen.y + 20, this.radius + 6, 12, 0, 0, Math.PI * 2);
+      } else if (this.jaguarAttack === 'leap') {
+        const target = camera.worldToScreen(this.jaguarTargetX, this.jaguarTargetY);
+        ctx.arc(target.x, target.y, 31.5, 0, Math.PI * 2);
+      } else if (this.jaguarAttack === 'bite') {
+        const angle = Math.atan2(this.jaguarDirY, this.jaguarDirX);
+        ctx.moveTo(screen.x, screen.y);
+        ctx.arc(screen.x, screen.y, this.jaguarBiteRange, angle - Math.PI * 5 / 18, angle + Math.PI * 5 / 18);
+        ctx.closePath();
+      } else {
+        const start = camera.worldToScreen(this.jaguarStartX, this.jaguarStartY);
+        const target = camera.worldToScreen(this.jaguarTargetX, this.jaguarTargetY);
+        ctx.moveTo(start.x, start.y);
+        ctx.lineTo(target.x, target.y);
+        ctx.strokeStyle = 'rgba(249,115,22,0.35)';
+        ctx.lineWidth = this.radius * 2;
+        ctx.lineCap = 'round';
+      }
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+
     // Render Boss / Elite Telegraphs beneath character
     if (this.skillState === 'telegraph_dash') {
       const progress = 1 - Math.max(0, this.skillStateTimer / Math.max(0.1, this.skillDuration));
@@ -1130,7 +1295,7 @@ export class Enemy {
 
     // Waist-deep water: land creatures are clipped at the river surface so they
     // wade instead of sliding over the water. Water dwellers skip this.
-    if (this.isWadingInWater) {
+    if (this.isWadingInWater && this.jaguarLeapHeight === 0) {
       const waterLine = this.radius * 0.9 - Math.max(8, this.radius * 0.75);
       ctx.beginPath();
       ctx.rect(-9999, -9999, 19998, 9999 + waterLine);
@@ -1168,7 +1333,9 @@ export class Enemy {
       ctx.stroke();
     }
 
-    ctx.scale(flip, 1);
+    ctx.translate(0, -this.jaguarLeapHeight / this.growthScale);
+    if (this.isJaguarPredator && this.jaguarState === 'warning' && this.jaguarAttack === 'leap') ctx.scale(1.08, 0.75);
+    ctx.scale(this.isJaguarPredator ? (this.jaguarDirX < 0 ? -1 : 1) : flip, 1);
 
     if (isFlashing) {
       ctx.fillStyle = '#ffffff';
@@ -2861,7 +3028,7 @@ export class Enemy {
     } else if (this.type === 'elite_jaguar') {
       // Large spotted jaguar: low prowling body, muscular legs and a sweeping tail.
       ctx.save();
-      const stride = Math.sin(this.animTimer * 3.8);
+      const stride = this.jaguarBusy ? 0 : Math.sin(this.animTimer * 3.8);
       const tailSway = Math.sin(this.animTimer * 2.1) * 6;
 
       ctx.strokeStyle = isFlashing ? '#ffffff' : '#92400e';
@@ -2918,6 +3085,18 @@ export class Enemy {
       ctx.beginPath();
       ctx.ellipse(36, 1, 7, 5.5, 0.08, 0, Math.PI * 2);
       ctx.fill();
+
+      if (this.jaguarAttack === 'bite' && this.jaguarState === 'warning') {
+        ctx.fillStyle = '#451a03';
+        ctx.beginPath();
+        ctx.moveTo(29, 3);
+        ctx.lineTo(47, 3);
+        ctx.lineTo(42, 16);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#fff7ed';
+        ctx.fillRect(39, 5, 3, 6);
+      }
 
       if (!isFlashing) {
         ctx.fillStyle = '#1c1917';
