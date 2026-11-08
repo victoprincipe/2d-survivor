@@ -10,6 +10,7 @@ import { GAME_MAPS } from '@/game/data/maps';
 import { countClaimableMissions, getAccountLevel } from '@/game/data/missions';
 import { WEAPON_REGISTRY } from '@/game/data/upgrades';
 import { MissionsTab } from './MissionsTab';
+import { AmazonGuideModal } from './AmazonGuideModal';
 import { renderWeaponIcon, renderNamedIcon } from './GameIcons';
 import {
   Flame,
@@ -84,6 +85,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
     savedData.difficulty ?? 'normal'
   );
   const [selectedMap, setSelectedMap] = useState<MapId>('night_plain');
+  const [isAmazonGuideOpen, setIsAmazonGuideOpen] = useState(false);
   const [selectionVolume, setSelectionVolume] = useState(1);
   const [isSelectionMusicPlaying, setIsSelectionMusicPlaying] = useState(false);
   const selectionAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -300,6 +302,18 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
                   );
                 })}
               </div>
+              {selectedMap === 'amazon_forest' && (
+                <button
+                  type="button"
+                  onClick={() => setIsAmazonGuideOpen(true)}
+                  className="mt-2 flex w-full cursor-pointer items-center justify-center gap-2 rounded-md border border-emerald-500/70 bg-gradient-to-b from-emerald-900/70 to-emerald-950 px-3 py-2 text-xs font-black uppercase tracking-wider text-emerald-200 shadow-[0_0_14px_rgba(16,185,129,0.25)] transition hover:border-emerald-400 hover:text-emerald-100 active:scale-[0.99]"
+                >
+                  <span className="text-base leading-none" aria-hidden="true">
+                    📖
+                  </span>
+                  Guia do Mapa / Bestiário
+                </button>
+              )}
             </div>
 
             {/* Difficulty Selector */}
@@ -545,6 +559,8 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
           </span>
         </div>
       </div>
+
+      {isAmazonGuideOpen && <AmazonGuideModal onClose={() => setIsAmazonGuideOpen(false)} />}
     </div>
   );
 };
