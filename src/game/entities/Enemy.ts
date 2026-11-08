@@ -33,6 +33,8 @@ export class Enemy {
   // Water ambush state, refreshed by the engine every frame.
   public isSubmerged: boolean = false;
   public playerInWater: boolean = false;
+  // Set by the engine while a land creature wades through the Amazon water.
+  public isWadingInWater: boolean = false;
   // Rate limiter for the water splash/ripple trail while walking in the river.
   public waterRippleTimer: number = Math.random() * 0.2;
   // Set by the engine for the Amazon Forest night frenzy (+25% speed).
@@ -508,6 +510,20 @@ export class Enemy {
       this.type === 'piranha' ||
       this.type === 'pink_river_dolphin' ||
       this.type === 'giant_otter'
+    );
+  }
+
+  /**
+   * Native water creatures (aquatic fauna and the river bosses) already swim
+   * at their natural level, so the river must not visually cut their sprites.
+   */
+  public get isWaterDweller(): boolean {
+    return (
+      this.isAquatic ||
+      this.type === 'boss_boto' ||
+      this.type === 'boss_iara' ||
+      this.type === 'boss_vitoria_regia' ||
+      this.type === 'boss_cobra_grande'
     );
   }
 
@@ -1110,6 +1126,15 @@ export class Enemy {
     // Predators grow without limit as they devour other animals.
     if (this.growthScale !== 1) {
       ctx.scale(this.growthScale, this.growthScale);
+    }
+
+    // Waist-deep water: land creatures are clipped at the river surface so they
+    // wade instead of sliding over the water. Water dwellers skip this.
+    if (this.isWadingInWater) {
+      const waterLine = this.radius * 0.9 - Math.max(8, this.radius * 0.75);
+      ctx.beginPath();
+      ctx.rect(-9999, -9999, 19998, 9999 + waterLine);
+      ctx.clip();
     }
 
     const isFlashing = this.hitFlashTimer > 0;

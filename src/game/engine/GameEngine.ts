@@ -468,6 +468,7 @@ export class GameEngine {
     // the grid so weapons, projectiles and separation cannot detect or hit
     // them at all.
     const playerInWater = this.worldProps.isWaterSurface(this.player.x, this.player.y);
+    this.player.isWadingInWater = playerInWater;
     const amazonNight = this.isAmazonNight();
     this.spatialGrid.clear();
     for (let i = 0; i < this.enemies.length; i++) {
@@ -543,6 +544,10 @@ export class GameEngine {
         e.x = resolved.x;
         e.y = resolved.y;
       }
+
+      // Land creatures standing on the river/lake surface are drawn waist-deep.
+      e.isWadingInWater =
+        !e.isWaterDweller && this.worldProps.isWaterSurface(e.x, e.y);
 
       // Animals wading through the river leave the same ring/splash trail as
       // the hero. Submerged ambushers stay hidden and therefore leave no wake.

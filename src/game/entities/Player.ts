@@ -121,6 +121,8 @@ export class Player {
   public invulnerableTimer: number = 0;
   public walkAnimTimer: number = 0;
   public isMoving: boolean = false;
+  // Set by the engine while the feet are on the Amazon river/lake surface.
+  public isWadingInWater: boolean = false;
 
   public character: CharacterConfig;
   public powerUps: PermanentPowerUps = {};
@@ -412,6 +414,17 @@ export class Player {
     ctx.save();
     ctx.translate(screen.x, screen.y);
 
+    const spriteHeight = 52;
+
+    // Waist-deep water: clip the lower ~45% of the sprite so the hero appears
+    // to wade through the river instead of floating over it.
+    if (this.isWadingInWater) {
+      const waterLine = 14 - spriteHeight * 0.45;
+      ctx.beginPath();
+      ctx.rect(-999, -999, 1998, 999 + waterLine);
+      ctx.clip();
+    }
+
     const walkSheet = this.walkSpriteImage;
     const attackSheet = this.attackSpriteImage;
     const hasWalkSheet = !!walkSheet && walkSheet.complete && walkSheet.naturalWidth > 0;
@@ -438,7 +451,6 @@ export class Player {
     }
 
     const flip = this.facingX < 0 ? -1 : 1;
-    const spriteHeight = 52;
 
     if (isUsingSheet && walkSheet) {
       // Sheet-based animation: 8 walk frames per row, attack frames on a single row.
