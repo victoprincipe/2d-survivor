@@ -82,8 +82,9 @@ const FRUIT_TREE_BENEFITS: Record<FruitTreeKind, string> = {
 };
 
 // Distinct minimap colors so each fruit can be told apart at a glance.
+// Açaí is only a fallback: active trees use the pixel-art bunch icon instead.
 const FRUIT_TREE_MINIMAP_COLORS: Record<FruitTreeKind, string> = {
-  acai: '#a855f7',
+  acai: '#3a1050',
   cupuacu: '#d4a017',
   castanha: '#8b5a2b',
   buriti: '#f97316',
