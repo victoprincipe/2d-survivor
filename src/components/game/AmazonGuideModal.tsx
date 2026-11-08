@@ -593,19 +593,19 @@ const FIELD_PLANTS: {
   icon: React.ReactNode;
 }[] = [
   {
-    name: 'Arbusto de Espinho',
+    name: 'Arbustos de Espinho',
     color: '#ef4444',
-    effect: 'Perigo · Dano + Lentidão 40% + Sangramento',
+    effect: 'Perigo Ambiental · Dano + Slow 40% + Sangramento',
     description:
-      'Arbusto baixo de galhos retorcidos e espinhos claros, espalhado pelo chão da floresta. Ao encostar ou pisar, o herói (ou um inimigo terrestre comum) sofre dano imediato, fica 40% mais lento e abre uma Ferida que causa dano a cada 1 segundo por 10 segundos. Enquanto sangra, gotas de sangue pixeladas caem do herói.',
+      'Arbusto baixo de galhos retorcidos e espinhos claros, espalhado pelo chão da floresta. Ao tocar, causa dano imediato, reduz a velocidade em 40% (Slow) e abre uma ferida que causa sangramento contínuo por 10 segundos, exibindo gotas de sangue no herói. Afeta o jogador e criaturas comuns.',
     icon: <Skull className="h-4 w-4" />,
   },
   {
     name: 'Erva de São-Caetano',
     color: '#bef264',
-    effect: 'Cura · Remove Lentidão e Sangramento',
+    effect: 'Antídoto Natural · Remove Slow e Sangramento',
     description:
-      'Pequena planta rasteira de folhas recortadas e frutos amarelos abertos, nascendo em posições aleatórias na terra. Chegue perto e pressione E no aviso [E] Coletar Erva de São-Caetano para consumir a erva e cancelar instantaneamente a Lentidão e o Sangramento. Cada erva ativa aparece no minimapa como um ponto verde-claro brilhante.',
+      'Planta rasteira verde-claro com ícone brilhante no radar. Coletada com a tecla E perto do herói, remove instantaneamente a lentidão (Slow) e cancela o efeito de sangramento causado pelos espinhos.',
     icon: <Leaf className="h-4 w-4" />,
   },
 ];
@@ -774,15 +774,15 @@ export const AmazonGuideModal: React.FC<AmazonGuideModalProps> = ({ onClose }) =
                 </div>
               </section>
 
-              {/* Thorn bushes and medicinal herbs */}
-              <section>
+              {/* Environmental hazards and natural antidote */}
+              <section className="rounded-lg border border-rose-900/60 bg-gradient-to-b from-[#241412] to-[#121419] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                 <h3 className="mb-1 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[#e69f22]">
                   <Shield className="h-4 w-4 text-rose-400" />
-                  Perigos & Ervas Medicinais
+                  Elementos do Cenário & Perigos Ambientais
                 </h3>
                 <p className="mb-2 text-[11px] text-[#9ca3af]">
-                  Cuidado com os arbustos de espinho · Cure a Ferida com a erva usando{' '}
-                  <span className="font-bold text-[#f3f4f6]">E</span>.
+                  Cuidado com os arbustos de espinho · Use a Erva de São-Caetano com{' '}
+                  <span className="font-bold text-[#f3f4f6]">E</span> para curar a Ferida.
                 </p>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {FIELD_PLANTS.map((plant) => (
