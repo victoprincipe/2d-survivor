@@ -31,7 +31,13 @@ import { Drop } from '../entities/Drops';
 import { VFXManager } from '../entities/VFX';
 import { WeaponSystem } from '../weapons/WeaponSystem';
 import { WaveDirector } from '../systems/WaveDirector';
-import { CollectedFruit, HerbProp, WorldSystem } from '../systems/WorldProps';
+import {
+  CollectedFruit,
+  HerbProp,
+  MUD_SPEED_MULTIPLIER,
+  WATER_SPEED_MULTIPLIER,
+  WorldSystem,
+} from '../systems/WorldProps';
 import { WEAPON_REGISTRY, PASSIVE_REGISTRY } from '../data/upgrades';
 import { saveGameData, loadSavedData } from '../data/persistence';
 import { getDifficulty } from '../data/difficulties';
@@ -558,7 +564,20 @@ export class GameEngine {
       if (this.gemStreakTimer <= 0) this.gemStreak = 0;
     }
 
-    // 1. Update Player
+    // 1. Terrain physics: mud and water slow the hero down before the step.
+    const playerInWater = this.worldProps.isWaterSurface(this.player.x, this.player.y);
+    const playerInMud = !playerInWater && this.worldProps.isMud(this.player.x, this.player.y);
+    this.player.isWadingInWater = playerInWater;
+    this.player.isInMud = playerInMud && !this.player.isJumping;
+    this.player.terrainSpeedMultiplier = this.player.isJumping
+      ? 1
+      : playerInWater
+        ? WATER_SPEED_MULTIPLIER
+        : playerInMud
+          ? MUD_SPEED_MULTIPLIER
+          : 1;
+
+    // 2. Update Player
     const playerAlive = this.player.update(dt, this.input);
     if (!playerAlive) {
       this.handlePlayerDeath();
@@ -576,8 +595,6 @@ export class GameEngine {
     // until the hero enters the water. While submerged they are left out of
     // the grid so weapons, projectiles and separation cannot detect or hit
     // them at all.
-    const playerInWater = this.worldProps.isWaterSurface(this.player.x, this.player.y);
-    this.player.isWadingInWater = playerInWater;
     const amazonNight = this.isAmazonNight();
     this.spatialGrid.clear();
     for (let i = 0; i < this.enemies.length; i++) {
@@ -596,14 +613,21 @@ export class GameEngine {
       e.playerInWater = playerInWater;
       // The forest night frenzy accelerates every animal by 25%.
       e.isAmazonNight = amazonNight;
-      // Jacaré-açu and Sucuri gain speed in the water (+50%) and on the beach
-      // (+30%) once the hero is wet enough to hunt.
-      e.terrainSpeedMultiplier =
-        e.isRiverPredator && playerInWater
-          ? this.worldProps.isWaterSurface(e.x, e.y)
-            ? 1.5
-            : 1.3
-          : 1.0;
+      // Terrain physics for land animals: the river slows them by 30% and the
+      // muddy margins by 20%. River predators keep their own water/beach boost.
+      const enemyInWater = this.worldProps.isWaterSurface(e.x, e.y);
+      if (e.isRiverPredator) {
+        e.terrainSpeedMultiplier = playerInWater ? (enemyInWater ? 1.5 : 1.3) : 1.0;
+      } else if (e.isWaterDweller) {
+        e.terrainSpeedMultiplier = 1.0;
+      } else {
+        const enemyInMud = !enemyInWater && this.worldProps.isMud(e.x, e.y);
+        e.terrainSpeedMultiplier = enemyInWater
+          ? WATER_SPEED_MULTIPLIER
+          : enemyInMud
+            ? MUD_SPEED_MULTIPLIER
+            : 1.0;
+      }
 
       const sep = e.isSubmerged
         ? { vx: 0, vy: 0 }

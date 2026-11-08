@@ -721,8 +721,7 @@ export class Enemy {
     const moveDx = (this.ecologyTargetX ?? player.x) - this.x;
     const moveDy = (this.ecologyTargetY ?? player.y) - this.y;
     const moveDist = Math.sqrt(moveDx * moveDx + moveDy * moveDy);
-    const terrainMult =
-      this.isRiverPredator && this.playerInWater ? this.terrainSpeedMultiplier : 1.0;
+    const terrainMult = this.terrainSpeedMultiplier;
     const speedMult =
       (this.slowTimer > 0 ? Math.max(0.35, 1 - this.slowFactor) : 1.0) * terrainMult;
     // Forest night frenzy: +25% movement speed only (skills keep their cadence).

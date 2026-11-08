@@ -93,11 +93,17 @@ const HERB_PROMPT_HEIGHT = 44;
 // fade their canopy over characters walking behind them.
 const DECOR_TREE_COUNT = 720;
 
-// Amazon water. For the player the river and lakes are purely visual, but
+// Amazon water. The river and lakes slow anyone wading through them, while
 // aquatic enemies use the stricter isNavigableWater check below to stay wet.
 const RIVER_WIDTH = 980;
 const RIVER_BANK = 260;
 const RIVER_HALF_WIDTH = RIVER_WIDTH / 2;
+// Muddy strip that oozes out of the water margins onto the sand and forest.
+const MUD_BAND = 130;
+
+// Movement penalties applied while wading through water or trudging in mud.
+export const WATER_SPEED_MULTIPLIER = 0.7;
+export const MUD_SPEED_MULTIPLIER = 0.8;
 
 // Repeating pixel-art tiles used by the Amazon ground/beach/water textures.
 const FOREST_GROUND_TILE = 320;
@@ -1340,6 +1346,17 @@ export class WorldSystem {
   }
 
   /**
+   * Organic thickness of the muddy margin. The same profile feeds both the
+   * painted mud and the terrain check, so footsteps match the dark clay.
+   */
+  private getMudBandThickness(x: number): number {
+    return (
+      MUD_BAND *
+      (0.6 + 0.4 * (0.5 + 0.5 * Math.sin(x * 0.0042 + 1.3)))
+    );
+  }
+
+  /**
    * Deterministic irregular lake outline. The noise is a function of the
    * normalized ellipse angle, so painting and the collision checks agree.
    */
@@ -1484,6 +1501,48 @@ export class WorldSystem {
       if (rho <= this.getLakeEdgeScale(lake, angle)) {
         return true;
       }
+    }
+
+    return false;
+  }
+
+  /**
+   * Muddy margin that starts at the water edge and reaches a short way onto the
+   * sandy beach and the forest floor. The hero and land animals move slower
+   * while their feet are on it.
+   */
+  public isMud(x: number, y: number): boolean {
+    if (this.mapId !== 'amazon_forest') return false;
+    if (Math.abs(x) > FOREST_HALF_SIZE || Math.abs(y) > FOREST_HALF_SIZE) return false;
+
+    // River banks: the ring between the water surface and the outer mud edge.
+    const waterHalf = this.getRiverHalfWidth(x, RIVER_HALF_WIDTH);
+    const mudHalf = waterHalf + this.getMudBandThickness(x);
+    const riverOffset = Math.abs(y - this.riverCenterY(x));
+    if (riverOffset >= waterHalf && riverOffset < mudHalf) return true;
+
+    // Lakes: an organic ring around each water ellipse.
+    for (let i = 0; i < this.lakes.length; i++) {
+      const lake = this.lakes[i];
+      const dx = x - lake.x;
+      const dy = y - lake.y;
+      const cos = Math.cos(-lake.rotation);
+      const sin = Math.sin(-lake.rotation);
+      const lx = dx * cos - dy * sin;
+      const ly = dx * sin + dy * cos;
+      const angle = this.getLakeNormalizedAngle(lake, x, y);
+      const edgeScale = this.getLakeEdgeScale(lake, angle);
+
+      const waterRho = Math.sqrt(
+        (lx * lx) / (lake.rx * lake.rx) + (ly * ly) / (lake.ry * lake.ry)
+      );
+      if (waterRho <= edgeScale) continue;
+
+      const mudRho = Math.sqrt(
+        (lx * lx) / ((lake.rx + MUD_BAND) * (lake.rx + MUD_BAND)) +
+        (ly * ly) / ((lake.ry + MUD_BAND) * (lake.ry + MUD_BAND))
+      );
+      if (mudRho <= edgeScale) return true;
     }
 
     return false;
@@ -5094,6 +5153,31 @@ export class WorldSystem {
       ctx.closePath();
     };
 
+    /**
+     * Dark clay margin that follows both riverbanks. It starts at the painted
+     * water edge and oozes a short, irregular distance onto the sand, matching
+     * the isMud() terrain check used by the movement code.
+     */
+    const traceRiverMudBand = (thicknessScale: number) => {
+      ctx.beginPath();
+      for (let i = 0; i < riverXs.length; i++) {
+        const x = riverXs[i];
+        const y = this.riverCenterY(x);
+        const half = this.getRiverHalfWidth(x, RIVER_HALF_WIDTH);
+        const mud = this.getMudBandThickness(x) * thicknessScale;
+        if (i === 0) ctx.moveTo(x, y - half - mud);
+        else ctx.lineTo(x, y - half - mud);
+      }
+      for (let i = riverXs.length - 1; i >= 0; i--) {
+        const x = riverXs[i];
+        const y = this.riverCenterY(x);
+        const half = this.getRiverHalfWidth(x, RIVER_HALF_WIDTH);
+        const mud = this.getMudBandThickness(x) * thicknessScale;
+        ctx.lineTo(x, y + half + mud);
+      }
+      ctx.closePath();
+    };
+
     // Sandy banks with a soft, mossy transition into the forest.
     traceRiverBand((RIVER_WIDTH + RIVER_BANK * 2 + 96) / 2);
     ctx.fillStyle = '#2b4524';
@@ -5128,6 +5212,15 @@ export class WorldSystem {
       ctx.fill();
       ctx.globalAlpha = 1;
     }
+
+    // Muddy margins oozing from the water onto the beach and forest floor.
+    traceRiverMudBand(1);
+    ctx.fillStyle = '#4a3322';
+    ctx.fill();
+
+    traceRiverMudBand(0.62);
+    ctx.fillStyle = '#3a2718';
+    ctx.fill();
 
     // Water surface: dark edge, base water, lighter current and shimmer.
     traceRiverBand(RIVER_WIDTH / 2);
@@ -5224,6 +5317,22 @@ export class WorldSystem {
         ctx.fill();
         ctx.globalAlpha = 1;
       }
+
+      // Muddy lakeshore ring before the water covers its inner edge.
+      ctx.fillStyle = '#4a3322';
+      ctx.beginPath();
+      this.traceLakeShape(ctx, lake, lake.rx + MUD_BAND, lake.ry + MUD_BAND);
+      ctx.fill();
+
+      ctx.fillStyle = '#3a2718';
+      ctx.beginPath();
+      this.traceLakeShape(
+        ctx,
+        lake,
+        lake.rx + MUD_BAND * 0.62,
+        lake.ry + MUD_BAND * 0.62
+      );
+      ctx.fill();
 
       ctx.fillStyle = '#145466';
       ctx.beginPath();

@@ -131,6 +131,10 @@ export class Player {
   public isMoving: boolean = false;
   // Set by the engine while the feet are on the Amazon river/lake surface.
   public isWadingInWater: boolean = false;
+  // Set by the engine while the feet are on the Amazon muddy margins.
+  public isInMud: boolean = false;
+  // Terrain speed penalty (water -30%, mud -20%), refreshed by the engine.
+  public terrainSpeedMultiplier: number = 1;
 
   public character: CharacterConfig;
   public powerUps: PermanentPowerUps = {};
@@ -376,7 +380,8 @@ export class Player {
     const dashing = this.dashTimer > 0;
     const speedBoost = this.speedBoostTimer > 0 ? 1.15 : 1;
     const slowMult = this.slowTimer > 0 ? Math.max(0.35, 1 - this.slowFactor) : 1;
-    const effectiveSpeed = this.speed * speedBoost * slowMult;
+    const effectiveSpeed =
+      this.speed * speedBoost * slowMult * this.terrainSpeedMultiplier;
 
     let moveX = moving ? dx * effectiveSpeed * dt : 0;
     let moveY = moving ? dy * effectiveSpeed * dt : 0;
@@ -647,6 +652,15 @@ export class Player {
         ctx.fillStyle = '#111827';
         ctx.fillRect(2, -14 + bob, 3, 3);
       }
+    }
+
+    // Mud caked on the boots/base of the sprite while walking through clay.
+    if (this.isInMud && this.isMoving && !isDead) {
+      ctx.fillStyle = 'rgba(61, 38, 22, 0.55)';
+      ctx.beginPath();
+      ctx.ellipse(-6, 12, 6, 3.2, 0, 0, Math.PI * 2);
+      ctx.ellipse(6, 12, 6, 3.2, 0, 0, Math.PI * 2);
+      ctx.fill();
     }
 
     ctx.restore();
