@@ -80,9 +80,9 @@ const ACAI_MINIMAP_ICON_DRAW_SIZE = 16;
 // Amazon field plants: dangerous thorn bushes and the medicinal São-Caetano
 // herb. Both are scattered over dry land and the herb respawns elsewhere after
 // being harvested, so the player always has a way to cure the wound.
-const THORN_BUSH_COUNT = 56;
+const THORN_BUSH_COUNT = 56 * 3;
 const THORN_BUSH_RADIUS = 24;
-const HERB_COUNT = 14;
+const HERB_COUNT = 14 * 3;
 const HERB_RESPAWN = 35;
 const HERB_PICKUP_RADIUS = 34;
 const HERB_PROMPT_WIDTH = 262;
@@ -92,6 +92,9 @@ const HERB_PROMPT_HEIGHT = 44;
 // deterministic forest seed, never move, block the body through their trunk and
 // fade their canopy over characters walking behind them.
 const DECOR_TREE_COUNT = 720;
+
+// Fruit trees: every kind spawns this many copies when the forest is created.
+const FRUIT_TREES_PER_KIND = 3;
 
 // Amazon water. The river and lakes slow anyone wading through them, while
 // aquatic enemies use the stricter isNavigableWater check below to stay wet.
@@ -445,7 +448,7 @@ export class WorldSystem {
   }
 
   private spawnInitialFruitTrees(): void {
-    // One tree of each fruit starts at a fully random land position.
+    // Several trees of each fruit start at fully random land positions.
     const kinds: FruitTreeKind[] = [
       'acai',
       'cupuacu',
@@ -456,16 +459,18 @@ export class WorldSystem {
     ];
 
     for (let i = 0; i < kinds.length; i++) {
-      const spawn = this.findFruitTreeSpawn();
-      this.fruitTrees.push({
-        id: this.nextFruitTreeId++,
-        kind: kinds[i],
-        x: spawn.x,
-        y: spawn.y,
-        active: true,
-        respawnTimer: 0,
-        animTimer: Math.random() * Math.PI * 2,
-      });
+      for (let copy = 0; copy < FRUIT_TREES_PER_KIND; copy++) {
+        const spawn = this.findFruitTreeSpawn();
+        this.fruitTrees.push({
+          id: this.nextFruitTreeId++,
+          kind: kinds[i],
+          x: spawn.x,
+          y: spawn.y,
+          active: true,
+          respawnTimer: 0,
+          animTimer: Math.random() * Math.PI * 2,
+        });
+      }
     }
   }
 
