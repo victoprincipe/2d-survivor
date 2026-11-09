@@ -451,6 +451,9 @@ export class Player {
 
   public triggerAttackAnimation(duration: number, facingX: number = this.facingX): void {
     this.attackFacingX = facingX;
+    // Rapid bow fire must not pin the atlas animation to its first frames.
+    // Keep aiming at the latest target while the current gesture completes.
+    if (this.character.animationSprite && this.attackAnimTimer > 0) return;
     this.attackAnimDuration = Math.max(0.01, duration);
     this.attackAnimTimer = this.attackAnimDuration;
   }

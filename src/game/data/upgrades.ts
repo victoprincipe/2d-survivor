@@ -910,7 +910,7 @@ export const AMAZON_STARTING_WEAPON_BY_CHARACTER: Record<string, WeaponId> = {
   antonio: 'chicotada_cipo',
   imelda: 'espinhos_pupunha',
   gennaro: 'ferrao_formiga',
-  kayrurururu: 'lanca_caipora',
+  kayrurururu: 'bow',
   bianca: 'rugido_mapinguari',
   dr_janelinha: 'ferrao_formiga',
   lula: 'rugido_mapinguari',
