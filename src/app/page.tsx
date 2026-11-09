@@ -1,8 +1,8 @@
 import { GameContainer } from '@/components/game/GameContainer';
 
 export const metadata = {
-  title: 'Vampire Survivors 2D | Roguelite Survival',
-  description: 'Um jogo roguelite de sobrevivência estilo Vampire Survivors em Next.js, React e HTML5 Canvas.',
+  title: 'Teste',
+  description: 'Teste: um jogo roguelite de sobrevivência em Next.js, React e HTML5 Canvas.',
 };
 
 export default function Home() {
