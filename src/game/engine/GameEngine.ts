@@ -109,6 +109,13 @@ const THORN_BUSH_BLEED_DURATION = 10;
 const THORN_BUSH_SLOW = 0.4;
 const THORN_BUSH_HIT_COOLDOWN = 2;
 
+// Iara's Dynamic Flood: 7s rising, 5s at the peak, 7s receding (19s loop).
+const FLOOD_RISE_DURATION = 7;
+const FLOOD_HOLD_DURATION = 5;
+const FLOOD_RECEDE_DURATION = 7;
+const FLOOD_CYCLE_DURATION =
+  FLOOD_RISE_DURATION + FLOOD_HOLD_DURATION + FLOOD_RECEDE_DURATION;
+
 // Amazon Forest mission objectives.
 const OBJECTIVE_ACT1_FRUITS = 3;
 const OBJECTIVE_ACT1_LEVEL = 10;
@@ -356,6 +363,8 @@ export class GameEngine {
   private bossHazards: BossHazard[] = [];
   private waterRipples: WaterRipple[] = [];
   private playerWaterFxTimer: number = 0;
+  private floodCycleTime: number = 0;
+  private floodPhysicsActive: boolean = false;
 
   public kills: number = 0;
   public goldCollected: number = 0;
@@ -587,14 +596,22 @@ export class GameEngine {
       if (this.gemStreakTimer <= 0) this.gemStreak = 0;
     }
 
+    // Iara's Dynamic Flood cycle (rising / hold / recede) before terrain physics.
+    this.updateFloodCycle(dt);
+
     // 1. Terrain physics: mud and water slow the hero down before the step.
     const playerInWater = this.worldProps.isWaterSurface(this.player.x, this.player.y);
-    const playerInMud = !playerInWater && this.worldProps.isMud(this.player.x, this.player.y);
-    this.player.isWadingInWater = playerInWater;
+    const playerInFlood =
+      !playerInWater &&
+      this.floodPhysicsActive &&
+      this.worldProps.isFloodWater(this.player.x, this.player.y);
+    const playerInMud =
+      !playerInWater && !playerInFlood && this.worldProps.isMud(this.player.x, this.player.y);
+    this.player.isWadingInWater = playerInWater || playerInFlood;
     this.player.isInMud = playerInMud && !this.player.isJumping;
     this.player.terrainSpeedMultiplier = this.player.isJumping
       ? 1
-      : playerInWater
+      : playerInWater || playerInFlood
         ? WATER_SPEED_MULTIPLIER
         : playerInMud
           ? MUD_SPEED_MULTIPLIER
@@ -641,7 +658,22 @@ export class GameEngine {
       // +30% boost there; the Ariranha gets +20% instead. The Sucuri is
       // amphibious and instead earns +50% in water and +30% on banks/mud.
       const enemyInWater = this.worldProps.isWaterSurface(e.x, e.y);
-      const enemyInMud = !enemyInWater && this.worldProps.isMud(e.x, e.y);
+      const enemyInFlood =
+        !enemyInWater &&
+        this.floodPhysicsActive &&
+        this.worldProps.isFloodWater(e.x, e.y);
+      const enemyInMud =
+        !enemyInWater && !enemyInFlood && this.worldProps.isMud(e.x, e.y);
+      // The flood only drags ordinary land animals; bosses, elites, flyers and
+      // native water creatures keep their own movement rules.
+      const floodSlowsEnemy =
+        enemyInFlood &&
+        !e.isBoss &&
+        !e.isElite &&
+        !e.isWaterDweller &&
+        !e.isRiverPredator &&
+        e.type !== 'bat' &&
+        e.type !== 'ghost';
       if (e.type === 'sucuri') {
         e.terrainSpeedMultiplier = enemyInWater
           ? SUCURI_WATER_SPEED_MULTIPLIER
@@ -659,11 +691,12 @@ export class GameEngine {
       } else if (e.isWaterDweller) {
         e.terrainSpeedMultiplier = 1.0;
       } else {
-        e.terrainSpeedMultiplier = enemyInWater
-          ? WATER_SPEED_MULTIPLIER
-          : enemyInMud
-            ? MUD_SPEED_MULTIPLIER
-            : 1.0;
+        e.terrainSpeedMultiplier =
+          enemyInWater || floodSlowsEnemy
+            ? WATER_SPEED_MULTIPLIER
+            : enemyInMud
+              ? MUD_SPEED_MULTIPLIER
+              : 1.0;
       }
 
       const sep = e.isSubmerged
@@ -784,9 +817,12 @@ export class GameEngine {
         }
       }
 
-      // Land creatures standing on the river/lake surface are drawn waist-deep.
+      // Land creatures standing on the river/lake/flood surface are drawn
+      // waist-deep while the active flood is rising or at its peak.
       e.isWadingInWater =
-        !e.isWaterDweller && this.worldProps.isWaterSurface(e.x, e.y);
+        !e.isWaterDweller &&
+        (this.worldProps.isWaterSurface(e.x, e.y) ||
+          (this.floodPhysicsActive && this.worldProps.isFloodWater(e.x, e.y)));
 
       // Animals wading through the river leave the same ring/splash trail as
       // the hero. Submerged ambushers stay hidden and therefore leave no wake.
@@ -1274,6 +1310,49 @@ export class GameEngine {
       this.hudThrottleTimer = 0;
       this.syncHUD();
     }
+  }
+
+  /**
+   * Iara's Dynamic Flood. While a living Iara is on the Amazon map the river
+   * rises for 7s, stays at its 70%-of-dry-land peak for 5s and recedes for 7s,
+   * looping without pause until the boss dies. Only the rising/hold phases
+   * apply the waist-deep water slow.
+   */
+  private updateFloodCycle(dt: number): void {
+    if (!this.waveDirector.isAmazonForest) {
+      this.floodCycleTime = 0;
+      this.floodPhysicsActive = false;
+      this.worldProps.setFloodIntensity(0);
+      return;
+    }
+
+    const iaraAlive = this.enemies.some(
+      (enemy) => enemy.type === 'boss_iara' && enemy.hp > 0
+    );
+    if (!iaraAlive) {
+      this.floodCycleTime = 0;
+      this.floodPhysicsActive = false;
+      this.worldProps.setFloodIntensity(0);
+      return;
+    }
+
+    this.floodCycleTime = (this.floodCycleTime + dt) % FLOOD_CYCLE_DURATION;
+    const t = this.floodCycleTime;
+    let intensity: number;
+    if (t < FLOOD_RISE_DURATION) {
+      intensity = t / FLOOD_RISE_DURATION;
+      this.floodPhysicsActive = true;
+    } else if (t < FLOOD_RISE_DURATION + FLOOD_HOLD_DURATION) {
+      intensity = 1;
+      this.floodPhysicsActive = true;
+    } else {
+      intensity =
+        1 -
+        (t - FLOOD_RISE_DURATION - FLOOD_HOLD_DURATION) / FLOOD_RECEDE_DURATION;
+      this.floodPhysicsActive = false;
+    }
+
+    this.worldProps.setFloodIntensity(intensity);
   }
 
   /**

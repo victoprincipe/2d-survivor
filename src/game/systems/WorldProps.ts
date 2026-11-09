@@ -105,6 +105,12 @@ const MUD_BAND = 130;
 export const WATER_SPEED_MULTIPLIER = 0.7;
 export const MUD_SPEED_MULTIPLIER = 0.8;
 
+// Iara's Dynamic Flood expands the river/lakes until 70% of the dry land is
+// submerged. The target radius is measured once on a coarse land grid and then
+// reused every frame, keeping the cycle cheap.
+const FLOOD_TARGET_LAND_FRACTION = 0.7;
+const FLOOD_LAND_SAMPLE_DIVISIONS = 64;
+
 // Mud advantages: river predators slide over the clay instead of sinking into
 // it, while the Ariranha keeps its footing and gains a smaller burst.
 export const MUD_RIVER_PREDATOR_SPEED_MULTIPLIER = 1.3;
@@ -385,6 +391,12 @@ export class WorldSystem {
   private acaiMinimapIcon: HTMLCanvasElement | null = null;
   private fruitMinimapIcons: Partial<Record<FruitTreeKind, HTMLCanvasElement>> = {};
   private waterAnimTimer: number = 0;
+
+  // Iara's Dynamic Flood: intensity is a 0..1 fraction of the maximum flood
+  // radius, which is lazily measured so 70% of the map's dry land is covered.
+  private floodIntensity: number = 0;
+  private maxFloodRadiusCache: number | null = null;
+  private floodLandSamples: { x: number; y: number }[] | null = null;
 
   constructor(mapId: MapId = 'night_plain') {
     this.mapId = mapId;
@@ -1684,6 +1696,120 @@ export class WorldSystem {
       if (rho <= this.getLakeEdgeScale(lake, angle)) {
         return true;
       }
+    }
+
+    return false;
+  }
+
+  /**
+   * Sets how far the Iara flood has expanded (0 = normal river bed, 1 = the
+   * full 70%-of-dry-land coverage). The maximum radius is measured on first
+   * use so the first flood frame does not need to rebuild the map.
+   */
+  public setFloodIntensity(intensity: number): void {
+    if (this.mapId !== 'amazon_forest') {
+      this.floodIntensity = 0;
+      return;
+    }
+    this.floodIntensity = Math.max(0, Math.min(1, intensity));
+    if (this.floodIntensity > 0) this.getMaxFloodRadius();
+  }
+
+  /** Current flood expansion fraction (0..1), exposed for rendering/UI. */
+  public getFloodIntensity(): number {
+    return this.floodIntensity;
+  }
+
+  /**
+   * True when the point is covered by newly flooded land, i.e. water pushed
+   * past the permanent river/lake shoreline by Iara's flood.
+   */
+  public isFloodWater(x: number, y: number): boolean {
+    if (this.mapId !== 'amazon_forest' || this.floodIntensity <= 0) return false;
+    if (this.isWaterSurface(x, y)) return false;
+
+    const radius = this.getMaxFloodRadius() * this.floodIntensity;
+    if (radius <= 0.5) return false;
+    return this.isInsideFloodExtent(x, y, radius);
+  }
+
+  /** Land cells sampled once to measure the flood's 70% coverage target. */
+  private getFloodLandSamples(): { x: number; y: number }[] {
+    if (this.floodLandSamples) return this.floodLandSamples;
+
+    const samples: { x: number; y: number }[] = [];
+    const step = FOREST_SIZE / FLOOD_LAND_SAMPLE_DIVISIONS;
+    for (let row = 0; row < FLOOD_LAND_SAMPLE_DIVISIONS; row++) {
+      const y = -FOREST_HALF_SIZE + (row + 0.5) * step;
+      for (let col = 0; col < FLOOD_LAND_SAMPLE_DIVISIONS; col++) {
+        const x = -FOREST_HALF_SIZE + (col + 0.5) * step;
+        if (this.isWaterSurface(x, y)) continue;
+        samples.push({ x, y });
+      }
+    }
+
+    this.floodLandSamples = samples;
+    return samples;
+  }
+
+  /**
+   * Radius (beyond the normal shoreline) at which the flood covers 70% of the
+   * map's dry land. Binary search uses the same shape as the renderer, so the
+   * visual water and the physics stay aligned.
+   */
+  private getMaxFloodRadius(): number {
+    if (this.maxFloodRadiusCache !== null) return this.maxFloodRadiusCache;
+
+    const samples = this.getFloodLandSamples();
+    if (samples.length === 0) {
+      this.maxFloodRadiusCache = 0;
+      return 0;
+    }
+
+    const target = Math.ceil(samples.length * FLOOD_TARGET_LAND_FRACTION);
+    let low = 0;
+    let high = FOREST_SIZE;
+    for (let iteration = 0; iteration < 16; iteration++) {
+      const mid = (low + high) / 2;
+      let covered = 0;
+      for (let i = 0; i < samples.length; i++) {
+        if (this.isInsideFloodExtent(samples[i].x, samples[i].y, mid)) {
+          covered++;
+          if (covered >= target) break;
+        }
+      }
+      if (covered >= target) high = mid;
+      else low = mid;
+    }
+
+    this.maxFloodRadiusCache = high;
+    return high;
+  }
+
+  /** Shared flood footprint: river, mouths and lakes expanded by `radius`. */
+  private isInsideFloodExtent(x: number, y: number, radius: number): boolean {
+    if (Math.abs(x) > FOREST_HALF_SIZE || Math.abs(y) > FOREST_HALF_SIZE) return false;
+
+    const riverHalf = this.getRiverHalfWidth(x, RIVER_HALF_WIDTH + radius);
+    if (riverHalf > 0 && Math.abs(y - this.riverCenterY(x)) < riverHalf) return true;
+
+    if (this.isRiverMouthWater(x, y, -radius)) return true;
+
+    for (let i = 0; i < this.lakes.length; i++) {
+      const lake = this.lakes[i];
+      const rx = lake.rx + radius;
+      const ry = lake.ry + radius;
+      if (rx <= 0 || ry <= 0) continue;
+
+      const dx = x - lake.x;
+      const dy = y - lake.y;
+      const cos = Math.cos(-lake.rotation);
+      const sin = Math.sin(-lake.rotation);
+      const lx = dx * cos - dy * sin;
+      const ly = dx * sin + dy * cos;
+      const rho = Math.sqrt((lx * lx) / (rx * rx) + (ly * ly) / (ry * ry));
+      const angle = this.getLakeNormalizedAngle(lake, x, y);
+      if (rho <= this.getLakeEdgeScale(lake, angle)) return true;
     }
 
     return false;
@@ -5545,6 +5671,11 @@ export class WorldSystem {
     // under the river/lake water instead of cutting across it.
     this.renderRiverMouth(ctx);
 
+    // Iara's Dynamic Flood: translucent water creeping over the dry land. It is
+    // painted before the permanent water so the old river/lake surface stays
+    // crisp while the flood ring spreads outward over the beach and forest.
+    this.renderFloodWater(ctx, camera);
+
     // Water surface: dark edge, base water, lighter current and shimmer.
     traceRiverBand(RIVER_WIDTH / 2);
     ctx.fillStyle = '#145466';
@@ -5653,6 +5784,99 @@ export class WorldSystem {
     }
 
     this.renderWaterSurfaceRipples(ctx, camera);
+
+    ctx.restore();
+  }
+
+  /**
+   * Paints the translucent water layer of Iara's Dynamic Flood. The band and
+   * lake shapes use exactly the same expanded footprints as isFloodWater(), so
+   * the slow/clip physics always match what the player sees.
+   */
+  private renderFloodWater(ctx: CanvasRenderingContext2D, camera: Camera): void {
+    if (this.mapId !== 'amazon_forest' || this.floodIntensity <= 0.001) return;
+
+    const radius = this.getMaxFloodRadius() * this.floodIntensity;
+    if (radius <= 0.5) return;
+
+    const start = -FOREST_HALF_SIZE - 1200;
+    const end = FOREST_HALF_SIZE + 1200;
+    const step = 220;
+    const riverXs: number[] = [];
+    for (let x = start; x <= end; x += step) riverXs.push(x);
+
+    const halfWidthAt = (x: number): number =>
+      this.getRiverHalfWidth(x, RIVER_HALF_WIDTH + radius);
+
+    const traceRiverFloodBand = (): void => {
+      ctx.beginPath();
+      for (let i = 0; i < riverXs.length; i++) {
+        const x = riverXs[i];
+        const y = this.riverCenterY(x);
+        const half = halfWidthAt(x);
+        if (i === 0) ctx.moveTo(x, y - half);
+        else ctx.lineTo(x, y - half);
+      }
+      for (let i = riverXs.length - 1; i >= 0; i--) {
+        const x = riverXs[i];
+        const y = this.riverCenterY(x);
+        ctx.lineTo(x, y + halfWidthAt(x));
+      }
+      ctx.closePath();
+    };
+
+    const traceRiverFloodShore = (side: -1 | 1): void => {
+      ctx.beginPath();
+      for (let i = 0; i < riverXs.length; i++) {
+        const x = riverXs[i];
+        const y = this.riverCenterY(x) + side * halfWidthAt(x);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+    };
+
+    ctx.save();
+    ctx.globalAlpha = 0.58 + 0.06 * Math.sin(this.waterAnimTimer * 1.6);
+    ctx.fillStyle = '#1b6b82';
+    traceRiverFloodBand();
+    ctx.fill();
+
+    const mouths = this.getRiverMouthGeometries();
+    for (let i = 0; i < mouths.length; i++) {
+      ctx.beginPath();
+      this.traceRiverMouth(ctx, mouths[i], radius);
+      ctx.fill();
+    }
+
+    for (let i = 0; i < this.lakes.length; i++) {
+      const lake = this.lakes[i];
+      const margin = Math.max(lake.rx, lake.ry) + radius + 80;
+      if (!camera.isInView(lake.x, lake.y, margin)) continue;
+
+      ctx.save();
+      ctx.translate(lake.x, lake.y);
+      ctx.rotate(lake.rotation);
+      ctx.beginPath();
+      this.traceLakeShape(ctx, lake, lake.rx + radius, lake.ry + radius);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    const shimmer = this.getWaterShimmerPattern(ctx);
+    if (shimmer) {
+      ctx.globalAlpha = 0.28;
+      ctx.fillStyle = shimmer;
+      traceRiverFloodBand();
+      ctx.fill();
+    }
+
+    ctx.globalAlpha = 0.4;
+    ctx.strokeStyle = '#e0f2fe';
+    ctx.lineWidth = 2.5;
+    traceRiverFloodShore(-1);
+    ctx.stroke();
+    traceRiverFloodShore(1);
+    ctx.stroke();
 
     ctx.restore();
   }
