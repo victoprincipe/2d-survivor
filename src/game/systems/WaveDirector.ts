@@ -43,6 +43,28 @@ const AMAZON_AQUATIC_MEDIUM_ENEMIES: EnemyType[] = ['pink_river_dolphin'];
 const AMAZON_AQUATIC_RESISTANT_ENEMIES: EnemyType[] = ['giant_otter'];
 const AMAZON_AQUATIC_ELITE_ENEMIES: EnemyType[] = ['elite_black_caiman'];
 
+// On Hard, Nightmare and Infernal the simultaneous Amazon bosses are no
+// longer copies of the same boss: each wave brings a fixed elemental combo.
+// Easy and Normal keep spawning the single bosses in their original order.
+const AMAZON_ELEMENTAL_COMBOS: { name: string; types: EnemyType[] }[] = [
+  {
+    name: 'Combo da Pira Sagrada',
+    types: ['boss_curupira', 'boss_boitata', 'boss_caipora'],
+  },
+  {
+    name: 'Combo da Correnteza Divina',
+    types: ['boss_boto', 'boss_iara', 'boss_vitoria_regia'],
+  },
+  {
+    name: 'Combo do Clamor Sônico',
+    types: ['boss_saci', 'boss_matinta'],
+  },
+  {
+    name: 'Combo dos Titãs Colossais',
+    types: ['boss_mapinguari', 'boss_cobra_grande'],
+  },
+];
+
 export class WaveDirector {
   public survivalTime: number = 0;
   public difficulty: DifficultyConfig;
@@ -210,8 +232,9 @@ export class WaveDirector {
     }
 
     // Event 5: 05:00 - Amazon boss waves every 90s (night plain keeps its final boss).
-    // The 10 scheduled folklore bosses end with Boitatá at 18:30; after that
-    // only the elite hordes below keep spawning.
+    // Easy and Normal spawn the 10 folklore bosses solo, ending with Boitatá at
+    // 18:30. Hard, Nightmare and Infernal instead bring the fixed elemental
+    // combos together. After the 10th wave only the elite hordes below spawn.
     if (
       this.isAmazonForest &&
       sec >= this.nextAmazonBossTime &&
@@ -466,24 +489,43 @@ export class WaveDirector {
       'boss_boitata',
     ];
     const type = order[this.amazonBossWave % order.length];
+    const combo =
+      simultaneous > 1
+        ? AMAZON_ELEMENTAL_COMBOS[this.amazonBossWave % AMAZON_ELEMENTAL_COMBOS.length]
+        : null;
+    const comboAppearance = Math.floor(this.amazonBossWave / AMAZON_ELEMENTAL_COMBOS.length);
     this.amazonBossWave += 1;
 
+    const bossTypes: EnemyType[] = [];
+    if (combo) {
+      for (let i = 0; i < simultaneous; i++) {
+        bossTypes.push(combo.types[(comboAppearance + i) % combo.types.length]);
+      }
+    } else {
+      bossTypes.push(type);
+    }
+
     let bossName = '';
-    for (let i = 0; i < simultaneous; i++) {
+    for (let i = 0; i < bossTypes.length; i++) {
+      const bossType = bossTypes[i];
       let pos = this.getSpawnPositionOutsideScreen(camera);
       // Iara, Boto and the Cobra-Grande are river spirits: try to make them
       // surface near the river or a lake when there is water just outside the
       // camera. The Cobra (Sucuri) must never start stranded on dry forest.
-      if (type === 'boss_boto' || type === 'boss_iara' || type === 'boss_cobra_grande') {
+      if (
+        bossType === 'boss_boto' ||
+        bossType === 'boss_iara' ||
+        bossType === 'boss_cobra_grande'
+      ) {
         const waterPos = this.getWaterSpawnPosition(camera, 48);
         if (waterPos) {
           pos = waterPos;
-        } else if (type === 'boss_cobra_grande' && this.worldProps) {
+        } else if (bossType === 'boss_cobra_grande' && this.worldProps) {
           pos = this.worldProps.getNearestRiverPoint(pos.x);
         }
       }
 
-      const boss = this.createEnemy(type, pos.x, pos.y, hpMult);
+      const boss = this.createEnemy(bossType, pos.x, pos.y, hpMult);
       if (i === 0) {
         this.bossActive = boss;
         bossName = boss.name;
@@ -491,7 +533,8 @@ export class WaveDirector {
       onSpawn(boss);
     }
 
-    this.triggerAlert(`👑 ${bossName.toUpperCase()} SURGIU NA FLORESTA!`, 6);
+    const alertName = combo ? combo.name : bossName;
+    this.triggerAlert(`👑 ${alertName.toUpperCase()} SURGIU NA FLORESTA!`, 6);
     sound.playBossWarning();
     sound.playBossRoar();
   }
