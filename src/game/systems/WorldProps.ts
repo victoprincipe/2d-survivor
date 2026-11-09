@@ -100,10 +100,6 @@ const RIVER_BANK = 260;
 const RIVER_HALF_WIDTH = RIVER_WIDTH / 2;
 // Muddy strip that oozes out of the water margins onto the sand and forest.
 const MUD_BAND = 130;
-// Second channel carved through the upper-lake sandbar. It sits on the left
-// flank of the lake, where the lake beach and the river beach used to touch
-// but a thin strip of land still interrupted the flow between both waters.
-const SECOND_RIVER_MOUTH_OFFSET = -900;
 
 // Movement penalties applied while wading through water or trudging in mud.
 export const WATER_SPEED_MULTIPLIER = 0.7;
@@ -251,6 +247,9 @@ interface RiverMouthGeometry {
   startY: number;
   endY: number;
   baseHalfWidth: number;
+  // The right-hand mouth uses a wider, hand-painted sand apron so its corners
+  // melt into the river/lake beaches with organic curves.
+  organicBank: boolean;
 }
 
 interface BankPlantProp {
@@ -1408,32 +1407,35 @@ export class WorldSystem {
   }
 
   /**
-   * Natural mouths where the upper lake empties into the river. Each mouth
-   * starts well inside the lake and ends on the river centreline, so both ends
-   * stay hidden under the existing water and only the open channels between
-   * them are drawn. The second mouth removes the sandbar that used to block the
-   * lake's left connection.
+   * Natural mouths where each lake empties into the river. Every mouth starts
+   * well inside its lake and ends on the river centreline, so both ends stay
+   * hidden under the existing water and only the open channel between them is
+   * drawn. The left mouth keeps its original single channel; the right mouth
+   * opens the sandbar that used to separate the lower-right lake from the
+   * river.
    */
   private getRiverMouthGeometries(): RiverMouthGeometry[] {
     if (this.riverMouths) return this.riverMouths;
     if (this.lakes.length === 0) return [];
 
-    const lake = this.lakes[0];
-    const startY = lake.y + lake.ry * 0.58;
-    const offsets = [0, SECOND_RIVER_MOUTH_OFFSET];
     const mouths: RiverMouthGeometry[] = [];
 
-    for (let i = 0; i < offsets.length; i++) {
-      const anchorX = lake.x + offsets[i];
+    for (let i = 0; i < this.lakes.length; i++) {
+      const lake = this.lakes[i];
+      const anchorX = lake.x;
       const endY = this.riverCenterY(anchorX);
-      if (startY >= endY - 40) continue;
+      // +1 when the river lies south of the lake, -1 when it lies north.
+      const towardRiver = endY >= lake.y ? 1 : -1;
+      const startY = lake.y + towardRiver * lake.ry * 0.58;
+      if (Math.abs(endY - startY) < 40) continue;
 
       mouths.push({
         lake,
         anchorX,
         startY,
         endY,
-        baseHalfWidth: i === 0 ? 470 : 380,
+        baseHalfWidth: i === 0 ? 470 : 440,
+        organicBank: i > 0,
       });
     }
 
@@ -1471,9 +1473,12 @@ export class WorldSystem {
     const mouths = this.getRiverMouthGeometries();
     for (let i = 0; i < mouths.length; i++) {
       const mouth = mouths[i];
-      if (y < mouth.startY || y > mouth.endY) continue;
+      if (y < Math.min(mouth.startY, mouth.endY) || y > Math.max(mouth.startY, mouth.endY)) {
+        continue;
+      }
 
-      const t = (y - mouth.startY) / Math.max(1, mouth.endY - mouth.startY);
+      const span = mouth.endY - mouth.startY;
+      const t = (y - mouth.startY) / (Math.abs(span) < 1 ? 1 : span);
       const profile = this.getRiverMouthProfile(t, mouth);
       if (Math.abs(x - profile.centerX) <= profile.halfWidth - inset) return true;
     }
@@ -1487,9 +1492,12 @@ export class WorldSystem {
     const mouths = this.getRiverMouthGeometries();
     for (let i = 0; i < mouths.length; i++) {
       const mouth = mouths[i];
-      if (y < mouth.startY || y > mouth.endY) continue;
+      if (y < Math.min(mouth.startY, mouth.endY) || y > Math.max(mouth.startY, mouth.endY)) {
+        continue;
+      }
 
-      const t = (y - mouth.startY) / Math.max(1, mouth.endY - mouth.startY);
+      const span = mouth.endY - mouth.startY;
+      const t = (y - mouth.startY) / (Math.abs(span) < 1 ? 1 : span);
       const profile = this.getRiverMouthProfile(t, mouth);
       const offset = Math.abs(x - profile.centerX);
       if (
@@ -5422,6 +5430,11 @@ export class WorldSystem {
       ctx.globalAlpha = 1;
     }
 
+    // Organic sand apron around the right-hand mouth. It is painted before the
+    // water layers, so the river and lake cover its inner half and only the
+    // curved beach corners remain visible around the new channel.
+    this.renderRiverMouthBanks(ctx);
+
     // Muddy margins oozing from the water onto the beach and forest floor.
     traceRiverMudBand(1);
     ctx.fillStyle = '#4a3322';
@@ -5431,27 +5444,7 @@ export class WorldSystem {
     ctx.fillStyle = '#3a2718';
     ctx.fill();
 
-    // Water surface: dark edge, base water, lighter current and shimmer.
-    traceRiverBand(RIVER_WIDTH / 2);
-    ctx.fillStyle = '#145466';
-    ctx.fill();
-
-    traceRiverBand((RIVER_WIDTH - 24) / 2);
-    ctx.fillStyle = '#1b6b82';
-    ctx.fill();
-
-    traceRiverBand((RIVER_WIDTH - 170) / 2);
-    ctx.fillStyle = '#2b8ba1';
-    ctx.fill();
-
     const waterShimmer = this.getWaterShimmerPattern(ctx);
-    if (waterShimmer) {
-      traceRiverBand((RIVER_WIDTH - 30) / 2);
-      ctx.fillStyle = waterShimmer;
-      ctx.globalAlpha = 0.55;
-      ctx.fill();
-      ctx.globalAlpha = 1;
-    }
 
     // Two lakes, each with its own sand rim and water texture.
     for (let i = 0; i < this.lakes.length; i++) {
@@ -5543,6 +5536,47 @@ export class WorldSystem {
       );
       ctx.fill();
 
+      ctx.restore();
+    }
+
+    // Open mouths where each lake flows straight into the river. They are
+    // painted after every sand bank but before the water surfaces, so the sand
+    // strip is removed and the dark water edge at the mouth ends is hidden
+    // under the river/lake water instead of cutting across it.
+    this.renderRiverMouth(ctx);
+
+    // Water surface: dark edge, base water, lighter current and shimmer.
+    traceRiverBand(RIVER_WIDTH / 2);
+    ctx.fillStyle = '#145466';
+    ctx.fill();
+
+    traceRiverBand((RIVER_WIDTH - 24) / 2);
+    ctx.fillStyle = '#1b6b82';
+    ctx.fill();
+
+    traceRiverBand((RIVER_WIDTH - 170) / 2);
+    ctx.fillStyle = '#2b8ba1';
+    ctx.fill();
+
+    if (waterShimmer) {
+      traceRiverBand((RIVER_WIDTH - 30) / 2);
+      ctx.fillStyle = waterShimmer;
+      ctx.globalAlpha = 0.55;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+
+    // Lake water, also painted after the mouths so the channels blend into the
+    // existing blue surface with no seam.
+    for (let i = 0; i < this.lakes.length; i++) {
+      const lake = this.lakes[i];
+      const margin = Math.max(lake.rx, lake.ry) + RIVER_BANK + 80;
+      if (!camera.isInView(lake.x, lake.y, margin)) continue;
+
+      ctx.save();
+      ctx.translate(lake.x, lake.y);
+      ctx.rotate(lake.rotation);
+
       ctx.fillStyle = '#145466';
       ctx.beginPath();
       this.traceLakeShape(ctx, lake, lake.rx, lake.ry);
@@ -5577,9 +5611,9 @@ export class WorldSystem {
       ctx.restore();
     }
 
-    // Open mouths where the upper lake flows straight into the river. Painting
-    // them after both banks removes every sand strip between the water bodies.
-    this.renderRiverMouth(ctx);
+    // Re-open the centre of each mouth after the river/lake water so their
+    // concentric shoreline layers do not draw a dark line across the channel.
+    this.renderRiverMouthSurface(ctx);
 
     // Floating water lilies.
     for (let i = 0; i < this.lilies.length; i++) {
@@ -5621,6 +5655,79 @@ export class WorldSystem {
     this.renderWaterSurfaceRipples(ctx, camera);
 
     ctx.restore();
+  }
+
+  /**
+   * Re-opens the centre of each mouth after the river and lake water have been
+   * painted. Those water bodies use concentric shoreline layers, so their dark
+   * outer edge would otherwise cut across the open channel. Repainting only the
+   * inner light water keeps the middle clean while leaving the organic dark
+   * corners on the mouth banks intact.
+   */
+  private renderRiverMouthSurface(ctx: CanvasRenderingContext2D): void {
+    const mouths = this.getRiverMouthGeometries();
+    if (mouths.length === 0) return;
+
+    const shimmer = this.getWaterShimmerPattern(ctx);
+
+    for (let m = 0; m < mouths.length; m++) {
+      const mouth = mouths[m];
+
+      ctx.fillStyle = '#2b8ba1';
+      ctx.beginPath();
+      this.traceRiverMouth(ctx, mouth, -62);
+      ctx.fill();
+
+      if (shimmer) {
+        ctx.fillStyle = shimmer;
+        ctx.globalAlpha = 0.55;
+        ctx.beginPath();
+        this.traceRiverMouth(ctx, mouth, -62);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+    }
+  }
+
+  /**
+   * Organic sand and beach apron around the right-hand mouth. The layered
+   * fills follow the same meandering profile as the water, so the corners where
+   * the channel meets the river and lake banks curve naturally instead of
+   * showing a straight or perfectly round edge.
+   */
+  private renderRiverMouthBanks(ctx: CanvasRenderingContext2D): void {
+    const mouths = this.getRiverMouthGeometries();
+    const organicMouths = mouths.filter((mouth) => mouth.organicBank);
+    if (organicMouths.length === 0) return;
+
+    const layers: { extraWidth: number; color: string }[] = [
+      { extraWidth: RIVER_BANK + 96, color: '#2b4524' },
+      { extraWidth: RIVER_BANK + 40, color: '#6f5a34' },
+      { extraWidth: RIVER_BANK + 12, color: '#a17f4a' },
+      { extraWidth: RIVER_BANK, color: '#b89355' },
+      { extraWidth: RIVER_BANK * 0.62, color: '#cdb079' },
+      { extraWidth: RIVER_BANK * 0.3, color: '#dcc28b' },
+    ];
+
+    for (let m = 0; m < organicMouths.length; m++) {
+      const mouth = organicMouths[m];
+      for (let i = 0; i < layers.length; i++) {
+        ctx.fillStyle = layers[i].color;
+        ctx.beginPath();
+        this.traceRiverMouth(ctx, mouth, layers[i].extraWidth);
+        ctx.fill();
+      }
+
+      const sandGrain = this.getSandGrainPattern(ctx);
+      if (sandGrain) {
+        ctx.fillStyle = sandGrain;
+        ctx.globalAlpha = 0.7;
+        ctx.beginPath();
+        this.traceRiverMouth(ctx, mouth, RIVER_BANK * 0.85);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+    }
   }
 
   /**
