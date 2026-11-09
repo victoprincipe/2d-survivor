@@ -43,6 +43,16 @@ const AMAZON_AQUATIC_MEDIUM_ENEMIES: EnemyType[] = ['pink_river_dolphin'];
 const AMAZON_AQUATIC_RESISTANT_ENEMIES: EnemyType[] = ['giant_otter'];
 const AMAZON_AQUATIC_ELITE_ENEMIES: EnemyType[] = ['elite_black_caiman'];
 
+// Fixed elemental boss combos for the higher difficulties. On Hard the wave
+// brings a duo and on Nightmare/Infernal a trio (or every member when the
+// combo is naturally smaller); Easy/Normal keep spawning one boss at a time.
+const AMAZON_ELEMENTAL_BOSS_COMBOS: EnemyType[][] = [
+  ['boss_curupira', 'boss_boitata', 'boss_caipora'], // Pira Sagrada (Fogo)
+  ['boss_boto', 'boss_iara', 'boss_vitoria_regia'], // Correnteza Divina (Água)
+  ['boss_saci', 'boss_matinta'], // Clamor Sônico (Vento)
+  ['boss_mapinguari', 'boss_cobra_grande'], // Titãs Colossais (Terra)
+];
+
 export class WaveDirector {
   public survivalTime: number = 0;
   public difficulty: DifficultyConfig;
@@ -465,11 +475,25 @@ export class WaveDirector {
       'boss_cobra_grande',
       'boss_boitata',
     ];
-    const type = order[this.amazonBossWave % order.length];
+    const scheduledType = order[this.amazonBossWave % order.length];
     this.amazonBossWave += 1;
 
+    // Easy/Normal: one boss, exactly as before. Higher difficulties: the
+    // scheduled boss still arrives at its original time, but its wave is now
+    // filled with the other guardians of the same elemental combo.
+    const combo =
+      AMAZON_ELEMENTAL_BOSS_COMBOS.find((group) => group.includes(scheduledType)) ?? [];
+    const bossTypes =
+      simultaneous === 1
+        ? [scheduledType]
+        : [scheduledType, ...combo.filter((type) => type !== scheduledType)].slice(
+            0,
+            simultaneous
+          );
+
     let bossName = '';
-    for (let i = 0; i < simultaneous; i++) {
+    for (let i = 0; i < bossTypes.length; i++) {
+      const type = bossTypes[i];
       let pos = this.getSpawnPositionOutsideScreen(camera);
       // Iara, Boto and the Cobra-Grande are river spirits: try to make them
       // surface near the river or a lake when there is water just outside the
