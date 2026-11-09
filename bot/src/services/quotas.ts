@@ -30,7 +30,7 @@ export function checkSubmissionQuota(userId: string): QuotaResult {
     return { ok: false, reason: `A fila está cheia (${queueConfig.queueLimit} jobs). Tente de novo mais tarde.` };
   }
 
-  if (countTodayGlobal() >= queueConfig.dailyGlobalLimit) {
+  if (queueConfig.dailyGlobalLimit > 0 && countTodayGlobal() >= queueConfig.dailyGlobalLimit) {
     return { ok: false, reason: 'O limite diário global de implementações foi atingido. Tente amanhã.' };
   }
 
@@ -42,7 +42,7 @@ export function checkSubmissionQuota(userId: string): QuotaResult {
   }
 
   if (countTodayByAuthor(userId) >= queueConfig.dailyUserLimit) {
-    return { ok: false, reason: `Você atingiu o limite de ${queueConfig.dailyUserLimit} implementações por dia.` };
+    return { ok: false, reason: `Você atingiu o limite de ${queueConfig.dailyUserLimit} prompts por dia.` };
   }
 
   return { ok: true };

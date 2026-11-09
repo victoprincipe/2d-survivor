@@ -6,6 +6,11 @@ const db = getDb();
 console.log(`Banco: ${paths.db}`);
 console.log(`Quota resetada em: ${getSetting('quota_reset_at') ?? 'nunca'}`);
 console.log(`Limite diário por usuário: ${queueConfig.dailyUserLimit}`);
+console.log(
+  `Limite diário global: ${
+    queueConfig.dailyGlobalLimit > 0 ? queueConfig.dailyGlobalLimit : 'desativado (sem limite global)'
+  }`,
+);
 
 const counts = db
   .prepare('SELECT status, COUNT(*) AS total FROM jobs GROUP BY status ORDER BY status')

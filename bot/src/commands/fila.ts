@@ -70,7 +70,10 @@ export function filaView(canManage: boolean): FilaView {
       },
       {
         name: 'Últimas 24h',
-        value: `${today}/${queueConfig.dailyGlobalLimit}`,
+        value:
+          queueConfig.dailyGlobalLimit > 0
+            ? `${today}/${queueConfig.dailyGlobalLimit}`
+            : `${today} (${queueConfig.dailyUserLimit}/usuário)`,
         inline: true,
       },
       {

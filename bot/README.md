@@ -161,7 +161,7 @@ O título exibido é derivado da primeira linha do prompt; não há campo separa
 
 - Conta com pelo menos 7 dias.
 - 1 job ativo por usuário.
-- 50 jobs por dia por usuário; 50 no total.
+- 50 prompts/jobs por dia por usuário (sem limite global compartilhado).
 - Fila máxima de 20.
 - Formulário de prompt: até 4000 caracteres. Não há mínimo além de 1 caractere; vazio só é permitido no `/implementar` com plano selecionado ou imagem/áudio.
 - O select de planos do `/implementar` mostra até 25 planos aprovados.
