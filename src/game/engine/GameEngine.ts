@@ -1565,8 +1565,13 @@ export class GameEngine {
         if (nightFrenzy) predator.growFromPrey();
         this.vfx.addDeathBurst(prey.x, prey.y, '#ef4444', 10);
         this.vfx.addSparks(predator.x, predator.y, '#f97316', 8);
-        predator.ecologyHuntTimer =
-          (isJaguar ? 15 : 10 + Math.random() * 2) * (nightFrenzy ? 0.5 : 1);
+        const huntDelay =
+          predator.type === 'elite_black_caiman'
+            ? 12
+            : isJaguar
+              ? 15
+              : 10 + Math.random() * 2;
+        predator.ecologyHuntTimer = huntDelay * (nightFrenzy ? 0.5 : 1);
       } else {
         // Nothing in reach: retry soon instead of waiting a full cycle.
         predator.ecologyHuntTimer = nightFrenzy ? 1 : 2;

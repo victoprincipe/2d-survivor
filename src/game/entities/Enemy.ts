@@ -539,12 +539,20 @@ export class Enemy {
         break;
     }
 
-    // Predators start their hunt cycle with the requested delay.
-    if (
-      this.type === 'elite_black_caiman' ||
-      this.type === 'boss_cobra_grande' ||
-      this.type === 'sucuri'
-    ) {
+    // The common Jacaré-açu spawns as a tiny hatchling (1/6 of the adult
+    // sprite) with proportionally reduced health and contact damage. It grows
+    // back to adult size and beyond by devouring prey.
+    if (this.type === 'elite_black_caiman') {
+      this.growthScale = 1 / 6;
+      this.maxHp = Math.max(1, Math.round(this.maxHp / 6));
+      this.damage = Math.max(1, Math.round(this.damage / 6));
+    }
+
+    // Predators start their hunt cycle with the requested delay. The common
+    // Jacaré-açu hunts on a fixed 12 s cycle.
+    if (this.type === 'elite_black_caiman') {
+      this.ecologyHuntTimer = 12;
+    } else if (this.type === 'boss_cobra_grande' || this.type === 'sucuri') {
       this.ecologyHuntTimer = 10 + Math.random() * 2;
     } else if (this.type === 'elite_jaguar') {
       this.ecologyHuntTimer = 15;
@@ -627,7 +635,8 @@ export class Enemy {
 
   /**
    * Grows after devouring prey. Jacaré-açu/Sucuri gain +15% max HP and +12%
-   * damage per meal; the Onça also becomes faster. There is no growth cap.
+   * damage per meal; the Onça also becomes faster. The common Jacaré-açu adds
+   * +20% body size per meal, from hatchling to adult and beyond. No growth cap.
    */
   public growFromPrey(): void {
     const oldMaxHp = this.maxHp;
@@ -640,7 +649,7 @@ export class Enemy {
       this.damage = Math.max(1, Math.round(this.damage * 1.12));
     }
     this.hp = Math.min(this.maxHp, this.hp + Math.max(1, this.maxHp - oldMaxHp));
-    this.growthScale *= 1.07;
+    this.growthScale *= this.type === 'elite_black_caiman' ? 1.2 : 1.07;
     this.ecologyFedCount += 1;
   }
 
@@ -1938,6 +1947,18 @@ export class Enemy {
       // Jacaré-açu: long dark snout, ridged back, heavy tail and pale teeth.
       ctx.save();
       const sway = Math.sin(this.animTimer * 1.9) * 2;
+
+      // Evolved predator aura once the hatchling reaches adult size or beyond.
+      if (this.growthScale >= 1) {
+        const aura = ctx.createRadialGradient(0, 0, 18, 0, 0, 66);
+        aura.addColorStop(0, 'rgba(249, 115, 22, 0.4)');
+        aura.addColorStop(0.6, 'rgba(239, 68, 68, 0.18)');
+        aura.addColorStop(1, 'rgba(239, 68, 68, 0)');
+        ctx.fillStyle = aura;
+        ctx.beginPath();
+        ctx.arc(0, 0, 66, 0, Math.PI * 2);
+        ctx.fill();
+      }
 
       ctx.strokeStyle = isFlashing ? '#ffffff' : '#1f3d2b';
       ctx.lineWidth = 12;
