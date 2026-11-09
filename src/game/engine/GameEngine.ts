@@ -40,7 +40,7 @@ import {
   WATER_SPEED_MULTIPLIER,
   WorldSystem,
 } from '../systems/WorldProps';
-import { WEAPON_REGISTRY, PASSIVE_REGISTRY } from '../data/upgrades';
+import { WEAPON_REGISTRY, PASSIVE_REGISTRY, AMAZON_STARTING_WEAPON_BY_CHARACTER } from '../data/upgrades';
 import { saveGameData, loadSavedData } from '../data/persistence';
 import { getDifficulty } from '../data/difficulties';
 import { applyRunToMissions } from '../data/missions';
@@ -446,7 +446,9 @@ export class GameEngine {
       this.worldProps.resolvePlayerMovement(fromX, fromY, dx, dy, radius, airborne)
     );
     this.weaponSystem = new WeaponSystem(
-      character.startingWeapon,
+      mapId === 'amazon_forest'
+        ? (AMAZON_STARTING_WEAPON_BY_CHARACTER[character.id] ?? 'garras_onca')
+        : character.startingWeapon,
       mapId === 'amazon_forest'
         ? { maxWeaponSlots: 4, maxPassiveSlots: 4, maxItemLevel: 10 }
         : undefined
@@ -2129,7 +2131,9 @@ export class GameEngine {
   }
 
   public applyUpgrade(option: UpgradeOption): void {
-    if (option.type === 'evolution') {
+    if (option.type === 'fusion') {
+      this.weaponSystem.applyFusion(option, this.player);
+    } else if (option.type === 'evolution') {
       if (option.baseId) {
         this.weaponSystem.evolveWeapon(option.baseId);
       }

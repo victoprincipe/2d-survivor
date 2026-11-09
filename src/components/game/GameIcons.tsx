@@ -65,6 +65,43 @@ export function renderWeaponIcon(id: WeaponId, sizeClass: string = 'w-4 h-4'): R
       return <Axe className={`${sizeClass} text-rose-400`} />;
     case 'lula_power':
       return <Hand className={`${sizeClass} text-red-400`} />;
+    case 'garras_onca':
+    case 'furia_onca_acu':
+      return <Swords className={`${sizeClass} text-orange-400`} />;
+    case 'espinhos_pupunha':
+    case 'metralha_floresta':
+      return <Target className={`${sizeClass} text-yellow-300`} />;
+    case 'ferrao_formiga':
+    case 'injecao_letal':
+      return <Syringe className={`${sizeClass} text-emerald-400`} />;
+    case 'bandeja_inox':
+      return <ConciergeBell className={`${sizeClass} text-slate-300`} />;
+    case 'ciclone_saci':
+    case 'tempestade_lendaria':
+      return <Orbit className={`${sizeClass} text-amber-500`} />;
+    case 'lanca_caipora':
+      return <BowArrow className={`${sizeClass} text-lime-400`} />;
+    case 'esporos_vitoria':
+    case 'nuvem_biologica':
+      return <FlaskConical className={`${sizeClass} text-green-400`} />;
+    case 'mordida_piranha':
+      return <Flame className={`${sizeClass} text-red-500`} />;
+    case 'rugido_mapinguari':
+      return <Shield className={`${sizeClass} text-amber-700`} />;
+    case 'chicotada_cipo':
+      return <FlameKindling className={`${sizeClass} text-green-500`} />;
+    case 'enxame_mutuca':
+      return <Sparkles className={`${sizeClass} text-slate-400`} />;
+    case 'gota_resina':
+      return <FlaskConical className={`${sizeClass} text-amber-500`} />;
+    case 'voo_tucano':
+      return <Feather className={`${sizeClass} text-orange-400`} />;
+    case 'teia_aranha':
+      return <Crosshair className={`${sizeClass} text-slate-200`} />;
+    case 'arrancada_sucuri':
+      return <Zap className={`${sizeClass} text-green-700`} />;
+    default:
+      return <Flame className={`${sizeClass} text-amber-400`} />;
   }
 }
 
@@ -94,6 +131,28 @@ export function renderPassiveIcon(id: PassiveId, sizeClass: string = 'w-4 h-4'):
       return <Target className={`${sizeClass} text-amber-300`} />;
     case 'bio_shield':
       return <Biohazard className={`${sizeClass} text-teal-400`} />;
+    case 'casco_tartaruga':
+      return <Shield className={`${sizeClass} text-emerald-500`} />;
+    case 'essencia_acai':
+      return <Magnet className={`${sizeClass} text-purple-400`} />;
+    case 'energia_guarana':
+      return <Feather className={`${sizeClass} text-red-400`} />;
+    case 'raiz_ginseng':
+      return <Heart className={`${sizeClass} text-green-400`} />;
+    case 'casca_marupa':
+      return <Clover className={`${sizeClass} text-amber-300`} />;
+    case 'olho_gato_maracaja':
+      return <Target className={`${sizeClass} text-yellow-400`} />;
+    case 'vigor_anta':
+      return <Dumbbell className={`${sizeClass} text-orange-300`} />;
+    case 'plumas_arara':
+      return <Clock className={`${sizeClass} text-sky-400`} />;
+    case 'coracao_jacare':
+      return <Sparkles className={`${sizeClass} text-rose-400`} />;
+    case 'resiliencia_preguica':
+      return <Hourglass className={`${sizeClass} text-lime-400`} />;
+    default:
+      return <Sparkles className={`${sizeClass} text-emerald-400`} />;
   }
 }
 

@@ -91,6 +91,8 @@ export class Player {
   public slowTimer: number = 0;
   public slowFactor: number = 0;
   public stunTimer: number = 0;
+  /** 0–1 fraction of stun duration removed by Amazon passives. */
+  public stunResistance: number = 0;
   public attackSpeedBoostTimer: number = 0;
   public shieldTimer: number = 0;
   // Thorn bush wound: damage every second until cured by the São-Caetano herb.
@@ -242,7 +244,9 @@ export class Player {
   }
 
   public applyStun(duration: number): void {
-    this.stunTimer = Math.max(this.stunTimer, duration);
+    const resistedDuration = duration * (1 - Math.min(1, Math.max(0, this.stunResistance)));
+    if (resistedDuration <= 0) return;
+    this.stunTimer = Math.max(this.stunTimer, resistedDuration);
     this.dashTimer = 0;
     this.jumpTimer = 0;
   }

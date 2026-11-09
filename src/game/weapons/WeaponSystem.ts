@@ -1,5 +1,5 @@
 import { WeaponId, PassiveId, UpgradeOption, WeaponInstance, PassiveInstance } from '../types';
-import { WEAPON_REGISTRY, PASSIVE_REGISTRY, LULA_SKILL } from '../data/upgrades';
+import { WEAPON_REGISTRY, PASSIVE_REGISTRY, LULA_SKILL, FUSION_RECIPES } from '../data/upgrades';
 import { Player } from '../entities/Player';
 import { Enemy } from '../entities/Enemy';
 import { SpatialGrid } from '../engine/SpatialGrid';
@@ -18,7 +18,20 @@ export type ProjectileVisualType =
   | 'flying_tray'
   | 'syringe'
   | 'fire_flask_lob'
-  | 'executioner_axe';
+  | 'executioner_axe'
+  | 'jaguar_claw'
+  | 'pupunha_spike'
+  | 'bullet_sting'
+  | 'saci_cyclone'
+  | 'caipora_spear'
+  | 'vitoria_spore'
+  | 'piranha_bite'
+  | 'vine_lash'
+  | 'mutuca'
+  | 'resin_drop'
+  | 'tucano'
+  | 'spider_web'
+  | 'sucuri';
 
 export interface Projectile {
   id: number;
@@ -85,6 +98,7 @@ export interface Projectile {
     zoneRadius: number;
     zoneDuration: number;
     zoneTickDamage: number;
+    zoneType?: 'fire' | 'bio_cloud' | 'static_field';
   };
   bottleFlight?: {
     startX: number;
@@ -105,6 +119,7 @@ export interface WhipSlashEffect {
   maxLife: number;
   isEvolved: boolean;
   direction: number; // 1 right, -1 left
+  color?: string;
 }
 
 export interface LightningStrikeEffect {
@@ -186,6 +201,38 @@ const ALL_PASSIVE_IDS: PassiveId[] = [
   'duplicator',
   'hunter_mark',
   'bio_shield',
+];
+
+/** Amazon Forest catalogue: 15 attacks + 10 buffs, all capped at level 10. */
+const AMAZON_WEAPON_IDS: WeaponId[] = [
+  'garras_onca',
+  'espinhos_pupunha',
+  'ferrao_formiga',
+  'bandeja_inox',
+  'ciclone_saci',
+  'lanca_caipora',
+  'esporos_vitoria',
+  'mordida_piranha',
+  'rugido_mapinguari',
+  'chicotada_cipo',
+  'enxame_mutuca',
+  'gota_resina',
+  'voo_tucano',
+  'teia_aranha',
+  'arrancada_sucuri',
+];
+
+const AMAZON_PASSIVE_IDS: PassiveId[] = [
+  'casco_tartaruga',
+  'essencia_acai',
+  'energia_guarana',
+  'raiz_ginseng',
+  'casca_marupa',
+  'olho_gato_maracaja',
+  'vigor_anta',
+  'plumas_arara',
+  'coracao_jacare',
+  'resiliencia_preguica',
 ];
 
 export class WeaponSystem {
@@ -311,6 +358,35 @@ export class WeaponSystem {
         this.bibleIsActive = true;
       }
     }
+  }
+
+  /** Supreme Fusion: consumes both level-10 components and equips the result at level 1. */
+  applyFusion(option: UpgradeOption, player: Player): void {
+    const weaponId = option.baseId;
+    const passiveId = option.fusionPassiveId;
+    const resultId = option.id as WeaponId;
+    if (!weaponId || !passiveId || !WEAPON_REGISTRY[resultId]) return;
+
+    const prevMaxHp = player.maxHp;
+    this.weapons.delete(weaponId);
+    this.passives.delete(passiveId);
+    this.projectiles = this.projectiles.filter((p) => p.weaponId !== weaponId);
+    this.groundZones = this.groundZones.filter((z) => z.weaponId !== weaponId);
+
+    this.weapons.set(resultId, {
+      id: resultId,
+      evolvedId: WEAPON_REGISTRY[resultId].evolvedId,
+      level: 1,
+      maxLevel: this.weaponMaxLevel(resultId),
+      evolved: true,
+      cooldownTimer: 0,
+      totalDamageDealt: 0,
+      comboStep: 0,
+    });
+
+    this.recalculatePlayerStats(player);
+    const gainedMaxHp = player.maxHp - prevMaxHp;
+    if (gainedMaxHp > 0) player.heal(gainedMaxHp);
   }
 
   devSetWeaponLevel(id: WeaponId, level: number, evolved?: boolean): void {
@@ -449,6 +525,43 @@ export class WeaponSystem {
       player.armor += bioShield.level * 1;
       player.debuffDamageBonus += bioShield.level * 0.1;
     }
+
+    // Amazon Forest buffs
+    const cascoTartaruga = this.passives.get('casco_tartaruga');
+    if (cascoTartaruga) player.armor += cascoTartaruga.level;
+
+    const essenciaAcai = this.passives.get('essencia_acai');
+    if (essenciaAcai) {
+      player.pickupRadius += essenciaAcai.level * 18;
+      player.xpMultiplier += essenciaAcai.level * 0.04;
+    }
+
+    const energiaGuarana = this.passives.get('energia_guarana');
+    if (energiaGuarana) player.speed *= 1 + energiaGuarana.level * 0.05;
+
+    const raizGinseng = this.passives.get('raiz_ginseng');
+    if (raizGinseng) player.recoveryPerSec += raizGinseng.level * 0.5;
+
+    const cascaMarupa = this.passives.get('casca_marupa');
+    if (cascaMarupa) {
+      player.critChance += cascaMarupa.level * 0.03;
+      player.goldMultiplier += cascaMarupa.level * 0.05;
+    }
+
+    const olhoGato = this.passives.get('olho_gato_maracaja');
+    if (olhoGato) player.areaMultiplier += olhoGato.level * 0.06;
+
+    const vigorAnta = this.passives.get('vigor_anta');
+    if (vigorAnta) player.maxHp += vigorAnta.level * 12;
+
+    const plumasArara = this.passives.get('plumas_arara');
+    if (plumasArara) player.cooldownReduction += plumasArara.level * 0.03;
+
+    const coracaoJacare = this.passives.get('coracao_jacare');
+    if (coracaoJacare) player.might += coracaoJacare.level * 0.06;
+
+    const resilienciaPreguica = this.passives.get('resiliencia_preguica');
+    player.stunResistance = resilienciaPreguica ? Math.min(1, resilienciaPreguica.level * 0.1) : 0;
 
     player.cooldownReduction = Math.min(0.55, player.cooldownReduction);
     player.critChance = Math.min(0.85, player.critChance);
@@ -767,6 +880,86 @@ export class WeaponSystem {
             : LULA_SKILL.cooldown / 1000;
         w.cooldownTimer = baseCd * cdFactor;
         this.triggerPoderDoL(w, player, grid, vfx, sound, onEnemyKilled);
+        break;
+      }
+      case 'garras_onca':
+      case 'furia_onca_acu': {
+        w.cooldownTimer = (w.evolved ? 0.46 : Math.max(0.62, 0.98 - w.level * 0.035)) * cdFactor;
+        this.triggerAmazonClaws(w, player, grid, vfx, sound, onEnemyKilled);
+        break;
+      }
+      case 'espinhos_pupunha':
+      case 'metralha_floresta': {
+        w.cooldownTimer = (w.evolved ? 0.5 : Math.max(0.72, 1.18 - w.level * 0.04)) * cdFactor;
+        this.triggerPupunhaSpikes(w, player, sound);
+        break;
+      }
+      case 'ferrao_formiga':
+      case 'injecao_letal': {
+        w.cooldownTimer = (w.evolved ? 0.42 : Math.max(0.62, 1.0 - w.level * 0.035)) * cdFactor;
+        this.triggerBulletSting(w, player, grid, sound);
+        break;
+      }
+      case 'bandeja_inox': {
+        w.cooldownTimer = Math.max(0.78, 1.28 - w.level * 0.04) * cdFactor;
+        this.triggerInoxTray(w, player, grid, sound);
+        break;
+      }
+      case 'ciclone_saci':
+      case 'tempestade_lendaria': {
+        w.cooldownTimer = (w.evolved ? 0.7 : Math.max(0.95, 1.65 - w.level * 0.06)) * cdFactor;
+        this.triggerSaciCyclone(w, player, sound);
+        break;
+      }
+      case 'lanca_caipora': {
+        w.cooldownTimer = Math.max(0.72, 1.12 - w.level * 0.035) * cdFactor;
+        this.triggerCaiporaSpear(w, player, grid, sound);
+        break;
+      }
+      case 'esporos_vitoria':
+      case 'nuvem_biologica': {
+        w.cooldownTimer = (w.evolved ? 0.85 : Math.max(1.0, 1.55 - w.level * 0.05)) * cdFactor;
+        this.triggerVitoriaSpores(w, player, grid, sound);
+        break;
+      }
+      case 'mordida_piranha': {
+        w.cooldownTimer = Math.max(0.52, 0.92 - w.level * 0.035) * cdFactor;
+        this.triggerPiranhaBite(w, player, sound);
+        break;
+      }
+      case 'rugido_mapinguari': {
+        w.cooldownTimer = Math.max(1.15, 1.85 - w.level * 0.06) * cdFactor;
+        this.triggerMapinguariRoar(w, player, grid, vfx, sound, onEnemyKilled);
+        break;
+      }
+      case 'chicotada_cipo': {
+        w.cooldownTimer = Math.max(0.74, 1.15 - w.level * 0.035) * cdFactor;
+        this.triggerVineLash(w, player, grid, vfx, sound, onEnemyKilled);
+        break;
+      }
+      case 'enxame_mutuca': {
+        w.cooldownTimer = Math.max(0.85, 1.35 - w.level * 0.045) * cdFactor;
+        this.triggerMutucaSwarm(w, player, grid, sound);
+        break;
+      }
+      case 'gota_resina': {
+        w.cooldownTimer = Math.max(1.0, 1.55 - w.level * 0.05) * cdFactor;
+        this.triggerResinDrop(w, player, grid, sound);
+        break;
+      }
+      case 'voo_tucano': {
+        w.cooldownTimer = Math.max(0.72, 1.1 - w.level * 0.035) * cdFactor;
+        this.triggerTucanoFlight(w, player, grid, sound);
+        break;
+      }
+      case 'teia_aranha': {
+        w.cooldownTimer = Math.max(0.9, 1.4 - w.level * 0.045) * cdFactor;
+        this.triggerSpiderWeb(w, player, grid, sound);
+        break;
+      }
+      case 'arrancada_sucuri': {
+        w.cooldownTimer = Math.max(1.1, 1.75 - w.level * 0.055) * cdFactor;
+        this.triggerSucuriCharge(w, player, grid, sound);
         break;
       }
     }
@@ -1590,6 +1783,659 @@ export class WeaponSystem {
     }
   }
 
+  private nearestAmazonTarget(
+    player: Player,
+    grid: SpatialGrid<Enemy>,
+    range: number = 560
+  ): Enemy | undefined {
+    const nearby = grid.queryRadius(player.x, player.y, range);
+    let closest: Enemy | undefined;
+    let closestDist = Infinity;
+    for (let i = 0; i < nearby.length; i++) {
+      const enemy = nearby[i];
+      if (enemy.hp <= 0 || enemy.isSubmerged) continue;
+      const dist = (enemy.x - player.x) ** 2 + (enemy.y - player.y) ** 2;
+      if (dist < closestDist) {
+        closestDist = dist;
+        closest = enemy;
+      }
+    }
+    return closest;
+  }
+
+  private triggerAmazonClaws(
+    w: WeaponInstance,
+    player: Player,
+    grid: SpatialGrid<Enemy>,
+    vfx: VFXManager,
+    sound: SoundEngine,
+    onEnemyKilled: (enemy: Enemy) => void
+  ): void {
+    const supreme = w.evolved;
+    const target = this.nearestAmazonTarget(player, grid);
+    const baseAngle = target
+      ? Math.atan2(target.y - player.y, target.x - player.x)
+      : Math.atan2(player.facingY, player.facingX);
+    const count = (supreme ? 7 : 3) + player.bonusAmount;
+    const speed = 540 * player.projectileSpeedMultiplier;
+    const baseDamage = (supreme ? 38 + w.level * 9 : 16 + w.level * 4) * player.might;
+    const pierce = (supreme ? 99 : 3 + Math.floor(w.level / 2)) + player.bonusPierce;
+    const life = 0.34 * player.durationMultiplier;
+
+    for (let i = 0; i < count; i++) {
+      const angle = baseAngle + (i - (count - 1) / 2) * (supreme ? 0.34 : 0.24);
+      this.projectiles.push({
+        id: this.nextProjId++,
+        type: 'jaguar_claw',
+        x: player.x + Math.cos(angle) * 18,
+        y: player.y + Math.sin(angle) * 18,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        radius: (supreme ? 18 : 13) * player.areaMultiplier,
+        damage: baseDamage,
+        pierce,
+        knockForce: 210,
+        bonusCritChance: supreme ? 0.35 : 0.18,
+        bonusCritMult: supreme ? 0.5 : 0.2,
+        bleedDps: (supreme ? 18 : 5 + w.level) * player.might,
+        bleedMaxDps: (supreme ? 140 : 45) * player.might,
+        bleedDuration: 3 * player.durationMultiplier,
+        explosionRadius: supreme ? 44 * player.areaMultiplier : 0,
+        life,
+        maxLife: life,
+        weaponId: w.id,
+        isEvolved: supreme,
+        hitEnemyIds: new Set(),
+      });
+    }
+    vfx.addSparks(player.x, player.y, supreme ? '#f97316' : '#fbbf24', supreme ? 12 : 6);
+    sound.playWhip();
+  }
+
+  private triggerPupunhaSpikes(w: WeaponInstance, player: Player, sound: SoundEngine): void {
+    const supreme = w.evolved;
+    const count = (supreme ? 14 : 5 + Math.floor(w.level / 2)) + player.bonusAmount;
+    const speed = (supreme ? 390 : 315) * player.projectileSpeedMultiplier;
+    const baseDamage = (supreme ? 14 + w.level * 4 : 10 + w.level * 3) * player.might;
+    const life = 0.9 * player.durationMultiplier;
+
+    for (let i = 0; i < count; i++) {
+      const angle = (i * Math.PI * 2) / count + (i % 2 === 0 ? 0.14 : -0.1);
+      this.projectiles.push({
+        id: this.nextProjId++,
+        type: 'pupunha_spike',
+        x: player.x,
+        y: player.y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        radius: (supreme ? 8 : 6) * player.areaMultiplier,
+        damage: baseDamage,
+        pierce: (supreme ? 3 : 1 + Math.floor(w.level / 4)) + player.bonusPierce,
+        knockForce: 110,
+        life,
+        maxLife: life,
+        weaponId: w.id,
+        isEvolved: supreme,
+        hitEnemyIds: new Set(),
+      });
+    }
+    sound.playKnife();
+  }
+
+  private triggerBulletSting(
+    w: WeaponInstance,
+    player: Player,
+    grid: SpatialGrid<Enemy>,
+    sound: SoundEngine
+  ): void {
+    const supreme = w.evolved;
+    const target = this.nearestAmazonTarget(player, grid, 600);
+    const baseAngle = target
+      ? Math.atan2(target.y - player.y, target.x - player.x)
+      : Math.atan2(player.facingY, player.facingX);
+    const count = (supreme ? 5 : 1 + Math.floor(w.level / 3)) + player.bonusAmount;
+    const speed = (supreme ? 840 : 720) * player.projectileSpeedMultiplier;
+    const baseDamage = (supreme ? 28 + w.level * 7 : 18 + w.level * 5) * player.might;
+    const life = 1.15 * player.durationMultiplier;
+
+    for (let i = 0; i < count; i++) {
+      const angle = baseAngle + (i - (count - 1) / 2) * 0.12;
+      this.projectiles.push({
+        id: this.nextProjId++,
+        type: 'bullet_sting',
+        x: player.x,
+        y: player.y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        radius: (supreme ? 10 : 7) * player.areaMultiplier,
+        damage: baseDamage,
+        pierce: (supreme ? 9 : 2 + Math.floor(w.level / 2)) + player.bonusPierce,
+        knockForce: 150,
+        poisonDps: (supreme ? 22 : 7 + w.level) * player.might,
+        poisonDuration: (supreme ? 4.2 : 3.0) * player.durationMultiplier,
+        poisonContagious: supreme,
+        explosionRadius: supreme ? 46 * player.areaMultiplier : 0,
+        life,
+        maxLife: life,
+        weaponId: w.id,
+        isEvolved: supreme,
+        hitEnemyIds: new Set(),
+      });
+    }
+    sound.playShoot();
+  }
+
+  private triggerInoxTray(
+    w: WeaponInstance,
+    player: Player,
+    grid: SpatialGrid<Enemy>,
+    sound: SoundEngine
+  ): void {
+    const target = this.nearestAmazonTarget(player, grid, 480);
+    const baseAngle = target
+      ? Math.atan2(target.y - player.y, target.x - player.x)
+      : Math.atan2(player.facingY, player.facingX);
+    const count = 1 + Math.floor(w.level / 4) + player.bonusAmount;
+    const maxSpeed = 530 * player.projectileSpeedMultiplier;
+    const baseDamage = (15 + w.level * 4) * player.might;
+    const life = 2.5 * player.durationMultiplier;
+
+    for (let i = 0; i < count; i++) {
+      const angle = baseAngle + (i * Math.PI * 2) / count;
+      const dx = Math.cos(angle);
+      const dy = Math.sin(angle);
+      this.projectiles.push({
+        id: this.nextProjId++,
+        type: 'flying_tray',
+        x: player.x,
+        y: player.y,
+        vx: dx * maxSpeed,
+        vy: dy * maxSpeed,
+        radius: (12 + Math.floor(w.level / 4) * 2) * player.areaMultiplier,
+        damage: baseDamage,
+        pierce: 999,
+        spinAngle: 0,
+        spinSpeed: 16,
+        life,
+        maxLife: life,
+        weaponId: w.id,
+        isEvolved: false,
+        hitEnemyIds: new Set(),
+        boomerang: {
+          phase: 'outbound',
+          phaseTimer: 0.44,
+          hoverDuration: (0.25 + w.level * 0.012) * player.durationMultiplier,
+          maxSpeed,
+          returnDamageMult: 1.3,
+          lockedReturnDir: false,
+          dirX: dx,
+          dirY: dy,
+          triggeredPlayerNova: false,
+        },
+      });
+    }
+    sound.playKnife();
+  }
+
+  private triggerSaciCyclone(w: WeaponInstance, player: Player, sound: SoundEngine): void {
+    const supreme = w.evolved;
+    const count = (supreme ? 3 : 1) + (w.level >= 6 ? 1 : 0) + player.bonusAmount;
+    const baseDamage = (supreme ? 18 + w.level * 5 : 13 + w.level * 3) * player.might;
+    const life = (supreme ? 2.1 : 1.4) * player.durationMultiplier;
+
+    for (let i = 0; i < count; i++) {
+      const startAngle = (i * Math.PI * 2) / count;
+      this.projectiles.push({
+        id: this.nextProjId++,
+        type: 'saci_cyclone',
+        x: player.x,
+        y: player.y,
+        vx: 0,
+        vy: 0,
+        radius: (supreme ? 18 : 13) * player.areaMultiplier,
+        damage: baseDamage,
+        pierce: 999,
+        knockForce: 120,
+        life,
+        maxLife: life,
+        weaponId: w.id,
+        isEvolved: supreme,
+        hitEnemyIds: new Set(),
+        spiral: {
+          followPlayer: true,
+          originX: player.x,
+          originY: player.y,
+          angle: startAngle,
+          radius: 18,
+          angularSpeed: 8 + w.level * 0.25,
+          radialSpeed: supreme ? 78 : 58,
+        },
+      });
+    }
+    this.spawnRingPulse(player.x, player.y, 46 * player.areaMultiplier, supreme ? '#38bdf8' : '#a16207', 0.3);
+    sound.playWhip();
+  }
+
+  private triggerCaiporaSpear(
+    w: WeaponInstance,
+    player: Player,
+    grid: SpatialGrid<Enemy>,
+    sound: SoundEngine
+  ): void {
+    const target = this.nearestAmazonTarget(player, grid, 620);
+    const angle = target
+      ? Math.atan2(target.y - player.y, target.x - player.x)
+      : Math.atan2(player.facingY, player.facingX);
+    const speed = 850 * player.projectileSpeedMultiplier;
+    const baseDamage = (26 + w.level * 7) * player.might;
+    const life = 1.25 * player.durationMultiplier;
+
+    this.projectiles.push({
+      id: this.nextProjId++,
+      type: 'caipora_spear',
+      x: player.x,
+      y: player.y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      radius: (9 + w.level * 0.3) * player.areaMultiplier,
+      damage: baseDamage,
+      pierce: (2 + Math.floor(w.level / 2)) + player.bonusPierce,
+      knockForce: 280,
+      bonusCritChance: 0.2,
+      life,
+      maxLife: life,
+      weaponId: w.id,
+      isEvolved: false,
+      hitEnemyIds: new Set(),
+    });
+    sound.playShoot();
+  }
+
+  private triggerVitoriaSpores(
+    w: WeaponInstance,
+    player: Player,
+    grid: SpatialGrid<Enemy>,
+    sound: SoundEngine
+  ): void {
+    const supreme = w.evolved;
+    const nearby = grid.queryRadius(player.x, player.y, 460);
+    const count = (supreme ? 3 : 1 + Math.floor(w.level / 4)) + player.bonusAmount;
+    const zoneRadius = (supreme ? 62 : 34 + w.level * 2) * player.areaMultiplier;
+    const zoneDuration = (supreme ? 4.2 : 3.0 + w.level * 0.1) * player.durationMultiplier;
+    const tickDamage = (supreme ? 9 + w.level * 3 : 5 + w.level * 2) * player.might;
+
+    for (let i = 0; i < count; i++) {
+      const target = nearby[i % Math.max(1, nearby.length)];
+      const angle = Math.random() * Math.PI * 2;
+      const targetX = target ? target.x : player.x + Math.cos(angle) * (120 + Math.random() * 120);
+      const targetY = target ? target.y : player.y + Math.sin(angle) * (120 + Math.random() * 120);
+      const lobDuration = 0.45;
+      this.projectiles.push({
+        id: this.nextProjId++,
+        type: 'vitoria_spore',
+        x: player.x,
+        y: player.y,
+        vx: (targetX - player.x) / lobDuration,
+        vy: (targetY - player.y) / lobDuration,
+        radius: 8,
+        damage: 0,
+        pierce: 1,
+        spinAngle: 0,
+        spinSpeed: 9,
+        life: lobDuration + 0.05,
+        maxLife: lobDuration + 0.05,
+        weaponId: w.id,
+        isEvolved: supreme,
+        hitEnemyIds: new Set(),
+        lob: {
+          startX: player.x,
+          startY: player.y,
+          targetX,
+          targetY,
+          elapsed: 0,
+          duration: lobDuration,
+          arcHeight: 62,
+          zoneRadius,
+          zoneDuration,
+          zoneTickDamage: tickDamage,
+          zoneType: 'bio_cloud',
+        },
+      });
+    }
+    sound.playShoot();
+  }
+
+  private triggerPiranhaBite(w: WeaponInstance, player: Player, sound: SoundEngine): void {
+    const count = 3 + Math.floor(w.level / 2) + player.bonusAmount;
+    const speed = 255 * player.projectileSpeedMultiplier;
+    const baseDamage = (9 + w.level * 3) * player.might;
+    const life = 0.48 * player.durationMultiplier;
+
+    for (let i = 0; i < count; i++) {
+      const angle = (i * Math.PI * 2) / count + Math.random() * 0.1;
+      this.projectiles.push({
+        id: this.nextProjId++,
+        type: 'piranha_bite',
+        x: player.x,
+        y: player.y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        radius: (10 + w.level * 0.4) * player.areaMultiplier,
+        damage: baseDamage,
+        pierce: 2 + Math.floor(w.level / 4) + player.bonusPierce,
+        homingTurnRate: 4.5,
+        knockForce: 160,
+        bleedDps: (4 + w.level) * player.might,
+        bleedDuration: 2.2 * player.durationMultiplier,
+        life,
+        maxLife: life,
+        weaponId: w.id,
+        isEvolved: false,
+        hitEnemyIds: new Set(),
+      });
+    }
+    sound.playKnife();
+  }
+
+  private triggerMapinguariRoar(
+    w: WeaponInstance,
+    player: Player,
+    grid: SpatialGrid<Enemy>,
+    vfx: VFXManager,
+    sound: SoundEngine,
+    onEnemyKilled: (enemy: Enemy) => void
+  ): void {
+    const radius = (110 + w.level * 9) * player.areaMultiplier;
+    const baseDamage = (12 + w.level * 4) * player.might;
+    this.spawnRingPulse(player.x, player.y, radius, '#a16207', 0.42);
+    this.spawnRingPulse(player.x, player.y, radius * 0.7, '#84cc16', 0.3);
+    vfx.addSparks(player.x, player.y, '#a16207', 14);
+    sound.playThunder();
+
+    const victims = grid.queryRadius(player.x, player.y, radius);
+    for (let i = 0; i < victims.length; i++) {
+      const enemy = victims[i];
+      if (enemy.hp <= 0) continue;
+      const angle = Math.atan2(enemy.y - player.y, enemy.x - player.x);
+      this.dealHitToEnemy(
+        w,
+        enemy,
+        baseDamage,
+        player,
+        Math.cos(angle),
+        Math.sin(angle),
+        260,
+        grid,
+        vfx,
+        onEnemyKilled
+      );
+      enemy.applySlow(0.35, 2.4 * player.durationMultiplier);
+    }
+  }
+
+  private triggerVineLash(
+    w: WeaponInstance,
+    player: Player,
+    grid: SpatialGrid<Enemy>,
+    vfx: VFXManager,
+    sound: SoundEngine,
+    onEnemyKilled: (enemy: Enemy) => void
+  ): void {
+    const facing = player.facingX < 0 ? -1 : 1;
+    const slashWidth = (130 + w.level * 10) * player.areaMultiplier;
+    const slashHeight = (58 + w.level * 4) * player.areaMultiplier;
+    const baseDamage = (18 + w.level * 4) * player.might;
+
+    this.whipSlashes.push({
+      x: player.x + (slashWidth / 2) * facing,
+      y: player.y,
+      width: slashWidth,
+      height: slashHeight,
+      life: 0.2,
+      maxLife: 0.2,
+      isEvolved: false,
+      direction: facing,
+      color: '#22c55e',
+    });
+    this.whipSlashes.push({
+      x: player.x,
+      y: player.y,
+      width: slashWidth * 0.9,
+      height: slashHeight * 0.75,
+      life: 0.16,
+      maxLife: 0.16,
+      isEvolved: false,
+      direction: -facing,
+      color: '#84cc16',
+    });
+
+    const targets = grid.queryRadius(player.x, player.y, slashWidth * 0.75);
+    for (let i = 0; i < targets.length; i++) {
+      const enemy = targets[i];
+      if (enemy.hp <= 0 || Math.abs(enemy.y - player.y) > slashHeight * 0.8 + enemy.radius) continue;
+      const result = this.dealHitToEnemy(
+        w,
+        enemy,
+        baseDamage,
+        player,
+        facing,
+        0,
+        190,
+        grid,
+        vfx,
+        onEnemyKilled
+      );
+      enemy.applySlow(0.3, 1.6 * player.durationMultiplier);
+      if (result.dead) continue;
+    }
+    sound.playWhip();
+  }
+
+  private triggerMutucaSwarm(
+    w: WeaponInstance,
+    player: Player,
+    grid: SpatialGrid<Enemy>,
+    sound: SoundEngine
+  ): void {
+    const target = this.nearestAmazonTarget(player, grid);
+    const baseAngle = target
+      ? Math.atan2(target.y - player.y, target.x - player.x)
+      : Math.atan2(player.facingY, player.facingX);
+    const count = 3 + Math.floor(w.level / 2) + player.bonusAmount;
+    const speed = 340 * player.projectileSpeedMultiplier;
+    const baseDamage = (7 + w.level * 2) * player.might;
+    const life = 1.9 * player.durationMultiplier;
+
+    for (let i = 0; i < count; i++) {
+      const angle = baseAngle + (i - (count - 1) / 2) * 0.32;
+      this.projectiles.push({
+        id: this.nextProjId++,
+        type: 'mutuca',
+        x: player.x,
+        y: player.y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        radius: (4 + Math.floor(w.level / 5)) * player.areaMultiplier,
+        damage: baseDamage,
+        pierce: 2 + Math.floor(w.level / 5) + player.bonusPierce,
+        homingTurnRate: 8,
+        life,
+        maxLife: life,
+        weaponId: w.id,
+        isEvolved: false,
+        hitEnemyIds: new Set(),
+      });
+    }
+    sound.playShoot();
+  }
+
+  private triggerResinDrop(
+    w: WeaponInstance,
+    player: Player,
+    grid: SpatialGrid<Enemy>,
+    sound: SoundEngine
+  ): void {
+    const nearby = grid.queryRadius(player.x, player.y, 430);
+    const count = 1 + Math.floor(w.level / 3) + player.bonusAmount;
+    const zoneRadius = (28 + w.level * 2) * player.areaMultiplier;
+    const zoneDuration = (3.0 + w.level * 0.15) * player.durationMultiplier;
+    const tickDamage = (7 + w.level * 2) * player.might;
+
+    for (let i = 0; i < count; i++) {
+      const target = nearby[i % Math.max(1, nearby.length)];
+      const angle = Math.random() * Math.PI * 2;
+      const targetX = target ? target.x : player.x + Math.cos(angle) * (100 + Math.random() * 130);
+      const targetY = target ? target.y : player.y + Math.sin(angle) * (100 + Math.random() * 130);
+      const lobDuration = 0.4;
+      this.projectiles.push({
+        id: this.nextProjId++,
+        type: 'resin_drop',
+        x: player.x,
+        y: player.y,
+        vx: (targetX - player.x) / lobDuration,
+        vy: (targetY - player.y) / lobDuration,
+        radius: 8,
+        damage: 0,
+        pierce: 1,
+        spinAngle: 0,
+        spinSpeed: 12,
+        life: lobDuration + 0.05,
+        maxLife: lobDuration + 0.05,
+        weaponId: w.id,
+        isEvolved: false,
+        hitEnemyIds: new Set(),
+        lob: {
+          startX: player.x,
+          startY: player.y,
+          targetX,
+          targetY,
+          elapsed: 0,
+          duration: lobDuration,
+          arcHeight: 70,
+          zoneRadius,
+          zoneDuration,
+          zoneTickDamage: tickDamage,
+          zoneType: 'fire',
+        },
+      });
+    }
+    sound.playShoot();
+  }
+
+  private triggerTucanoFlight(
+    w: WeaponInstance,
+    player: Player,
+    grid: SpatialGrid<Enemy>,
+    sound: SoundEngine
+  ): void {
+    const target = this.nearestAmazonTarget(player, grid);
+    const baseAngle = target
+      ? Math.atan2(target.y - player.y, target.x - player.x)
+      : Math.atan2(player.facingY, player.facingX);
+    const count = 2 + Math.floor(w.level / 3) + player.bonusAmount;
+    const speed = 450 * player.projectileSpeedMultiplier;
+    const baseDamage = (12 + w.level * 3) * player.might;
+    const life = 1.55 * player.durationMultiplier;
+
+    for (let i = 0; i < count; i++) {
+      const angle = baseAngle + (i - (count - 1) / 2) * 0.18;
+      this.projectiles.push({
+        id: this.nextProjId++,
+        type: 'tucano',
+        x: player.x,
+        y: player.y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        radius: (8 + Math.floor(w.level / 4)) * player.areaMultiplier,
+        damage: baseDamage,
+        pierce: 1 + Math.floor(w.level / 4) + player.bonusPierce,
+        bouncesLeft: 2 + Math.floor(w.level / 4),
+        homingTurnRate: 4.5,
+        life,
+        maxLife: life,
+        weaponId: w.id,
+        isEvolved: false,
+        hitEnemyIds: new Set(),
+      });
+    }
+    sound.playShoot();
+  }
+
+  private triggerSpiderWeb(
+    w: WeaponInstance,
+    player: Player,
+    grid: SpatialGrid<Enemy>,
+    sound: SoundEngine
+  ): void {
+    const target = this.nearestAmazonTarget(player, grid);
+    const baseAngle = target
+      ? Math.atan2(target.y - player.y, target.x - player.x)
+      : Math.atan2(player.facingY, player.facingX);
+    const count = 1 + Math.floor(w.level / 3) + player.bonusAmount;
+    const speed = 335 * player.projectileSpeedMultiplier;
+    const baseDamage = (7 + w.level * 2) * player.might;
+    const life = 1.5 * player.durationMultiplier;
+
+    for (let i = 0; i < count; i++) {
+      const angle = baseAngle + (i - (count - 1) / 2) * 0.2;
+      this.projectiles.push({
+        id: this.nextProjId++,
+        type: 'spider_web',
+        x: player.x,
+        y: player.y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        radius: (9 + w.level * 0.5) * player.areaMultiplier,
+        damage: baseDamage,
+        pierce: 2 + Math.floor(w.level / 3) + player.bonusPierce,
+        slowFactor: 0.55,
+        slowDuration: (2.5 + w.level * 0.1) * player.durationMultiplier,
+        life,
+        maxLife: life,
+        weaponId: w.id,
+        isEvolved: false,
+        hitEnemyIds: new Set(),
+      });
+    }
+    sound.playShoot();
+  }
+
+  private triggerSucuriCharge(
+    w: WeaponInstance,
+    player: Player,
+    grid: SpatialGrid<Enemy>,
+    sound: SoundEngine
+  ): void {
+    const target = this.nearestAmazonTarget(player, grid, 600);
+    const angle = target
+      ? Math.atan2(target.y - player.y, target.x - player.x)
+      : Math.atan2(player.facingY, player.facingX);
+    const speed = 570 * player.projectileSpeedMultiplier;
+    const baseDamage = (30 + w.level * 8) * player.might;
+    const life = 1.35 * player.durationMultiplier;
+
+    this.projectiles.push({
+      id: this.nextProjId++,
+      type: 'sucuri',
+      x: player.x,
+      y: player.y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      radius: (18 + w.level * 0.7) * player.areaMultiplier,
+      damage: baseDamage,
+      pierce: 999,
+      knockForce: 330,
+      bonusCritChance: 0.12,
+      life,
+      maxLife: life,
+      weaponId: w.id,
+      isEvolved: false,
+      hitEnemyIds: new Set(),
+    });
+    this.spawnRingPulse(player.x, player.y, 50 * player.areaMultiplier, '#166534', 0.28);
+    sound.playWhip();
+  }
+
   private performLightningBolt(
     w: WeaponInstance,
     strikeX: number,
@@ -2061,9 +2907,10 @@ export class WeaponSystem {
         p.y = groundY - Math.sin(t * Math.PI) * p.lob.arcHeight;
 
         if (t >= 1) {
+          const zoneType = p.lob.zoneType ?? 'fire';
           this.groundZones.push({
             id: this.nextZoneId++,
-            type: 'fire',
+            type: zoneType,
             weaponId: p.weaponId,
             x: p.lob.targetX,
             y: p.lob.targetY,
@@ -2079,7 +2926,7 @@ export class WeaponSystem {
           vfx.addSparks(
             p.lob.targetX,
             p.lob.targetY,
-            p.isEvolved ? '#38bdf8' : '#f97316',
+            zoneType === 'bio_cloud' ? '#34d399' : p.isEvolved ? '#38bdf8' : '#f97316',
             8
           );
           sound.playHit();
@@ -2312,6 +3159,19 @@ export class WeaponSystem {
               vfx,
               onEnemyKilled
             );
+          } else if (p.type === 'jaguar_claw' || p.type === 'bullet_sting') {
+            this.triggerSplashExplosion(
+              w,
+              enemy.x,
+              enemy.y,
+              p.explosionRadius,
+              p.damage * 0.5,
+              p.type === 'jaguar_claw' ? '#f97316' : '#22c55e',
+              player,
+              grid,
+              vfx,
+              onEnemyKilled
+            );
           }
         }
 
@@ -2356,7 +3216,29 @@ export class WeaponSystem {
                         ? '#fbbf24'
                         : p.type === 'executioner_axe'
                           ? '#f43f5e'
-                          : '#e2e8f0';
+                          : p.type === 'jaguar_claw'
+                            ? '#f97316'
+                            : p.type === 'pupunha_spike'
+                              ? '#facc15'
+                              : p.type === 'bullet_sting'
+                                ? '#22c55e'
+                                : p.type === 'saci_cyclone'
+                                  ? '#a16207'
+                                  : p.type === 'caipora_spear'
+                                    ? '#84cc16'
+                                    : p.type === 'piranha_bite'
+                                      ? '#dc2626'
+                                      : p.type === 'vine_lash'
+                                        ? '#22c55e'
+                                        : p.type === 'mutuca'
+                                          ? '#94a3b8'
+                                          : p.type === 'tucano'
+                                            ? '#f59e0b'
+                                            : p.type === 'spider_web'
+                                              ? '#e2e8f0'
+                                              : p.type === 'sucuri'
+                                                ? '#166534'
+                                                : '#e2e8f0';
         vfx.addSparks(p.x, p.y, sparkColor, 3);
         hitSomeone = true;
 
@@ -2474,11 +3356,15 @@ export class WeaponSystem {
 
       ctx.save();
       ctx.globalAlpha = alpha;
-      ctx.fillStyle = s.isEvolved ? 'rgba(220, 38, 38, 0.72)' : 'rgba(245, 158, 11, 0.65)';
+      ctx.fillStyle = s.color
+        ? `${s.color}99`
+        : s.isEvolved
+          ? 'rgba(220, 38, 38, 0.72)'
+          : 'rgba(245, 158, 11, 0.65)';
       ctx.beginPath();
       ctx.ellipse(screen.x, screen.y, s.width / 2, s.height / 2, 0, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = s.isEvolved ? '#fecaca' : '#ffffff';
+      ctx.strokeStyle = s.color ?? (s.isEvolved ? '#fecaca' : '#ffffff');
       ctx.lineWidth = 2.5;
       ctx.stroke();
       ctx.restore();
@@ -2686,6 +3572,168 @@ export class WeaponSystem {
           ctx.closePath();
           ctx.fill();
         }
+      } else if (p.type === 'jaguar_claw') {
+        ctx.strokeStyle = p.isEvolved ? '#fdba74' : '#f97316';
+        ctx.lineWidth = p.isEvolved ? 3.4 : 2.4;
+        for (let claw = -1; claw <= 1; claw++) {
+          ctx.beginPath();
+          ctx.moveTo(-p.radius * 0.7, claw * p.radius * 0.34);
+          ctx.quadraticCurveTo(0, claw * p.radius * 0.1, p.radius, claw * p.radius * 0.5);
+          ctx.stroke();
+        }
+        ctx.fillStyle = 'rgba(120, 53, 15, 0.55)';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, p.radius * 1.25, p.radius * 0.8, 0, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (p.type === 'pupunha_spike') {
+        ctx.fillStyle = p.isEvolved ? '#fef08a' : '#facc15';
+        ctx.beginPath();
+        ctx.moveTo(p.radius * 1.5, 0);
+        ctx.lineTo(-p.radius * 0.7, -p.radius * 0.42);
+        ctx.lineTo(-p.radius * 0.2, 0);
+        ctx.lineTo(-p.radius * 0.7, p.radius * 0.42);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#92400e';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      } else if (p.type === 'bullet_sting') {
+        ctx.fillStyle = '#3f3f46';
+        ctx.beginPath();
+        ctx.ellipse(-p.radius * 0.35, 0, p.radius * 0.9, p.radius * 0.55, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = p.isEvolved ? '#22c55e' : '#dc2626';
+        ctx.beginPath();
+        ctx.moveTo(p.radius * 1.7, 0);
+        ctx.lineTo(p.radius * 0.35, -p.radius * 0.42);
+        ctx.lineTo(p.radius * 0.35, p.radius * 0.42);
+        ctx.closePath();
+        ctx.fill();
+      } else if (p.type === 'saci_cyclone') {
+        ctx.strokeStyle = p.isEvolved ? '#38bdf8' : '#a16207';
+        ctx.lineWidth = 2.4;
+        for (let ring = 0; ring < 3; ring++) {
+          ctx.beginPath();
+          ctx.arc(0, 0, p.radius * (0.45 + ring * 0.3), ring * 1.1, ring * 1.1 + Math.PI * 1.2);
+          ctx.stroke();
+        }
+        ctx.fillStyle = p.isEvolved ? 'rgba(125, 211, 252, 0.25)' : 'rgba(120, 53, 15, 0.22)';
+        ctx.beginPath();
+        ctx.arc(0, 0, p.radius * 1.15, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (p.type === 'caipora_spear') {
+        ctx.fillStyle = '#78350f';
+        ctx.fillRect(-p.radius * 2.4, -1.5, p.radius * 3, 3);
+        ctx.fillStyle = '#84cc16';
+        ctx.beginPath();
+        ctx.moveTo(p.radius * 1.8, 0);
+        ctx.lineTo(p.radius * 0.6, -p.radius * 0.7);
+        ctx.lineTo(p.radius * 0.6, p.radius * 0.7);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#d9f99d';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      } else if (p.type === 'vitoria_spore') {
+        ctx.fillStyle = p.isEvolved ? '#34d399' : '#65a30d';
+        ctx.beginPath();
+        ctx.arc(0, 2, p.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#ecfccb';
+        ctx.lineWidth = 1.5;
+        for (let spot = 0; spot < 4; spot++) {
+          const a = (spot * Math.PI) / 2;
+          ctx.beginPath();
+          ctx.arc(Math.cos(a) * p.radius * 0.45, Math.sin(a) * p.radius * 0.45, 1.6, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      } else if (p.type === 'piranha_bite') {
+        ctx.fillStyle = '#dc2626';
+        ctx.beginPath();
+        ctx.moveTo(p.radius, 0);
+        ctx.lineTo(-p.radius, -p.radius * 0.8);
+        ctx.lineTo(-p.radius * 0.45, 0);
+        ctx.lineTo(-p.radius, p.radius * 0.8);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#fef2f2';
+        ctx.beginPath();
+        ctx.moveTo(p.radius * 0.6, 0);
+        ctx.lineTo(0, -p.radius * 0.24);
+        ctx.lineTo(0, p.radius * 0.24);
+        ctx.closePath();
+        ctx.fill();
+      } else if (p.type === 'mutuca') {
+        ctx.fillStyle = '#334155';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, p.radius * 1.2, p.radius * 0.6, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(226, 232, 240, 0.65)';
+        ctx.beginPath();
+        ctx.ellipse(-p.radius * 0.2, -p.radius * 0.75, p.radius * 0.9, p.radius * 0.35, -0.4, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (p.type === 'resin_drop') {
+        ctx.fillStyle = '#f59e0b';
+        ctx.beginPath();
+        ctx.arc(0, 2, p.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#fef3c7';
+        ctx.beginPath();
+        ctx.arc(-p.radius * 0.25, -p.radius * 0.2, p.radius * 0.3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#b45309';
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.moveTo(0, -p.radius * 1.6);
+        ctx.lineTo(0, -p.radius);
+        ctx.stroke();
+      } else if (p.type === 'tucano') {
+        ctx.fillStyle = '#111827';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, p.radius * 1.2, p.radius * 0.72, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#f97316';
+        ctx.beginPath();
+        ctx.moveTo(p.radius * 1.35, 0);
+        ctx.lineTo(p.radius * 0.55, -p.radius * 0.42);
+        ctx.lineTo(p.radius * 0.55, p.radius * 0.42);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#facc15';
+        ctx.beginPath();
+        ctx.arc(-p.radius * 0.1, -p.radius * 0.18, p.radius * 0.25, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (p.type === 'spider_web') {
+        ctx.strokeStyle = 'rgba(241, 245, 249, 0.9)';
+        ctx.lineWidth = 1.2;
+        for (let spoke = 0; spoke < 6; spoke++) {
+          const a = (spoke * Math.PI) / 3;
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(Math.cos(a) * p.radius, Math.sin(a) * p.radius);
+          ctx.stroke();
+        }
+        for (let ring = 1; ring <= 2; ring++) {
+          ctx.beginPath();
+          ctx.arc(0, 0, (p.radius * ring) / 2, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      } else if (p.type === 'sucuri') {
+        ctx.fillStyle = '#166534';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, p.radius * 1.7, p.radius * 0.72, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#4ade80';
+        for (let spot = -2; spot <= 2; spot++) {
+          ctx.beginPath();
+          ctx.arc(spot * p.radius * 0.45, 0, p.radius * 0.14, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.fillStyle = '#facc15';
+        ctx.beginPath();
+        ctx.arc(p.radius * 1.2, -p.radius * 0.18, p.radius * 0.16, 0, Math.PI * 2);
+        ctx.arc(p.radius * 1.2, p.radius * 0.18, p.radius * 0.16, 0, Math.PI * 2);
+        ctx.fill();
       }
 
       ctx.restore();
@@ -2756,7 +3804,8 @@ export class WeaponSystem {
     // 1. Priority 1: Evolution at the weapon's maximum level with its synergy passive.
     const readyEvolutions: UpgradeOption[] = [];
     for (const [wId, w] of this.weapons.entries()) {
-      if (w.level >= w.maxLevel && !w.evolved) {
+      // Amazon Forest progression is fusion-only; chests never use the old evolutions.
+      if (!this.maxItemLevel && w.level >= w.maxLevel && !w.evolved) {
         const meta = WEAPON_REGISTRY[wId];
         if (this.passives.has(meta.synergyPassive)) {
           readyEvolutions.push({
@@ -2823,6 +3872,32 @@ export class WeaponSystem {
     return undefined;
   }
 
+  /** Returns one card per exact 10/10 fusion recipe currently owned. */
+  private collectFusionOptions(): UpgradeOption[] {
+    if (!this.maxItemLevel) return [];
+    const ready: UpgradeOption[] = [];
+    for (const recipe of FUSION_RECIPES) {
+      const weapon = this.weapons.get(recipe.weaponId);
+      const passive = this.passives.get(recipe.passiveId);
+      if (weapon?.level === 10 && passive?.level === 10) {
+        ready.push({
+          type: 'fusion',
+          id: recipe.resultId,
+          baseId: recipe.weaponId,
+          fusionPassiveId: recipe.passiveId,
+          name: recipe.name,
+          description: recipe.description,
+          level: 1,
+          isNew: true,
+          isEvolution: true,
+          isFusion: true,
+          iconName: recipe.iconName,
+        });
+      }
+    }
+    return ready;
+  }
+
   generateUpgradeOptions(): UpgradeOption[] {
     interface WeightedCandidate {
       option: UpgradeOption;
@@ -2857,9 +3932,10 @@ export class WeaponSystem {
       }
     }
 
-    // 2. New weapons (Amazon Forest caps the category at 4 slots).
+    // 2. New weapons (Amazon Forest uses its 15-attack catalogue and caps at 4 slots).
     if (this.weapons.size < this.maxWeaponSlots) {
-      for (const wId of ALL_WEAPON_IDS) {
+      const weaponPool = this.maxItemLevel ? AMAZON_WEAPON_IDS : ALL_WEAPON_IDS;
+      for (const wId of weaponPool) {
         if (!this.weapons.has(wId)) {
           const meta = WEAPON_REGISTRY[wId];
           const passiveMeta = PASSIVE_REGISTRY[meta.synergyPassive];
@@ -2908,9 +3984,10 @@ export class WeaponSystem {
       }
     }
 
-    // 4. New passives (Amazon Forest caps the category at 4 slots).
+    // 4. New passives (Amazon Forest uses its 10-buff catalogue and caps at 4 slots).
     if (this.passives.size < this.maxPassiveSlots) {
-      for (const pId of ALL_PASSIVE_IDS) {
+      const passivePool = this.maxItemLevel ? AMAZON_PASSIVE_IDS : ALL_PASSIVE_IDS;
+      for (const pId of passivePool) {
         if (!this.passives.has(pId)) {
           const meta = PASSIVE_REGISTRY[pId];
           const weaponMeta = WEAPON_REGISTRY[meta.synergyWeapon];
@@ -2934,7 +4011,8 @@ export class WeaponSystem {
       }
     }
 
-    if (candidates.length === 0) return [];
+    const fusionChoices = this.collectFusionOptions();
+    if (candidates.length === 0) return fusionChoices.slice(0, 3);
 
     const pickWeighted = (pool: WeightedCandidate[]): WeightedCandidate => {
       const total = pool.reduce((sum, item) => sum + item.weight, 0);
@@ -2969,6 +4047,13 @@ export class WeaponSystem {
     for (let i = chosen.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [chosen[i], chosen[j]] = [chosen[j], chosen[i]];
+    }
+
+    // A ready Supreme Fusion always gets its own special card on that level-up.
+    if (fusionChoices.length > 0) {
+      const fusion = fusionChoices[Math.floor(Math.random() * fusionChoices.length)];
+      if (chosen.length >= 3) chosen.pop();
+      chosen.unshift(fusion);
     }
 
     return chosen;

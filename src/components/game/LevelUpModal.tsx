@@ -41,14 +41,17 @@ export const LevelUpModal: React.FC<LevelUpModalProps> = ({ options, onSelect })
         <div className="w-full flex flex-col gap-3">
           {options.map((opt, index) => {
             const isEvolution = opt.isEvolution;
+            const isFusion = opt.isFusion;
             return (
               <button
                 key={`${opt.id}-${index}`}
                 onClick={() => onSelect(opt)}
                 className={`group w-full flex items-center gap-4 p-3.5 sm:p-4 rounded-xl border-2 transition-all duration-150 text-left cursor-pointer active:scale-[0.99] relative overflow-hidden ${
-                  isEvolution
-                    ? 'bg-gradient-to-r from-purple-950/80 via-slate-900 to-rose-950/80 border-amber-400 hover:border-amber-300 shadow-lg shadow-purple-500/20'
-                    : opt.hasSynergyOwned
+                  isFusion
+                    ? 'bg-gradient-to-r from-amber-950/90 via-slate-900 to-emerald-950/80 border-yellow-300 hover:border-yellow-200 shadow-lg shadow-amber-500/30'
+                    : isEvolution
+                      ? 'bg-gradient-to-r from-purple-950/80 via-slate-900 to-rose-950/80 border-amber-400 hover:border-amber-300 shadow-lg shadow-purple-500/20'
+                      : opt.hasSynergyOwned
                       ? 'bg-slate-900/95 hover:bg-slate-850 border-emerald-500/70 hover:border-amber-400 shadow-md shadow-emerald-500/10'
                       : 'bg-slate-900/90 hover:bg-slate-850 border-slate-700/80 hover:border-amber-500/80 shadow-md'
                 }`}
@@ -61,9 +64,11 @@ export const LevelUpModal: React.FC<LevelUpModalProps> = ({ options, onSelect })
                 {/* Icon Box */}
                 <div
                   className={`w-14 h-14 shrink-0 rounded-xl flex items-center justify-center border shadow-inner ${
-                    isEvolution
-                      ? 'bg-purple-900/50 border-amber-400'
-                      : 'bg-slate-950 border-slate-700 group-hover:border-slate-500'
+                    isFusion
+                      ? 'bg-amber-900/60 border-yellow-300'
+                      : isEvolution
+                        ? 'bg-purple-900/50 border-amber-400'
+                        : 'bg-slate-950 border-slate-700 group-hover:border-slate-500'
                   }`}
                 >
                   {renderNamedIcon(opt.iconName, 'w-8 h-8')}
@@ -77,7 +82,11 @@ export const LevelUpModal: React.FC<LevelUpModalProps> = ({ options, onSelect })
                     </h3>
 
                     {/* Tag badge */}
-                    {isEvolution ? (
+                    {isFusion ? (
+                      <span className="bg-gradient-to-r from-yellow-300 via-amber-400 to-emerald-400 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse">
+                        ⚡ FUSÃO SUPREMA!
+                      </span>
+                    ) : isEvolution ? (
                       <span className="bg-gradient-to-r from-amber-500 to-rose-500 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse">
                         🔥 EVOLUÇÃO!
                       </span>
@@ -118,7 +127,7 @@ export const LevelUpModal: React.FC<LevelUpModalProps> = ({ options, onSelect })
         <div className="mt-4 text-slate-500 text-[11px] text-center">
           Pressione <span className="text-amber-400 font-mono">[1]</span>,{' '}
           <span className="text-amber-400 font-mono">[2]</span> ou{' '}
-          <span className="text-amber-400 font-mono">[3]</span> no teclado • Evoluções ocorrem nos Baús de Elite
+          <span className="text-amber-400 font-mono">[3]</span> no teclado • Evoluções ocorrem nos Baús de Elite • Fusões Supremas exigem dois itens no Nível 10
         </div>
       </div>
     </div>

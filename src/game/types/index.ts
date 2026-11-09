@@ -1,3 +1,27 @@
+export type AmazonWeaponId =
+  | 'garras_onca'
+  | 'espinhos_pupunha'
+  | 'ferrao_formiga'
+  | 'bandeja_inox'
+  | 'ciclone_saci'
+  | 'lanca_caipora'
+  | 'esporos_vitoria'
+  | 'mordida_piranha'
+  | 'rugido_mapinguari'
+  | 'chicotada_cipo'
+  | 'enxame_mutuca'
+  | 'gota_resina'
+  | 'voo_tucano'
+  | 'teia_aranha'
+  | 'arrancada_sucuri';
+
+export type SupremeWeaponId =
+  | 'furia_onca_acu'
+  | 'metralha_floresta'
+  | 'nuvem_biologica'
+  | 'tempestade_lendaria'
+  | 'injecao_letal';
+
 export type WeaponId =
   | 'bottle_51'
   | 'wand'
@@ -12,7 +36,9 @@ export type WeaponId =
   | 'syringe'
   | 'fire_flask'
   | 'executioner_axe'
-  | 'lula_power';
+  | 'lula_power'
+  | AmazonWeaponId
+  | SupremeWeaponId;
 
 export type EvolvedWeaponId =
   | 'rain_51'
@@ -28,7 +54,21 @@ export type EvolvedWeaponId =
   | 'supreme_serum'
   | 'purifying_blaze'
   | 'death_spiral'
-  | 'poder_do_l_maximo';
+  | 'poder_do_l_maximo'
+  | AmazonWeaponId
+  | SupremeWeaponId;
+
+export type AmazonPassiveId =
+  | 'casco_tartaruga'
+  | 'essencia_acai'
+  | 'energia_guarana'
+  | 'raiz_ginseng'
+  | 'casca_marupa'
+  | 'olho_gato_maracaja'
+  | 'vigor_anta'
+  | 'plumas_arara'
+  | 'coracao_jacare'
+  | 'resiliencia_preguica';
 
 export type PassiveId =
   | 'spinach'
@@ -42,7 +82,8 @@ export type PassiveId =
   | 'hourglass'
   | 'duplicator'
   | 'hunter_mark'
-  | 'bio_shield';
+  | 'bio_shield'
+  | AmazonPassiveId;
 
 export interface WeaponInstance {
   id: WeaponId;
@@ -92,14 +133,16 @@ export interface CharacterConfig {
 }
 
 export interface UpgradeOption {
-  type: 'weapon' | 'passive' | 'evolution';
+  type: 'weapon' | 'passive' | 'evolution' | 'fusion';
   id: WeaponId | PassiveId | EvolvedWeaponId;
   baseId?: WeaponId;
+  fusionPassiveId?: PassiveId;
   name: string;
   description: string;
   level: number;
   isNew: boolean;
   isEvolution?: boolean;
+  isFusion?: boolean;
   synergyWith?: string;
   hasSynergyOwned?: boolean;
   iconName: string;
