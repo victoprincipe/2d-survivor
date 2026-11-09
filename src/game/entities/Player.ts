@@ -93,6 +93,9 @@ export class Player {
   public stunTimer: number = 0;
   /** 0–1 fraction of stun duration removed by Amazon passives. */
   public stunResistance: number = 0;
+  // External impulse (Caipora's charge) that drags the hero through the world.
+  public knockbackVX: number = 0;
+  public knockbackVY: number = 0;
   public attackSpeedBoostTimer: number = 0;
   public shieldTimer: number = 0;
   // Thorn bush wound: damage every second until cured by the São-Caetano herb.
@@ -251,6 +254,12 @@ export class Player {
     this.jumpTimer = 0;
   }
 
+  /** Pushes the hero with an external impulse (Caipora's charge). */
+  public applyKnockback(velocityX: number, velocityY: number): void {
+    this.knockbackVX = velocityX;
+    this.knockbackVY = velocityY;
+  }
+
   update(dt: number, input: InputManager): boolean {
     // Simulation time keeps animation frozen whenever the engine is paused.
     this.idleAnimTimer = (this.idleAnimTimer + dt) % 4;
@@ -400,6 +409,16 @@ export class Player {
     } else if (moving) {
       this.facingX = input.facingX;
       this.facingY = input.facingY;
+    }
+
+    if (this.knockbackVX !== 0 || this.knockbackVY !== 0) {
+      moveX += this.knockbackVX * dt;
+      moveY += this.knockbackVY * dt;
+      const decay = Math.pow(0.02, dt);
+      this.knockbackVX *= decay;
+      this.knockbackVY *= decay;
+      if (Math.abs(this.knockbackVX) < 1) this.knockbackVX = 0;
+      if (Math.abs(this.knockbackVY) < 1) this.knockbackVY = 0;
     }
 
     if (moveX !== 0 || moveY !== 0) {

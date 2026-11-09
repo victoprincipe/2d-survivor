@@ -77,6 +77,10 @@ interface BossHazard {
   tickTimer: number;
   damage: number;
   windStrength: number;
+  // Wind combo: after the whirlpool pulls the hero, it flings them toward
+  // Matinta Pereira's line of sonic waves.
+  windTargetX?: number;
+  windTargetY?: number;
 }
 
 interface WaterRipple {
@@ -369,6 +373,10 @@ export class GameEngine {
   private playerWaterFxTimer: number = 0;
   private floodCycleTime: number = 0;
   private floodPhysicsActive: boolean = false;
+  // Amazon elemental combo presence, refreshed once per frame.
+  private fireComboActive: boolean = false;
+  private windComboActive: boolean = false;
+  private earthComboActive: boolean = false;
 
   public kills: number = 0;
   public goldCollected: number = 0;
@@ -628,6 +636,9 @@ export class GameEngine {
       return;
     }
 
+    // 2.1. Refresh which Amazon elemental combos are currently on the field.
+    this.updateAmazonElementalCombos();
+
     // 1.5. Water trail for the hero (and timers for the animal trails below).
     this.updateWaterEffects(dt);
 
@@ -756,8 +767,10 @@ export class GameEngine {
       // Aquatic enemies are locked to the water: reject any step that would
       // carry them onto the riverbank or dry forest floor. The Ariranha may
       // also slide through the muddy margin, while river predators may haul
-      // out onto the beach but never leave the river/beach band.
-      if (e.isRiverPredator) {
+      // out onto the beach but never leave the river/beach band. The
+      // Cobra-Grande's Earth-combo trample is the exception and may cross land.
+      const cobraTrampling = e.type === 'boss_cobra_grande' && e.comboChargeActive;
+      if (e.isRiverPredator && !cobraTrampling) {
         const resolved = this.worldProps.resolveRiverBankMovement(
           previousX,
           previousY,
@@ -932,6 +945,29 @@ export class GameEngine {
         this.vfx.addSparks(e.x, e.y, '#fb923c', isBoitata ? 4 : 10);
       }
 
+      if (e.pendingEncirclingEmbers && this.fireComboActive) {
+        e.pendingEncirclingEmbers = false;
+        const ringCount = 4;
+        const ringOffset = e.animTimer * 0.6 + Math.random() * 0.5;
+        const damage = Math.max(1, Math.round(e.damage * 0.25));
+        for (let k = 0; k < ringCount; k++) {
+          const ringAngle = ringOffset + (k * Math.PI * 2) / ringCount;
+          const ringRadius = 96 + Math.random() * 22;
+          this.bossHazards.push({
+            x: this.player.x + Math.cos(ringAngle) * ringRadius,
+            y: this.player.y + Math.sin(ringAngle) * ringRadius,
+            radius: 24,
+            life: 3.5,
+            maxLife: 3.5,
+            kind: 'ember',
+            tickTimer: 0,
+            damage,
+            windStrength: 0,
+          });
+        }
+        this.vfx.addSparks(this.player.x, this.player.y, '#fb923c', 8);
+      }
+
       if (e.pendingFireRing > 0) {
         const count = e.pendingFireRing;
         e.pendingFireRing = 0;
@@ -970,17 +1006,25 @@ export class GameEngine {
         );
         e.x = resolved.x;
         e.y = resolved.y;
+        // Wind combo: the whirlpool pulls the hero in, then flings them toward
+        // Matinta Pereira while she fires a synchronized sonic wave.
+        const matinta = this.windComboActive
+          ? this.enemies.find((other) => other.type === 'boss_matinta' && other.hp > 0)
+          : undefined;
         this.bossHazards.push({
           x: oldX,
           y: oldY,
-          radius: 230,
-          life: 3.6,
-          maxLife: 3.6,
+          radius: matinta ? 320 : 230,
+          life: matinta ? 1.4 : 3.6,
+          maxLife: matinta ? 1.4 : 3.6,
           kind: 'wind',
           tickTimer: 0,
           damage: 0,
-          windStrength: Math.random() < 0.5 ? 170 : -170,
+          windStrength: matinta ? -260 : Math.random() < 0.5 ? 170 : -170,
+          windTargetX: matinta?.x,
+          windTargetY: matinta?.y,
         });
+        if (matinta) matinta.pendingSonicWave = true;
         this.vfx.addDeathBurst(oldX, oldY, '#94a3b8', 12);
         this.vfx.addSparks(e.x, e.y, '#f472b6', 14);
       }
@@ -1183,7 +1227,7 @@ export class GameEngine {
         const stompDy = this.player.y - e.y;
         const stompDist = Math.sqrt(stompDx * stompDx + stompDy * stompDy);
         if (stompDist < 190 + this.player.radius) {
-          this.player.applyStun(1.15);
+          this.player.applyStun(this.earthComboActive ? 1.5 : 1.15);
           const stompDamage = Math.max(1, Math.round(e.damage * 0.7));
           const fatal = this.applyPlayerDamage(stompDamage, false, false);
           if (fatal) {
@@ -1230,7 +1274,18 @@ export class GameEngine {
         ? e.chargeHits(this.player, previousX, previousY)
         : dist < this.player.radius + e.radius;
       if (!e.isSubmerged && !e.jaguarBusy && !(e instanceof GorillaBoss && (e.isLeaping || e.isRoaring)) && !this.player.isJumping && bodyHit) {
-        const fatal = this.applyPlayerDamage(e.damage, false, true);
+        // Fire combo: Caipora's mounted charge knocks the hero away, ideally
+        // into the flame ring left by Boitatá and Curupira.
+        if (e.type === 'boss_caipora' && e.skillState === 'dashing' && this.fireComboActive && dist > 0) {
+          this.player.applyKnockback((dx / dist) * 520, (dy / dist) * 520);
+        }
+        // Earth combo: the Cobra-Grande's committed trample deals massive damage.
+        const trampling = e.type === 'boss_cobra_grande' && e.comboChargeActive;
+        const contactDamage = trampling
+          ? Math.max(1, Math.round(e.damage * 2.4))
+          : e.damage;
+        const fatal = this.applyPlayerDamage(contactDamage, trampling, true);
+        if (trampling) this.camera.shake(0.32, 9);
 
         if (fatal) {
           this.handlePlayerDeath();
@@ -1332,6 +1387,56 @@ export class GameEngine {
     if (this.hudThrottleTimer >= 0.1) {
       this.hudThrottleTimer = 0;
       this.syncHUD();
+    }
+  }
+
+  /**
+   * Detects which folklore bosses share the battlefield and enables their
+   * coordinated attacks. The fire trio counts as active with any two of its
+   * guardians so the combo also works on Hard (two bosses per wave); the wind
+   * and earth duos need both of their members.
+   */
+  private updateAmazonElementalCombos(): void {
+    let fireCount = 0;
+    let saci = false;
+    let matinta = false;
+    let mapinguari = false;
+    let cobra = false;
+
+    if (this.waveDirector.isAmazonForest) {
+      for (let i = 0; i < this.enemies.length; i++) {
+        const e = this.enemies[i];
+        if (!e.isBoss || e.hp <= 0) continue;
+        if (
+          e.type === 'boss_boitata' ||
+          e.type === 'boss_curupira' ||
+          e.type === 'boss_caipora'
+        ) {
+          fireCount += 1;
+        } else if (e.type === 'boss_saci') {
+          saci = true;
+        } else if (e.type === 'boss_matinta') {
+          matinta = true;
+        } else if (e.type === 'boss_mapinguari') {
+          mapinguari = true;
+        } else if (e.type === 'boss_cobra_grande') {
+          cobra = true;
+        }
+      }
+    }
+
+    this.fireComboActive = fireCount >= 2;
+    this.windComboActive = saci && matinta;
+    this.earthComboActive = mapinguari && cobra;
+
+    const stunned = this.player.stunTimer > 0;
+    for (let i = 0; i < this.enemies.length; i++) {
+      const e = this.enemies[i];
+      if (!e.isBoss) continue;
+      e.fireComboActive = this.fireComboActive;
+      e.earthComboActive = this.earthComboActive;
+      e.playerStunned = stunned;
+      if (!this.fireComboActive) e.pendingEncirclingEmbers = false;
     }
   }
 
@@ -1948,10 +2053,24 @@ export class GameEngine {
       if (h.kind === 'wind') {
         if (dist < h.radius) {
           const falloff = 1 - dist / h.radius;
-          const dirX = dist > 0 ? dx / dist : 1;
-          const dirY = dist > 0 ? dy / dist : 0;
-          const moveX = dirX * h.windStrength * falloff * dt;
-          const moveY = dirY * h.windStrength * falloff * dt;
+          const pullPhase = h.maxLife - h.life < 0.55;
+          const targetX = h.windTargetX;
+          const targetY = h.windTargetY;
+          let dirX = dist > 0 ? dx / dist : 1;
+          let dirY = dist > 0 ? dy / dist : 0;
+          let strength = h.windStrength;
+          let factor = falloff;
+          if (!pullPhase && targetX !== undefined && targetY !== undefined) {
+            const tdx = targetX - this.player.x;
+            const tdy = targetY - this.player.y;
+            const targetDist = Math.sqrt(tdx * tdx + tdy * tdy) || 1;
+            dirX = tdx / targetDist;
+            dirY = tdy / targetDist;
+            strength = 300;
+            factor = 1;
+          }
+          const moveX = dirX * strength * factor * dt;
+          const moveY = dirY * strength * factor * dt;
           if (this.player.collisionResolver) {
             const resolved = this.player.collisionResolver(
               this.player.x,

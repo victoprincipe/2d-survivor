@@ -132,6 +132,14 @@ export class Enemy {
   // Cobra-Grande (long lunges) and Boitatá (fire trail + radial fireballs).
   public emberTrailTimer: number = 0;
   public pendingFireRing: number = 0;
+  // Elemental combo coordination, refreshed by the engine every frame.
+  public fireComboActive: boolean = false;
+  public earthComboActive: boolean = false;
+  public playerStunned: boolean = false;
+  public comboEmberTimer: number = 0;
+  public pendingEncirclingEmbers: boolean = false;
+  public comboChargeActive: boolean = false;
+  public comboChargeCooldown: number = 0;
 
   constructor(id: number, type: EnemyType, x: number, y: number, hpMultiplier: number = 1.0) {
     this.id = id;
@@ -757,17 +765,24 @@ export class Enemy {
     const movementMult = speedMult * (this.isAmazonNight ? 1.25 : 1.0);
 
     // River predators flee while the hero stays in the forest. They only
-    // charge (and use their skills) once the hero steps into the water.
+    // charge (and use their skills) once the hero steps into the water. The
+    // Earth combo is the exception: a stunned hero lets the Cobra-Grande haul
+    // out and commit to its colossal trample.
     if (this.isRiverPredator && !this.playerInWater) {
-      // Cancel any charge/lunge started while the hero was still in the water.
-      this.skillState = 'idle';
-      this.skillStateTimer = 0;
-      if (dist > 0) {
-        const fleeSpeed = this.speed * movementMult;
-        this.x += (-dx / dist) * fleeSpeed * dt;
-        this.y += (-dy / dist) * fleeSpeed * dt;
+      const canTrample =
+        this.type === 'boss_cobra_grande' &&
+        (this.comboChargeActive || (this.earthComboActive && this.playerStunned));
+      if (!canTrample) {
+        // Cancel any charge/lunge started while the hero was still in the water.
+        this.skillState = 'idle';
+        this.skillStateTimer = 0;
+        if (dist > 0) {
+          const fleeSpeed = this.speed * movementMult;
+          this.x += (-dx / dist) * fleeSpeed * dt;
+          this.y += (-dy / dist) * fleeSpeed * dt;
+        }
+        return this.hp > 0;
       }
-      return this.hp > 0;
     }
 
     if (this.isJaguarPredator && this.updateJaguar(dt, player, dist)) return this.hp > 0;
@@ -782,12 +797,14 @@ export class Enemy {
         this.type === 'boss_gorilla'
           ? GORILLA_CHARGE.speed
           : this.type === 'boss_cobra_grande'
-          ? 620
-          : this.type === 'boss_boitata'
-            ? 340
-            : this.isBoss
-              ? 275
-              : 210;
+            ? this.comboChargeActive
+              ? 820
+              : 620
+            : this.type === 'boss_boitata'
+              ? 340
+              : this.isBoss
+                ? 275
+                : 210;
       const dashSpeed = baseDashSpeed * movementMult;
       this.x += this.dashDirX * dashSpeed * dt;
       this.y += this.dashDirY * dashSpeed * dt;
@@ -1010,6 +1027,19 @@ export class Enemy {
     dist: number,
     speedMult: number
   ): void {
+    // Fire combo: Boitatá and Curupira seed a rotating ring of flames around
+    // the hero on top of their usual trails.
+    if (
+      this.fireComboActive &&
+      (this.type === 'boss_boitata' || this.type === 'boss_curupira')
+    ) {
+      this.comboEmberTimer -= dt;
+      if (this.comboEmberTimer <= 0) {
+        this.comboEmberTimer = this.type === 'boss_boitata' ? 1.3 : 1.9;
+        this.pendingEncirclingEmbers = true;
+      }
+    }
+
     // Boitatá leaves a continuous line of fire behind it wherever it slithers.
     if (this.type === 'boss_boitata') {
       this.emberTrailTimer -= dt;
@@ -1021,6 +1051,49 @@ export class Enemy {
 
     // Cobra-Grande uses long, fast lunges that carry it across land and river.
     if (this.type === 'boss_cobra_grande') {
+      this.comboChargeCooldown = Math.max(0, this.comboChargeCooldown - dt);
+
+      // Earth combo: the Cobra detects a stunned hero and commits to a much
+      // longer, straight-line trample.
+      if (this.comboChargeActive) {
+        if (this.skillState === 'telegraph_dash') {
+          this.skillStateTimer -= dt;
+          if (this.skillStateTimer <= 0) {
+            this.skillState = 'dashing';
+            this.skillDuration = 1.2;
+            this.skillStateTimer = 1.2;
+          }
+          return;
+        }
+        if (this.skillState === 'dashing') {
+          this.skillStateTimer -= dt;
+          if (this.skillStateTimer <= 0) {
+            this.skillState = 'idle';
+            this.comboChargeActive = false;
+            this.skillCooldown = 2.4;
+          }
+          return;
+        }
+        this.comboChargeActive = false;
+      }
+      if (
+        this.skillState === 'idle' &&
+        this.earthComboActive &&
+        this.playerStunned &&
+        this.comboChargeCooldown <= 0 &&
+        dist <= 900
+      ) {
+        const trampleNorm = dist > 0 ? dist : 1;
+        this.dashDirX = dx / trampleNorm;
+        this.dashDirY = dy / trampleNorm;
+        this.skillState = 'telegraph_dash';
+        this.skillDuration = 0.45;
+        this.skillStateTimer = 0.45;
+        this.comboChargeActive = true;
+        this.comboChargeCooldown = 5.5;
+        return;
+      }
+
       if (this.skillState === 'telegraph_dash') {
         this.skillStateTimer -= dt;
         if (this.skillStateTimer <= 0) {
@@ -1068,7 +1141,7 @@ export class Enemy {
         this.skillStateTimer -= dt;
         if (this.skillStateTimer <= 0) {
           this.skillState = 'idle';
-          this.skillCooldown = 3.0;
+          this.skillCooldown = this.fireComboActive ? 1.8 : 3.0;
         }
         return;
       }
@@ -1102,17 +1175,19 @@ export class Enemy {
       }
       this.skillCooldown = 2.8;
     } else if (this.type === 'boss_caipora') {
-      if (this.bossSkillIndex % 2 === 0) {
+      // Fire combo: Caipora skips the wild summons and charges relentlessly,
+      // driving the hero into the flame ring left by the other guardians.
+      if (this.fireComboActive || this.bossSkillIndex % 2 === 0) {
         const norm = dist > 0 ? dist : 1;
         this.dashDirX = dx / norm;
         this.dashDirY = dy / norm;
         this.skillState = 'telegraph_dash';
-        this.skillDuration = 0.5;
-        this.skillStateTimer = 0.5;
+        this.skillDuration = this.fireComboActive ? 0.38 : 0.5;
+        this.skillStateTimer = this.skillDuration;
       } else {
         this.pendingSummonWild = 5;
       }
-      this.skillCooldown = 3.2;
+      this.skillCooldown = this.fireComboActive ? 1.8 : 3.2;
     } else if (this.type === 'boss_matinta') {
       if (this.bossSkillIndex % 2 === 0) {
         this.pendingSonicWave = true;
