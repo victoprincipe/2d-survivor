@@ -116,6 +116,10 @@ const FLOOD_RECEDE_DURATION = 7;
 const FLOOD_CYCLE_DURATION =
   FLOOD_RISE_DURATION + FLOOD_HOLD_DURATION + FLOOD_RECEDE_DURATION;
 
+// While Iara's flood covers the forest, the Boto and the Vitória-Régia swim
+// 30% faster and their signature attacks sweep the newly flooded area.
+const FLOOD_RIVER_SPIRIT_SPEED_MULTIPLIER = 1.3;
+
 // Amazon Forest mission objectives.
 const OBJECTIVE_ACT1_FRUITS = 3;
 const OBJECTIVE_ACT1_LEVEL = 10;
@@ -688,6 +692,13 @@ export class GameEngine {
             : 1.0;
       } else if (e.type === 'giant_otter') {
         e.terrainSpeedMultiplier = enemyInMud ? MUD_OTTER_SPEED_MULTIPLIER : 1.0;
+      } else if (
+        this.floodPhysicsActive &&
+        (e.type === 'boss_boto' || e.type === 'boss_vitoria_regia')
+      ) {
+        // Iara's flood lets the river spirits leave the original river bed and
+        // swim across the whole flooded area with a 30% speed boost.
+        e.terrainSpeedMultiplier = FLOOD_RIVER_SPIRIT_SPEED_MULTIPLIER;
       } else if (e.isWaterDweller) {
         e.terrainSpeedMultiplier = 1.0;
       } else {
@@ -995,18 +1006,25 @@ export class GameEngine {
       if (e.pendingSoundWave) {
         e.pendingSoundWave = false;
         const baseAngle = Math.atan2(this.player.y - e.y, this.player.x - e.x);
-        this.camera.shake(0.12, 3);
-        for (let k = 0; k < 5; k++) {
-          const angle = baseAngle + (k - 2) * 0.22;
+        // During the flood the Boto widens and lengthens the fan so the hero
+        // cannot simply outrun it along the flooded banks.
+        const floodEmpowered = this.floodPhysicsActive;
+        const waveCount = floodEmpowered ? 7 : 5;
+        const waveSpread = floodEmpowered ? 0.25 : 0.22;
+        const waveSpeed = floodEmpowered ? 275 : 240;
+        const waveLife = floodEmpowered ? 3.6 : 3;
+        this.camera.shake(0.12, floodEmpowered ? 4 : 3);
+        for (let k = 0; k < waveCount; k++) {
+          const angle = baseAngle + (k - (waveCount - 1) / 2) * waveSpread;
           this.bossProjectiles.push({
             x: e.x,
             y: e.y,
-            vx: Math.cos(angle) * 240,
-            vy: Math.sin(angle) * 240,
-            radius: 11,
+            vx: Math.cos(angle) * waveSpeed,
+            vy: Math.sin(angle) * waveSpeed,
+            radius: floodEmpowered ? 12 : 11,
             damage: Math.max(1, Math.round(e.damage * 0.65)),
-            life: 3,
-            maxLife: 3,
+            life: waveLife,
+            maxLife: waveLife,
             kind: 'soundwave',
           });
         }
@@ -1111,21 +1129,26 @@ export class GameEngine {
       if (e.pendingSporeRing > 0) {
         const rings = e.pendingSporeRing;
         e.pendingSporeRing = 0;
-        this.vfx.addSparks(e.x, e.y, '#84cc16', 16);
+        // The flood carries the spores farther: denser rings that expand over
+        // the whole flooded area instead of only the old shoreline.
+        const floodEmpowered = this.floodPhysicsActive;
+        const sporeCount = floodEmpowered ? 20 : 16;
+        const sporeSpeed = floodEmpowered ? 220 : 190;
+        const sporeLife = floodEmpowered ? 4 : 3.4;
+        this.vfx.addSparks(e.x, e.y, '#84cc16', floodEmpowered ? 22 : 16);
         for (let ring = 0; ring < rings; ring++) {
-          const count = 16;
-          const offset = (ring * Math.PI) / count;
-          for (let k = 0; k < count; k++) {
-            const angle = offset + (k * Math.PI * 2) / count;
+          const offset = (ring * Math.PI) / sporeCount;
+          for (let k = 0; k < sporeCount; k++) {
+            const angle = offset + (k * Math.PI * 2) / sporeCount;
             this.bossProjectiles.push({
               x: e.x,
               y: e.y,
-              vx: Math.cos(angle) * 190,
-              vy: Math.sin(angle) * 190,
-              radius: 8,
+              vx: Math.cos(angle) * sporeSpeed,
+              vy: Math.sin(angle) * sporeSpeed,
+              radius: floodEmpowered ? 9 : 8,
               damage: Math.max(1, Math.round(e.damage * 0.45)),
-              life: 3.4,
-              maxLife: 3.4,
+              life: sporeLife,
+              maxLife: sporeLife,
               kind: 'spore',
             });
           }
