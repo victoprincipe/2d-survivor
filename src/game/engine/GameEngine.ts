@@ -1773,7 +1773,7 @@ export class GameEngine {
         this.vfx.addDeathBurst(prey.x, prey.y, '#ef4444', 10);
         this.vfx.addSparks(predator.x, predator.y, '#f97316', 8);
         const huntDelay =
-          predator.type === 'elite_black_caiman'
+          predator.type === 'elite_black_caiman' || predator.type === 'baby_black_caiman'
             ? 12
             : isJaguar
               ? 15

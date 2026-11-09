@@ -1,5 +1,6 @@
 import { DifficultyConfig, EnemyType, MapId } from '../types';
 import { Enemy } from '../entities/Enemy';
+import { BabyCaiman } from '../entities/BabyCaiman';
 import { Player } from '../entities/Player';
 import { Camera } from '../engine/Camera';
 import { SoundEngine } from '../engine/SoundEngine';
@@ -76,6 +77,11 @@ export class WaveDirector {
   private nextAmazonBossTime: number = 300;
   private nextAmazonEliteHordeTime: number = 1120;
   private amazonBossWave: number = 0;
+  // The adult Jacaré-açu and its hatchling are tracked on independent timers
+  // so the baby mechanic can never starve the adult out of the spawn rotation.
+  private nextAmazonCaimanTime: number = 95 + Math.random() * 55;
+  private nextAmazonBabyCaimanTime: number = 35 + Math.random() * 25;
+  private initialCaimanSpawned: boolean = false;
 
   constructor(
     difficulty: DifficultyConfig,
@@ -147,10 +153,52 @@ export class WaveDirector {
       return;
     }
 
+    // The adult Jacaré-açu is guaranteed at the start of an Amazon run and then
+    // keeps its own slow spawn cycle. The hatchling spawns independently on a
+    // faster timer. Both still obey the map's overall enemy cap.
+    if (this.isAmazonForest) {
+      if (!this.initialCaimanSpawned && enemies.length < maxEnemies) {
+        this.initialCaimanSpawned = true;
+        const pos =
+          this.getWaterSpawnPosition(camera, 44) ??
+          (this.worldProps
+            ? this.worldProps.getNearestRiverPoint(camera.x)
+            : this.getSpawnPositionOutsideScreen(camera));
+        onSpawn(this.createEnemy('elite_black_caiman', pos.x, pos.y, hpMultiplier));
+      }
+
+      if (this.survivalTime >= this.nextAmazonCaimanTime && enemies.length < maxEnemies) {
+        this.nextAmazonCaimanTime = this.survivalTime + 95 + Math.random() * 55;
+        const pos = this.getWaterSpawnPosition(camera, 44);
+        if (pos) {
+          const adult = this.createEnemy(
+            'elite_black_caiman',
+            pos.x,
+            pos.y,
+            hpMultiplier * 1.05
+          );
+          this.triggerAlert(`⚠️ ${adult.name.toUpperCase()} SURGIU NO RIO!`, 4.5);
+          onSpawn(adult);
+        }
+      }
+
+      if (this.survivalTime >= this.nextAmazonBabyCaimanTime && enemies.length < maxEnemies) {
+        this.nextAmazonBabyCaimanTime = this.survivalTime + 35 + Math.random() * 25;
+        const pos = this.getWaterSpawnPosition(camera, 24);
+        if (pos) {
+          onSpawn(this.createEnemy('baby_black_caiman', pos.x, pos.y, hpMultiplier * 0.75));
+        }
+      }
+    }
+
     // Rare Amazon Forest elite: one of the map's oversized predators appears
     // from time to time on top of the regular waves. The Jacaré-açu only
     // replaces the land elite when there is water just outside the camera.
-    if (this.isAmazonForest && this.survivalTime >= this.nextAmazonEliteTime) {
+    if (
+      this.isAmazonForest &&
+      this.survivalTime >= this.nextAmazonEliteTime &&
+      enemies.length < maxEnemies
+    ) {
       this.nextAmazonEliteTime = this.survivalTime + 90 + Math.random() * 60;
       let eliteType =
         AMAZON_ELITE_ENEMIES[Math.floor(Math.random() * AMAZON_ELITE_ENEMIES.length)];
@@ -401,7 +449,10 @@ export class WaveDirector {
   }
 
   public createEnemy(type: EnemyType, x: number, y: number, hpMult: number): Enemy {
-    const enemy = new Enemy(this.nextEnemyId++, type, x, y, hpMult);
+    const enemy =
+      type === 'baby_black_caiman'
+        ? new BabyCaiman(this.nextEnemyId++, x, y, hpMult)
+        : new Enemy(this.nextEnemyId++, type, x, y, hpMult);
     enemy.damage = Math.max(1, Math.round(enemy.damage * this.difficulty.enemyDamage));
     enemy.xpValue = Math.max(1, Math.round(enemy.xpValue * this.difficulty.xpMultiplier));
 

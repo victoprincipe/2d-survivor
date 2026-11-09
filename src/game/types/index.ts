@@ -285,7 +285,10 @@ export type EnemyType =
   | 'piranha'
   | 'pink_river_dolphin'
   | 'giant_otter'
-  | 'elite_black_caiman';
+  // Adult Jacaré-açu and its hatchling are separate identities: the adult has
+  // its own spawn logic while the baby keeps the eat-and-grow mechanic.
+  | 'elite_black_caiman'
+  | 'baby_black_caiman';
 
 export type DropType =
   | 'gem_blue'

@@ -399,6 +399,18 @@ export class Enemy {
         this.isAquatic = true;
         this.skillCooldown = 4.5 + Math.random() * 1.5;
         break;
+      // The baby Caiman is a separate, weaker identity so the adult Jacaré-açu
+      // keeps its own stats, spawn pools and elite behaviour.
+      case 'baby_black_caiman':
+        this.name = 'Filhote de Jacaré-açu';
+        this.radius = 18;
+        this.maxHp = Math.round(150 * hpMultiplier);
+        this.speed = 95;
+        this.damage = 6;
+        this.xpValue = 45;
+        this.knockbackResistance = 1.05;
+        this.isAquatic = true;
+        break;
       case 'ghost':
         this.name = 'Espectro Noturno';
         this.radius = 16;
@@ -547,18 +559,18 @@ export class Enemy {
         break;
     }
 
-    // The common Jacaré-açu spawns as a tiny hatchling (1/6 of the adult
-    // sprite) with proportionally reduced health and contact damage. It grows
-    // back to adult size and beyond by devouring prey.
+    // The adult Jacaré-açu always starts at 1/3 of its normal sprite size,
+    // between the requested 1/2 and 1/3 range. The hatchling keeps the smaller
+    // 1/6 starting size and the established eat-and-grow mechanic.
     if (this.type === 'elite_black_caiman') {
+      this.growthScale = 1 / 3;
+    } else if (this.type === 'baby_black_caiman') {
       this.growthScale = 1 / 6;
-      this.maxHp = Math.max(1, Math.round(this.maxHp / 6));
-      this.damage = Math.max(1, Math.round(this.damage / 6));
     }
 
-    // Predators start their hunt cycle with the requested delay. The common
-    // Jacaré-açu hunts on a fixed 12 s cycle.
-    if (this.type === 'elite_black_caiman') {
+    // Predators start their hunt cycle with the requested delay. The Jacaré-açu
+    // and its hatchling hunt on a fixed 12 s cycle.
+    if (this.type === 'elite_black_caiman' || this.type === 'baby_black_caiman') {
       this.ecologyHuntTimer = 12;
     } else if (this.type === 'boss_cobra_grande' || this.type === 'sucuri') {
       this.ecologyHuntTimer = 10 + Math.random() * 2;
@@ -575,7 +587,11 @@ export class Enemy {
    * river and its beach. The regular Sucuri is not restricted this way.
    */
   public get isRiverPredator(): boolean {
-    return this.type === 'elite_black_caiman' || this.type === 'boss_cobra_grande';
+    return (
+      this.type === 'elite_black_caiman' ||
+      this.type === 'baby_black_caiman' ||
+      this.type === 'boss_cobra_grande'
+    );
   }
 
   /** Piranha, Boto-cor-de-rosa and Ariranha hide underwater unless the hero is wet. */
@@ -620,10 +636,11 @@ export class Enemy {
     return this.type === 'elite_tapir';
   }
 
-  /** Jacaré-açu, Sucuri and Onça-pintada grow by devouring other animals. */
+  /** Jacaré-açu, its hatchling, Sucuri and Onça-pintada grow by devouring prey. */
   public get isEcologyPredator(): boolean {
     return (
       this.type === 'elite_black_caiman' ||
+      this.type === 'baby_black_caiman' ||
       this.type === 'boss_cobra_grande' ||
       this.type === 'elite_jaguar' ||
       this.type === 'sucuri'
@@ -643,8 +660,9 @@ export class Enemy {
 
   /**
    * Grows after devouring prey. Jacaré-açu/Sucuri gain +15% max HP and +12%
-   * damage per meal; the Onça also becomes faster. The common Jacaré-açu adds
-   * +20% body size per meal, from hatchling to adult and beyond. No growth cap.
+   * damage per meal; the Onça also becomes faster. The Jacaré-açu and its
+   * hatchling add +20% body size per meal, from hatchling to adult and beyond.
+   * No growth cap.
    */
   public growFromPrey(): void {
     const oldMaxHp = this.maxHp;
@@ -657,7 +675,8 @@ export class Enemy {
       this.damage = Math.max(1, Math.round(this.damage * 1.12));
     }
     this.hp = Math.min(this.maxHp, this.hp + Math.max(1, this.maxHp - oldMaxHp));
-    this.growthScale *= this.type === 'elite_black_caiman' ? 1.2 : 1.07;
+    this.growthScale *=
+      this.type === 'elite_black_caiman' || this.type === 'baby_black_caiman' ? 1.2 : 1.07;
     this.ecologyFedCount += 1;
   }
 
@@ -2018,8 +2037,9 @@ export class Enemy {
       ctx.ellipse(2, 9 + paddle * 0.2, 5, 2.5, 0.2, 0, Math.PI * 2);
       ctx.ellipse(-10, 9 - paddle * 0.2, 5, 2.5, -0.2, 0, Math.PI * 2);
       ctx.fill();
-    } else if (this.type === 'elite_black_caiman') {
-      // Jacaré-açu: long dark snout, ridged back, heavy tail and pale teeth.
+    } else if (this.type === 'elite_black_caiman' || this.type === 'baby_black_caiman') {
+      // Jacaré-açu and its hatchling: dark snout, ridged back, heavy tail and
+      // pale teeth.
       ctx.save();
       const sway = Math.sin(this.animTimer * 1.9) * 2;
 

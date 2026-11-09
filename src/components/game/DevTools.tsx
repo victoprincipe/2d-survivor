@@ -55,7 +55,8 @@ const AMAZON_DEV_MONSTERS: { type: EnemyType; label: string }[] = [
   { type: 'piranha', label: '🐟 Piranha' },
   { type: 'pink_river_dolphin', label: '🐬 Boto-cor-de-rosa' },
   { type: 'giant_otter', label: '🦦 Ariranha' },
-  { type: 'elite_black_caiman', label: '🐊 Jacaré-açu' },
+  { type: 'elite_black_caiman', label: '🐊 Jacaré-açu Adulto' },
+  { type: 'baby_black_caiman', label: '🐊 Filhote de Jacaré-açu' },
 ];
 
 const AMAZON_DEV_BOSSES: { type: EnemyType; label: string }[] = [
