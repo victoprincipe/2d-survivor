@@ -17,9 +17,10 @@ import { PauseModal } from './PauseModal';
 import { DevTools } from './DevTools';
 import { GorillaDialogue } from './GorillaDialogue';
 import { ForestQuizDialogue } from './ForestQuizDialogue';
+import { EquipmentRewardModal } from './EquipmentRewardModal';
 import { ForestQuizView } from '@/game/data/forestQuiz';
 
-type GameState = 'menu' | 'playing' | 'paused' | 'level_up' | 'chest' | 'game_over' | 'victory' | 'dialogue' | 'quiz';
+type GameState = 'menu' | 'playing' | 'paused' | 'level_up' | 'chest' | 'game_over' | 'victory' | 'dialogue' | 'quiz' | 'equipment_reward';
 
 const DEFAULT_HUD: HUDState = {
   playerHp: 100,
@@ -93,6 +94,11 @@ export const GameContainer: React.FC = () => {
       }
 
       const engine = new GameEngine(canvas, character, currentSavedData, difficulty, mapId, {
+        onEquipmentReward: () => {
+          setSavedData(loadSavedData());
+          gameStateRef.current = 'equipment_reward';
+          setGameState('equipment_reward');
+        },
         onForestQuiz: quiz => {
           setForestQuiz(quiz);
           gameStateRef.current = 'quiz';
@@ -297,6 +303,11 @@ export const GameContainer: React.FC = () => {
       )}
 
       {/* Overlays / Modals */}
+      {gameState === 'equipment_reward' && <EquipmentRewardModal onClose={() => {
+        engineRef.current?.resume();
+        gameStateRef.current = 'playing';
+        setGameState('playing');
+      }} />}
       {gameState === 'quiz' && forestQuiz && (
         <ForestQuizDialogue quiz={forestQuiz} onAnswer={choice => {
           const next = engineRef.current?.answerForestQuiz(choice);

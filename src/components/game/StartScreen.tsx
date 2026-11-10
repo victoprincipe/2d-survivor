@@ -433,9 +433,9 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
                     key={char.id}
                     onClick={() => {
                       handleSelectCharacter(index);
-                      setIsEquipmentOpen(char.id === 'kayrurururu');
+                      setIsEquipmentOpen(true);
                     }}
-                    aria-label={char.id === 'kayrurururu' ? `Selecionar ${char.name} e abrir equipamento` : `Selecionar ${char.name}`}
+                    aria-label={`Selecionar ${char.name} e abrir equipamento`}
                     className={`char-card ${isSelected ? 'char-card-active' : ''}`}
                   >
                     <div>
@@ -573,7 +573,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
         </div>
       </div>
 
-      {isEquipmentOpen && selectedChar.id === 'kayrurururu' && (
+      {isEquipmentOpen && (
         <EquipmentModal character={selectedChar} savedData={savedData} onUpdateSave={onUpdateSave}
           onClose={() => setIsEquipmentOpen(false)} />
       )}

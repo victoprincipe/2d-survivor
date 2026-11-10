@@ -1,4 +1,18 @@
-import { CharacterConfig, CharacterInventory, EquipmentSlot, EquipmentStats } from '../types';
+import { CharacterConfig, CharacterInventory, EquipmentItem, EquipmentSlot, EquipmentStats } from '../types';
+
+export const GUARDIAN_BOW: EquipmentItem = {
+  id: 'guardian_bow', name: 'Arco do Guardião', slot: 'weapon',
+  stats: { attackSpeed: 0.1, bonusAmount: 1, critChance: 0.05 },
+};
+export function equipmentArtwork(id: string): string | undefined {
+  return id === GUARDIAN_BOW.id ? '/sprites/equipment/guardian-bow.svg' : undefined;
+}
+
+/** Repeated claims keep the same inventory and never duplicate the quest item. */
+export function claimGuardianBow(inventory: CharacterInventory): CharacterInventory {
+  if (!inventory.forestQuizCompleted || inventory.items.some(item => item.id === GUARDIAN_BOW.id)) return inventory;
+  return { ...inventory, items: [...inventory.items, { ...GUARDIAN_BOW, stats: { ...GUARDIAN_BOW.stats } }] };
+}
 
 export const EQUIPMENT_SLOTS: Record<EquipmentSlot, string> = {
   armor: 'Armadura', boots: 'Botas', gloves: 'Luvas', helmet: 'Capacete', weapon: 'Arma',
@@ -7,6 +21,7 @@ export const EQUIPMENT_STATS: Record<keyof EquipmentStats, { label: string; perc
   maxHp: { label: 'Vida máxima' }, armor: { label: 'Armadura' },
   might: { label: 'Dano', percent: true }, speed: { label: 'Velocidade', percent: true },
   recovery: { label: 'Regeneração/s' }, critChance: { label: 'Chance crítica', percent: true },
+  attackSpeed: { label: 'Velocidade de ataque', percent: true }, bonusAmount: { label: 'Projétil extra' },
 };
 export const emptyInventory = (): CharacterInventory => ({ items: [], equipped: {} });
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -18,6 +33,7 @@ export function normalizeInventories(value: unknown): Record<string, CharacterIn
   return Object.fromEntries(Object.entries(value).filter(([, data]) => isRecord(data)).map(([id, data]) => {
     const inventory = emptyInventory();
     const source = data as Record<string, unknown>;
+    inventory.forestQuizCompleted = source.forestQuizCompleted === true;
     for (const item of Array.isArray(source.items) ? source.items : []) {
       if (!isRecord(item) || typeof item.id !== 'string' || !item.id ||
           typeof item.name !== 'string' || typeof item.slot !== 'string' ||
@@ -31,6 +47,7 @@ export function normalizeInventories(value: unknown): Record<string, CharacterIn
       }
       inventory.items.push({ id: item.id, name: item.name, slot: item.slot as EquipmentSlot, stats });
     }
+    if (inventory.items.some(item => item.id === GUARDIAN_BOW.id)) inventory.forestQuizCompleted = true;
     for (const slot of Object.keys(EQUIPMENT_SLOTS) as EquipmentSlot[]) {
       const equippedId = isRecord(source.equipped) ? source.equipped[slot] : undefined;
       if (inventory.items.some((item) => item.id === equippedId && item.slot === slot)) inventory.equipped[slot] = equippedId as string;

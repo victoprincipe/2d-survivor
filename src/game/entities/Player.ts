@@ -205,6 +205,7 @@ export class Player {
     if (b.xpMultiplier) this.xpMultiplier += b.xpMultiplier;
     if (b.recovery) this.recoveryPerSec += b.recovery;
     if (b.critChance) this.critChance += b.critChance;
+    if (b.bonusAmount) this.bonusAmount += b.bonusAmount;
     if (b.area) this.areaMultiplier += b.area;
     if (b.speed) this.baseSpeed *= 1 + b.speed;
 

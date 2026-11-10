@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { FOREST_QUIZ_REWARD, ForestQuizView } from '@/game/data/forestQuiz';
+import { ForestQuizView } from '@/game/data/forestQuiz';
 
 export function ForestQuizDialogue({ quiz, onAnswer, onClose }: {
   quiz: ForestQuizView; onAnswer: (choice: number) => void; onClose: () => void;
@@ -22,11 +22,11 @@ export function ForestQuizDialogue({ quiz, onAnswer, onClose }: {
       <h2 id="forest-quiz-title" className="mb-4 text-2xl font-bold">Guardião dos Enigmas</h2>
       <div aria-live="polite" aria-atomic="true">
         {quiz.status === 'question' ? <>
-          <p className="mb-3 text-sm text-stone-400">Pergunta {quiz.index + 1} de {quiz.total} · Acerte todas e ganhe {FOREST_QUIZ_REWARD} de ouro.</p>
+          <p className="mb-3 text-sm text-stone-400">Pergunta {quiz.index + 1} de {quiz.total} · Prove sua sabedoria: acerte todas para abrir a caverna e resgatar o Arco do Guardião.</p>
           <p className="mb-5 text-lg">{quiz.text}</p>
         </> : <p className="mb-5 text-lg">
           {quiz.status === 'failed' ? 'Resposta incorreta, viajante. A recompensa exige sabedoria! Volte para tentar novamente.'
-            : `Você provou sua sabedoria! A recompensa de ${FOREST_QUIZ_REWARD} de ouro já foi entregue nesta partida.`}
+            : 'Você provou sua sabedoria! A caverna está aberta. Meu arco espera por você lá dentro. Use E para entrar e resgatar. Depois, equipe-o no inventário da seleção de personagem.'}
         </p>}
       </div>
       {quiz.status === 'question' && <div className="flex flex-col gap-3" key={quiz.index}>

@@ -15,7 +15,7 @@ import {
   DevTelemetrySnapshot,
   EnemyType,
 } from '../types';
-import { emptyInventory, withEquipment } from '../data/inventory';
+import { claimGuardianBow, emptyInventory, GUARDIAN_BOW, withEquipment } from '../data/inventory';
 import { Camera } from './Camera';
 import { InputManager } from './Input';
 import { SoundEngine } from './SoundEngine';
@@ -23,6 +23,7 @@ import { SpatialGrid } from './SpatialGrid';
 import { Player } from '../entities/Player';
 import { Enemy } from '../entities/Enemy';
 import { GorillaNpc } from '../entities/GorillaNpc';
+import { CaveInterior } from '../entities/CaveInterior';
 import { QuizKeeper } from '../entities/QuizKeeper';
 import { ForestQuiz, ForestQuizView } from '../data/forestQuiz';
 import { GorillaBoss } from '../entities/GorillaBoss';
@@ -46,6 +47,7 @@ import { getDifficulty } from '../data/difficulties';
 import { applyRunToMissions } from '../data/missions';
 
 export interface GameEngineCallbacks {
+  onEquipmentReward: () => void;
   onForestQuiz?: (quiz: ForestQuizView) => void;
   onGorillaDialogue?: () => void;
   onHUDUpdate: (hud: HUDState) => void;
@@ -313,8 +315,11 @@ export class GameEngine {
   public enemies: Enemy[] = [];
   private readonly gorillaNpc: GorillaNpc | null;
   private readonly quizKeeper: QuizKeeper | null;
-  private readonly forestQuiz = new ForestQuiz();
+  private readonly forestQuiz: ForestQuiz;
   private forestQuizOpen = false;
+  private readonly caveInterior = new CaveInterior();
+  private insideCave = false;
+  private caveRewardClaimed = false;
   private quizLaunchRemaining = 0;
   private readonly quizLaunchDuration = 2.2;
 
@@ -328,8 +333,11 @@ export class GameEngine {
         this.sound.playQuizFailureScream();
         this.resume();
       }
-      if (reward > 0) {
-        this.goldCollected += reward;
+      if (reward) {
+        const data = loadSavedData();
+        const id = this.player.character.id;
+        const inventory = data.inventories[id] ?? emptyInventory();
+        saveGameData({ ...data, inventories: { ...data.inventories, [id]: { ...inventory, forestQuizCompleted: true } } });
         this.sound.playMissionClaim();
         this.syncHUD();
       }
@@ -449,6 +457,9 @@ export class GameEngine {
     this.worldProps = new WorldSystem(mapId);
     this.gorillaNpc = mapId === 'amazon_forest' ? new GorillaNpc() : null;
     this.quizKeeper = mapId === 'amazon_forest' ? new QuizKeeper() : null;
+    const inventory = savedData.inventories?.[character.id] ?? emptyInventory();
+    this.caveRewardClaimed = inventory.items.some(item => item.id === GUARDIAN_BOW.id);
+    this.forestQuiz = new ForestQuiz(inventory.forestQuizCompleted === true || this.caveRewardClaimed);
     this.difficulty = getDifficulty(difficultyId);
     this.waveDirector = new WaveDirector(this.difficulty, mapId, this.worldProps);
     this.amazonTurns = this.createAmazonMissionTurns();
@@ -464,7 +475,7 @@ export class GameEngine {
     this.camera.y = spawn.y;
     this.player.levelUpHealFraction = this.difficulty.levelUpHealFraction;
     this.player.setCollisionResolver((fromX, fromY, dx, dy, radius, airborne) =>
-      this.worldProps.resolvePlayerMovement(fromX, fromY, dx, dy, radius, airborne)
+      this.insideCave ? this.caveInterior.resolveMovement(fromX + dx, fromY + dy, radius) : this.worldProps.resolvePlayerMovement(fromX, fromY, dx, dy, radius, airborne)
     );
     this.weaponSystem = new WeaponSystem(
       mapId === 'amazon_forest'
@@ -590,6 +601,41 @@ export class GameEngine {
     this.quizKeeper?.update(dt);
     this.gorillaNpc?.update(dt);
     const interactRequested = this.input.consumeInteract();
+    if (this.insideCave) {
+      this.player.isWadingInWater = false;
+      this.player.isInMud = false;
+      this.player.terrainSpeedMultiplier = 1;
+      if (!this.player.update(dt, this.input)) { this.handlePlayerDeath(); return; }
+      if (interactRequested && this.caveInterior.nearExit(this.player)) {
+        this.insideCave = false;
+        this.player.x = -1950;
+        this.player.y = 1980;
+      } else if (interactRequested && this.caveInterior.nearReward(this.player) && this.forestQuiz.view().status === 'rewarded' && !this.caveRewardClaimed) {
+        const data = loadSavedData();
+        const id = this.player.character.id;
+        const inventory = data.inventories[id] ?? emptyInventory();
+        const next = claimGuardianBow({ ...inventory, forestQuizCompleted: true });
+        saveGameData({ ...data, inventories: { ...data.inventories, [id]: next } });
+        this.caveRewardClaimed = true;
+        this.sound.playChestOpen();
+        this.syncHUD();
+        this.pause();
+        this.callbacks.onEquipmentReward();
+      }
+      this.camera.x = this.player.x;
+      this.camera.y = this.player.y;
+      return;
+    }
+    if (interactRequested && !this.gorillaFight && this.quizKeeper && Math.hypot(this.player.x + 1950, this.player.y - 1935) < 75) {
+      if (this.forestQuiz.view().status !== 'rewarded') return;
+      this.insideCave = true;
+      this.player.x = 0;
+      this.player.y = 120;
+      this.camera.x = 0;
+      this.camera.y = 120;
+      this.input.clearJump();
+      return;
+    }
     if (interactRequested && !this.gorillaFight && this.quizKeeper?.canInteract(this.player) && this.callbacks.onForestQuiz) {
       this.pause();
       this.input.handlePointerUp();
@@ -2534,6 +2580,11 @@ export class GameEngine {
   private render(): void {
     const { ctx, camera } = this;
 
+    if (this.insideCave) {
+      this.caveInterior.render(ctx, camera, this.player, this.forestQuiz.view().status === 'rewarded', this.caveRewardClaimed);
+      this.player.render(ctx, camera);
+      return;
+    }
     // 1. Clear & Render Floor Tile Pattern
     this.worldProps.renderFloor(ctx, camera);
 
@@ -2565,6 +2616,7 @@ export class GameEngine {
     this.renderBossHazards();
 
     // 5. Render Enemies & Player
+    this.worldProps.renderForestCave(ctx, camera, this.player.y, false);
     for (let i = 0; i < this.enemies.length; i++) {
       this.enemies[i].render(ctx, camera);
     }
@@ -2587,6 +2639,16 @@ export class GameEngine {
     this.player.render(ctx, camera);
     ctx.restore();
     if (this.quizKeeper && this.player.y < this.quizKeeper.y) this.quizKeeper.render(ctx, camera);
+    this.worldProps.renderForestCave(ctx, camera, this.player.y, true);
+    if (this.quizKeeper && !this.gorillaFight && Math.hypot(this.player.x + 1950, this.player.y - 1935) < 75) {
+      const p = camera.worldToScreen(-1950, 1840);
+      ctx.save(); ctx.font = 'bold 15px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillStyle = '#fde68a'; ctx.strokeStyle = '#101811'; ctx.lineWidth = 4;
+      const unlocked = this.forestQuiz.view().status === 'rewarded';
+      const label = unlocked ? '[E] Entrar na caverna' : 'Entrada selada. Conclua o quiz do velho.';
+      if (unlocked) { ctx.shadowColor = '#fbbf24'; ctx.shadowBlur = 12; }
+      ctx.strokeText(label, p.x, p.y); ctx.fillText(label, p.x, p.y); ctx.restore();
+    }
     if (this.player.stunTimer > 0) {
       const playerScreen = camera.worldToScreen(this.player.x, this.player.y);
       ctx.save();

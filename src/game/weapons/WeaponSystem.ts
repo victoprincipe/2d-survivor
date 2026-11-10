@@ -456,7 +456,7 @@ export class WeaponSystem {
     player.durationMultiplier = 1.0;
     player.critChance = 0.05 + (b.critChance || 0);
     player.critMultiplier = 1.75;
-    player.bonusAmount = 0;
+    player.bonusAmount = b.bonusAmount || 0;
     player.bonusPierce = 0;
     player.knockbackMultiplier = 1.0;
     player.debuffDamageBonus = 0;
@@ -802,7 +802,7 @@ export class WeaponSystem {
   ): void {
     // Buriti buff: shorter cooldowns (faster attacks) for its duration.
     const attackSpeedFactor = player.attackSpeedBoostTimer > 0 ? 0.65 : 1;
-    const cdFactor = Math.max(0.45, 1 - player.cooldownReduction) * attackSpeedFactor;
+    const cdFactor = Math.max(0.45, 1 - player.cooldownReduction) * attackSpeedFactor / (1 + (player.character.statBonuses.attackSpeed || 0));
 
     switch (w.id) {
       case 'bottle_51': {

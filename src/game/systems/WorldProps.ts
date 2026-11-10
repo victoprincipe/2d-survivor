@@ -1,6 +1,7 @@
 import { Camera } from '../engine/Camera';
 import { Player } from '../entities/Player';
 import { Drop } from '../entities/Drops';
+import { ForestCave } from '../entities/ForestCave';
 import { DropType, MapId } from '../types';
 
 // The night plain is effectively open, so this is only a large safety limit
@@ -345,6 +346,14 @@ const PLATEAU_RIM_WIDTH = 22;
 const PLATEAU_RAMP_INSET = 120;
 
 export class WorldSystem {
+  private readonly forestCave: ForestCave | null;
+
+  public renderForestCave(ctx: CanvasRenderingContext2D, camera: Camera, playerY: number, foreground: boolean): void {
+    if (this.forestCave && (playerY < this.forestCave.y) === foreground) {
+      this.forestCave.render(ctx, camera);
+    }
+  }
+
   public torches: TorchProp[] = [];
   private nextTorchId: number = 1;
   private torchSpawnTimer: number = 0;
@@ -403,6 +412,7 @@ export class WorldSystem {
 
   constructor(mapId: MapId = 'night_plain') {
     this.mapId = mapId;
+    this.forestCave = mapId === 'amazon_forest' ? new ForestCave() : null;
     if (mapId === 'amazon_forest') {
       this.worldHalfSize = FOREST_HALF_SIZE;
       this.generatePlateaus();
@@ -482,6 +492,7 @@ export class WorldSystem {
       const y = (Math.random() * 2 - 1) * limit;
 
       if (this.isInWater(x, y)) continue;
+      if (this.isInSageClearing(x, y, 70)) continue;
       if (this.isOverPlateau(x, y, 70) || this.isOnPlateauRamp(x, y, 70)) continue;
       if (this.collidesWithTree(x, y, 70)) continue;
 
@@ -506,6 +517,7 @@ export class WorldSystem {
       const x = (Math.random() * 2 - 1) * limit;
       const y = (Math.random() * 2 - 1) * limit;
       if (this.isInWater(x, y)) continue;
+      if (this.isInSageClearing(x, y, 70)) continue;
       if (this.isOverPlateau(x, y, 70) || this.isOnPlateauRamp(x, y, 70)) continue;
       if (this.collidesWithTree(x, y, 70)) continue;
       return { x, y };
@@ -557,6 +569,7 @@ export class WorldSystem {
 
       if (this.isInWater(x, y)) continue;
       if (this.isOverPlateau(x, y, clearance + 40)) continue;
+      if (this.isInSageClearing(x, y, clearance + 40)) continue;
       if (this.isOnPlateauRamp(x, y, clearance + 40)) continue;
       if (this.collidesWithTree(x, y, clearance + 30)) continue;
 
@@ -777,19 +790,10 @@ export class WorldSystem {
   }
 
   private generatePlateaus(): void {
-    // Three hand-placed hills around the centre of the map. Each one has a
+    // Two hand-placed hills around the centre of the map. Each one has a
     // single dirt ramp at a different side, so the player and the animals must
     // walk around the rim and climb through that opening.
     this.plateaus = [
-      {
-        x: -2200,
-        y: 1900,
-        rx: 860,
-        ry: 640,
-        rampAngle: 0.18,
-        rampHalfWidth: 122,
-        rampLength: 520,
-      },
       {
         x: 2100,
         y: -1900,
@@ -1034,6 +1038,13 @@ export class WorldSystem {
     return false;
   }
 
+  /** Reserve flat ground for the sage, cave and their shared approach. */
+  private isInSageClearing(x: number, y: number, padding = 0): boolean {
+    return this.mapId === 'amazon_forest' &&
+      x >= -2390 - padding && x <= -1740 + padding &&
+      y >= 1640 - padding && y <= 2080 + padding;
+  }
+
   private generateForest(): void {
     // Deterministic scatter so the forest looks the same between renders.
     let seed = 1337;
@@ -1254,10 +1265,11 @@ export class WorldSystem {
       });
     });
 
-    // Keep the hills and their ramps clear: base-level trees and ground clutter
+    // Keep the sage's flat clearing, hills and their ramps clear: trees and clutter
     // would otherwise be drawn as if they grew out of the cliff or blocked the
     // only climbable passage.
     const clearOfPlateaus = (x: number, y: number, padding: number): boolean =>
+      !this.isInSageClearing(x, y, padding) &&
       !this.isOverPlateau(x, y, padding) && !this.isOnPlateauRamp(x, y, padding);
 
     this.trees = this.trees.filter((tree) =>
@@ -1294,6 +1306,7 @@ export class WorldSystem {
 
         // Keep the initial spawn clearing readable.
         if (Math.abs(x) < 280 && Math.abs(y) < 280) continue;
+        if (this.isInSageClearing(x, y, 180)) continue;
         if (this.isInWater(x, y)) continue;
         if (this.isOverPlateau(x, y, 130) || this.isOnPlateauRamp(x, y, 130)) continue;
         if (this.collidesWithTree(x, y, 54)) continue;
@@ -4727,12 +4740,14 @@ export class WorldSystem {
     // If the animal already spawned inside a trunk, let it walk out instead of
     // trapping it forever against the tree it overlaps.
     const startedInsideTree = this.collidesWithDecorTree(fromX, fromY, radius);
+    const startedInsideCave = this.forestCave?.collides(fromX, fromY, radius) ?? false;
 
     for (let i = 0; i < steps; i++) {
       const nextX = x + stepX;
       if (
         !this.blocksOnPlateauRim(x, y, nextX, y, false, radius) &&
-        (startedInsideTree || !this.collidesWithDecorTree(nextX, y, radius))
+        (startedInsideTree || !this.collidesWithDecorTree(nextX, y, radius)) &&
+        (startedInsideCave || !this.forestCave?.collides(nextX, y, radius))
       ) {
         x = nextX;
       }
@@ -4740,7 +4755,8 @@ export class WorldSystem {
       const nextY = y + stepY;
       if (
         !this.blocksOnPlateauRim(x, y, x, nextY, false, radius) &&
-        (startedInsideTree || !this.collidesWithDecorTree(x, nextY, radius))
+        (startedInsideTree || !this.collidesWithDecorTree(x, nextY, radius)) &&
+        (startedInsideCave || !this.forestCave?.collides(x, nextY, radius))
       ) {
         y = nextY;
       }
@@ -4750,6 +4766,7 @@ export class WorldSystem {
   }
 
   private collidesWithTree(x: number, y: number, radius: number): boolean {
+    if (this.forestCave?.collides(x, y, radius)) return true;
     for (let i = 0; i < this.trees.length; i++) {
       const tree = this.trees[i];
       const treeRadius = tree.size * 0.32;
@@ -5245,6 +5262,7 @@ export class WorldSystem {
       ctx.restore();
 
       this.renderAmazonWater(ctx, camera);
+      this.forestCave?.renderPath(ctx, camera);
       return;
     }
 

@@ -5,6 +5,12 @@ export class QuizKeeper {
   public readonly x = -2200;
   public readonly y = 1900;
   private time = 0;
+  private readonly sprite: HTMLImageElement;
+
+  constructor() {
+    this.sprite = new Image();
+    this.sprite.src = '/sprites/quiz-keeper/idle.png';
+  }
 
   canInteract(player: { x: number; y: number }): boolean {
     return Math.hypot(player.x - this.x, player.y - this.y) <= 110;
@@ -13,6 +19,27 @@ export class QuizKeeper {
   update(dt: number): void { this.time += dt; }
 
   render(ctx: CanvasRenderingContext2D, camera: Camera): void {
+    if (!this.sprite.complete || this.sprite.naturalWidth === 0) {
+      this.renderFallback(ctx, camera);
+      return;
+    }
+    if (!camera.isInView(this.x, this.y, 130)) return;
+    const screen = camera.worldToScreen(this.x, this.y);
+    const breath = Math.sin(this.time * 2) * 0.006;
+    const height = 108 * (1 + breath);
+    const width = height * this.sprite.naturalWidth / this.sprite.naturalHeight;
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.beginPath();
+    ctx.ellipse(screen.x, screen.y + 4, 24, 9, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.imageSmoothingEnabled = true;
+    // The feet in the transparent sprite are anchored to the world position.
+    ctx.drawImage(this.sprite, screen.x - width * 0.44, screen.y + 4 - height * 0.97, width, height);
+    ctx.restore();
+  }
+
+  private renderFallback(ctx: CanvasRenderingContext2D, camera: Camera): void {
     if (!camera.isInView(this.x, this.y, 130)) return;
     const screen = camera.worldToScreen(this.x, this.y);
     const breath = Math.sin(this.time * 2) * 1.3;

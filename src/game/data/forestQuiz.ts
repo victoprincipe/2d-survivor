@@ -1,5 +1,3 @@
-export const FOREST_QUIZ_REWARD = 500;
-
 export const FOREST_QUESTIONS = [
   // Forest types: https://acta.inpa.gov.br/fasciculos/36-1/BODY/v36n1a05.html
   {
@@ -41,19 +39,19 @@ export interface ForestQuizView {
 export class ForestQuiz {
   private index = 0;
   private failed = false;
-  private rewarded = false;
+  constructor(private rewarded = false) {}
 
   begin(): ForestQuizView {
     if (!this.rewarded) { this.index = 0; this.failed = false; }
     return this.view();
   }
 
-  answer(choice: number): number {
-    if (this.failed || this.rewarded || !Number.isInteger(choice) || choice < 0 || choice >= FOREST_QUESTIONS[this.index].options.length) return 0;
-    if (choice !== FOREST_QUESTIONS[this.index].correct) { this.failed = true; return 0; }
-    if (this.index < FOREST_QUESTIONS.length - 1) { this.index++; return 0; }
+  answer(choice: number): boolean {
+    if (this.failed || this.rewarded || !Number.isInteger(choice) || choice < 0 || choice >= FOREST_QUESTIONS[this.index].options.length) return false;
+    if (choice !== FOREST_QUESTIONS[this.index].correct) { this.failed = true; return false; }
+    if (this.index < FOREST_QUESTIONS.length - 1) { this.index++; return false; }
     this.rewarded = true;
-    return FOREST_QUIZ_REWARD;
+    return true;
   }
 
   view(): ForestQuizView {

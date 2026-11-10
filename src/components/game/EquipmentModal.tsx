@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { CharacterConfig, EquipmentSlot, SavedGameData } from '@/game/types';
-import { EQUIPMENT_SLOTS, emptyInventory } from '@/game/data/inventory';
+import { EQUIPMENT_SLOTS, emptyInventory, equipmentArtwork } from '@/game/data/inventory';
 import { InventoryTab } from './InventoryTab';
 
 interface Props {
@@ -37,7 +37,7 @@ const ITEM_ARTWORK: { slot?: EquipmentSlot; left: number; top: number }[] = [
 ];
 
 export function EquipmentModal({ character, savedData, onUpdateSave, onClose }: Props) {
-  const [showItems, setShowItems] = useState(false);
+  const [selectedSlot, setSelectedSlot] = useState<EquipmentSlot | null>(null);
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const drag = useRef<{ pointerId: number; offsetX: number; offsetY: number } | null>(null);
@@ -107,15 +107,16 @@ export function EquipmentModal({ character, savedData, onUpdateSave, onClose }: 
         {SLOT_POSITIONS.map(({ slot, left, top }) => {
           const item = inventory.items.find((owned) => owned.id === inventory.equipped[slot] && owned.slot === slot);
           const label = `${EQUIPMENT_SLOTS[slot]}: ${item?.name ?? 'Espaço vazio'}`;
-          return <button key={slot} type="button" aria-label={label} title={label} onClick={() => setShowItems(true)}
+          return <button key={slot} type="button" aria-label={label} title={label} onClick={() => setSelectedSlot(slot)}
             style={{ left, top }} className="group absolute h-[13.5%] w-[21%] cursor-pointer rounded-lg border-2 border-transparent hover:border-amber-300 focus-visible:border-amber-300 focus-visible:outline-none">
+            {item && equipmentArtwork(item.id) && <span className="absolute inset-1 rounded bg-stone-950"><Image src={equipmentArtwork(item.id)!} alt={item.name} fill unoptimized className="object-contain" /></span>}
             <span className="absolute inset-x-0 bottom-1 rounded bg-black/80 p-1 text-[clamp(8px,1.5dvh,13px)] text-amber-100 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100">{label}</span>
           </button>;
         })}
-        {showItems && (
+        {selectedSlot && (
           <div data-no-drag className="absolute bottom-full left-0 mb-14 max-h-[50dvh] w-[min(90vw,420px)] touch-auto cursor-auto overflow-y-auto rounded-xl border border-amber-700 bg-slate-950/95 p-3">
-            <button type="button" onClick={() => setShowItems(false)} className="mb-3 rounded border border-amber-700 px-3 py-2 text-xs text-amber-200">← Voltar ao equipamento</button>
-            <InventoryTab character={character} savedData={savedData} onUpdateSave={onUpdateSave} />
+            <button type="button" onClick={() => setSelectedSlot(null)} className="mb-3 rounded border border-amber-700 px-3 py-2 text-xs text-amber-200">← Voltar ao equipamento</button>
+            <InventoryTab character={character} savedData={savedData} onUpdateSave={onUpdateSave} slotFilter={selectedSlot} />
           </div>
         )}
       </div>

@@ -3,17 +3,21 @@
 import { CharacterConfig, EquipmentSlot, EquipmentStats, SavedGameData } from '@/game/types';
 import { emptyInventory, EQUIPMENT_SLOTS, formatEquipmentStat, getEquipmentBonuses } from '@/game/data/inventory';
 import { saveGameData } from '@/game/data/persistence';
+import Image from 'next/image';
+import { equipmentArtwork } from '@/game/data/inventory';
 
 interface Props {
   character: CharacterConfig;
   savedData: SavedGameData;
   onUpdateSave: (save: SavedGameData) => void;
+  slotFilter?: EquipmentSlot;
 
 }
 
-export function InventoryTab({ character, savedData, onUpdateSave }: Props) {
+export function InventoryTab({ character, savedData, onUpdateSave, slotFilter }: Props) {
   const inventory = savedData.inventories?.[character.id] ?? emptyInventory();
   const bonuses = getEquipmentBonuses(inventory);
+  const items = inventory.items.filter(item => !slotFilter || item.slot === slotFilter);
   const changeEquipment = (slot: EquipmentSlot, itemId?: string) => {
     if (itemId && !inventory.items.some((item) => item.id === itemId && item.slot === slot)) return;
     const equipped = { ...inventory.equipped };
@@ -35,7 +39,7 @@ export function InventoryTab({ character, savedData, onUpdateSave }: Props) {
         <p className="mt-1 text-xs text-slate-400">Cada personagem possui seus próprios itens e equipamentos. Os atributos equipados são somados ao personagem ao iniciar a partida.</p>
       </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-        {(Object.keys(EQUIPMENT_SLOTS) as EquipmentSlot[]).map((slot) => {
+        {(slotFilter ? [slotFilter] : Object.keys(EQUIPMENT_SLOTS) as EquipmentSlot[]).map((slot) => {
           const item = inventory.items.find((owned) => owned.id === inventory.equipped[slot] && owned.slot === slot);
           return (
             <div key={slot} className={`rounded-lg border p-3 ${item ? 'border-amber-500/70 bg-amber-950/20' : 'border-dashed border-slate-600 bg-slate-950/50'}`}>
@@ -54,11 +58,12 @@ export function InventoryTab({ character, savedData, onUpdateSave }: Props) {
           : <p className="mt-1 text-xs text-slate-400">Nenhum bônus ativo. Equipe itens para aumentar seus atributos.</p>}
       </div>
       <div>
-        <h3 className="text-sm font-bold">Itens de {character.name} ({inventory.items.length})</h3>
-        {inventory.items.length === 0 ? <p className="mt-2 rounded-lg border border-slate-700 p-4 text-center text-xs text-slate-400">Inventário vazio. Novos itens serão adicionados futuramente.</p> :
-          <div className="mt-2 grid gap-2 sm:grid-cols-2">{inventory.items.map((item) => {
+        <h3 className="text-sm font-bold">{slotFilter ? `Tag: ${EQUIPMENT_SLOTS[slotFilter]}` : `Itens de ${character.name}`} ({items.length})</h3>
+        {items.length === 0 ? <p className="mt-2 rounded-lg border border-slate-700 p-4 text-center text-xs text-slate-400">{slotFilter ? `Nenhum item com a tag ${EQUIPMENT_SLOTS[slotFilter]} disponível.` : 'Inventário vazio. Conclua desafios para obter equipamentos.'}</p> :
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">{items.map((item) => {
             const equipped = inventory.equipped[item.slot] === item.id;
             return <div key={item.id} className="rounded-lg border border-slate-700 bg-slate-950/50 p-3">
+              {equipmentArtwork(item.id) && <Image src={equipmentArtwork(item.id)!} alt={item.name} width={72} height={110} unoptimized className="mx-auto h-28 w-20 object-contain" />}
               <p className="text-sm font-bold">{item.name}</p><p className="text-xs text-slate-400">{EQUIPMENT_SLOTS[item.slot]}</p>
               <ul className="my-2 text-xs text-emerald-300">{renderStats(item.stats)}</ul>
               <button type="button" disabled={equipped} onClick={() => changeEquipment(item.slot, item.id)} className="rounded border border-amber-700 px-3 py-1 text-xs text-amber-200 disabled:opacity-50">{equipped ? 'Equipado' : 'Equipar'}</button>

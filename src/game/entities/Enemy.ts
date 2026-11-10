@@ -151,9 +151,9 @@ export class Enemy {
       case 'boss_gorilla':
         this.name = 'Gorila — O Maior da Floresta';
         this.radius = 50;
-        this.maxHp = Math.round(3200 * hpMultiplier);
+        this.maxHp = Math.round(16000 * hpMultiplier);
         this.speed = 78;
-        this.damage = 32;
+        this.damage = 48;
         this.xpValue = 800;
         this.isBoss = true;
         this.knockbackResistance = 0.04;
