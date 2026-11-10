@@ -930,7 +930,26 @@ export class GameEngine {
       }
 
       if (e instanceof AnacondaBoss) {
-        if (e.pendingLeapSound) { e.pendingLeapSound = false; this.sound.playWaterStep(); }
+        if (e.dive.pendingSound) { e.dive.pendingSound = false; this.sound.playWaterStep(); }
+        if (e.dive.pendingEmergeImpact) {
+          e.dive.pendingEmergeImpact = false;
+          this.weaponSystem.spawnRingPulse(e.x, e.y, ANACONDA.dive.emergeRadius, '#a5f3fc', 0.45);
+          this.sound.playWaterStep(); this.camera.shake(0.2, 6);
+          if (Math.hypot(this.player.x - e.x, this.player.y - e.y) <= ANACONDA.dive.emergeRadius + this.player.radius &&
+            this.applyPlayerDamage(Math.max(1, Math.round(ANACONDA.dive.emergeDamage * this.difficulty.enemyDamage)), true, true)) {
+            this.handlePlayerDeath(); return;
+          }
+        }
+        const waves = e.dive.pendingTicks;
+        e.dive.pendingTicks = 0;
+        for (let tick = 0; tick < waves; tick++) {
+          this.sound.playWaterStep();
+          if (Math.hypot(this.player.x - e.x, this.player.y - e.y) > ANACONDA.dive.radius + this.player.radius) continue;
+          const hp = this.player.hp;
+          const fatal = this.applyPlayerDamage(Math.max(1, Math.round(ANACONDA.dive.damage * this.difficulty.enemyDamage)), true, false);
+          if (this.player.hp < hp) this.player.applyStun(ANACONDA.dive.stun);
+          if (fatal) { this.handlePlayerDeath(); return; }
+        }
         if (e.consumeBiteHit(this.player)) {
           if (this.applyPlayerDamage(e.damage, false, true)) { this.handlePlayerDeath(); return; }
         }
@@ -940,13 +959,12 @@ export class GameEngine {
           if (this.applyPlayerDamage(Math.max(1, Math.round(e.damage * ANACONDA.acid.damage)), true, false)) { this.handlePlayerDeath(); return; }
         }
       }
-      if ((e instanceof GorillaBoss || e instanceof AnacondaBoss) && e.pendingLeapImpact) {
-        const leap = e instanceof AnacondaBoss ? ANACONDA.leap : GORILLA_LEAP;
+      if (e instanceof GorillaBoss && e.pendingLeapImpact) {
+        const leap = GORILLA_LEAP;
         e.pendingLeapImpact = false;
         this.weaponSystem.spawnRingPulse(e.x, e.y, leap.radius, '#f59e0b', 0.4);
         this.camera.shake(0.25, 8);
-        if (e instanceof AnacondaBoss) this.sound.playWaterStep();
-        else this.sound.playThunder();
+        this.sound.playThunder();
         if (Math.hypot(this.player.x - e.x, this.player.y - e.y) <= leap.radius + this.player.radius &&
           !this.player.isJumping && !this.player.godMode && this.player.invulnerableTimer <= 0) {
           const hp = this.player.hp;
@@ -2721,7 +2739,10 @@ export class GameEngine {
 
     // 4. Render Ground Hazards & Auras beneath Enemies/Player
     this.weaponSystem.renderGround(ctx, camera, this.player);
-    if (this.bossEncounter?.boss instanceof AnacondaBoss) this.bossEncounter.boss.acid.renderGround(ctx, camera);
+    if (this.bossEncounter?.boss instanceof AnacondaBoss) {
+      this.bossEncounter.boss.acid.renderGround(ctx, camera);
+      this.bossEncounter.boss.dive.render(ctx, camera);
+    }
     this.renderBossHazards();
 
     // 5. Render Enemies & Player
