@@ -412,8 +412,6 @@ export class GameEngine {
   private lastTime: number = 0;
   private animFrameId: number | null = null;
   private hudThrottleTimer: number = 0;
-  private gemStreak: number = 0;
-  private gemStreakTimer: number = 0;
   private itemSpawnTimer: number = 0;
   private processedEnemyDeaths = new WeakSet<Enemy>();
   private thornCooldowns = new WeakMap<Enemy, number>();
@@ -658,10 +656,6 @@ export class GameEngine {
       this.input.handlePointerUp();
       this.callbacks.onGorillaDialogue();
       return;
-    }
-    if (this.gemStreakTimer > 0) {
-      this.gemStreakTimer -= dt;
-      if (this.gemStreakTimer <= 0) this.gemStreak = 0;
     }
 
     // Iara's Dynamic Flood cycle (rising / hold / recede) before terrain physics.
@@ -2261,9 +2255,6 @@ export class GameEngine {
 
   private handleDropCollected(drop: Drop): void {
     if (drop.type === 'gem_blue' || drop.type === 'gem_green' || drop.type === 'gem_red') {
-      this.gemStreak += 1;
-      this.gemStreakTimer = 0.5;
-      this.sound.playGemPickup(this.gemStreak);
       const leveledUp = this.player.addXp(drop.value);
 
       if (leveledUp) {

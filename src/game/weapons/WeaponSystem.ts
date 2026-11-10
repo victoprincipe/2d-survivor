@@ -1262,7 +1262,7 @@ export class WeaponSystem {
       });
     }
 
-    sound.playShoot();
+    if (player.character.id === 'kayrurururu') sound.playBowShot();
   }
 
   private triggerSyringe(
@@ -3263,7 +3263,7 @@ export class WeaponSystem {
         }
       }
 
-      if (hitSomeone) sound.playHit();
+      if (hitSomeone && p.type === 'bow') sound.playBowHit();
     }
   }
 
