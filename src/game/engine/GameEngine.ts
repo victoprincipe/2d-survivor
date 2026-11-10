@@ -16,7 +16,7 @@ import {
   DevTelemetrySnapshot,
   EnemyType,
 } from '../types';
-import { claimGuardianBow, emptyInventory, FOREST_ARMOR, GUARDIAN_BOW, withEquipment } from '../data/inventory';
+import { claimGuardianBow, emptyInventory, FOREST_ARMOR, GUARDIAN_BOW, ANACONDA_GLOVES, withEquipment } from '../data/inventory';
 import { Camera } from './Camera';
 import { InputManager } from './Input';
 import { SoundEngine } from './SoundEngine';
@@ -28,6 +28,10 @@ import { CaveInterior } from '../entities/CaveInterior';
 import { QuizKeeper } from '../entities/QuizKeeper';
 import { ForestQuiz, ForestQuizView } from '../data/forestQuiz';
 import { GorillaBoss } from '../entities/GorillaBoss';
+import { AnacondaBoss } from '../entities/AnacondaBoss';
+import { AnacondaNpc } from '../entities/AnacondaNpc';
+import { EquipmentDrop } from '../entities/EquipmentDrop';
+import { ANACONDA } from '../data/anaconda';
 import { GORILLA_LEAP, GORILLA_ROAR } from '../data/gorilla';
 import { Drop } from '../entities/Drops';
 import { VFXManager } from '../entities/VFX';
@@ -48,6 +52,7 @@ import { getDifficulty } from '../data/difficulties';
 import { applyRunToMissions } from '../data/missions';
 
 export interface GameEngineCallbacks {
+  onAnacondaDialogue?: () => void;
   onEquipmentReward: (item: EquipmentItem) => void;
   onForestQuiz?: (quiz: ForestQuizView) => void;
   onGorillaDialogue?: () => void;
@@ -315,6 +320,9 @@ export class GameEngine {
 
   public enemies: Enemy[] = [];
   private readonly gorillaNpc: GorillaNpc | null;
+  private readonly anacondaNpc: AnacondaNpc | null;
+  private anacondaDefeated = false;
+  private challengeBossSerial = -1;
   private readonly quizKeeper: QuizKeeper | null;
   private readonly forestQuiz: ForestQuiz;
   private forestQuizOpen = false;
@@ -352,27 +360,56 @@ export class GameEngine {
     this.resume();
   }
   private gorillaDefeated = false;
-  private gorillaFight: { boss: GorillaBoss; hiddenEnemies: Enemy[]; previousBoss: Enemy | null } | null = null;
+  private bossEncounter: { kind: 'gorilla' | 'anaconda'; boss: GorillaBoss | AnacondaBoss; hiddenEnemies: Enemy[]; previousBoss: Enemy | null } | null = null;
+
+  private get anacondaAvailable(): boolean {
+    return !!this.anacondaNpc && !this.bossEncounter && !this.anacondaDefeated;
+  }
+
+  private beginBossEncounter(kind: 'gorilla' | 'anaconda', boss: GorillaBoss | AnacondaBoss): void {
+    this.bossEncounter = { kind, boss, hiddenEnemies: this.enemies, previousBoss: this.waveDirector.bossActive };
+    this.enemies = [boss];
+    this.spatialGrid.clear(); this.bossProjectiles = []; this.bossHazards = [];
+    this.waveDirector.bossActive = boss;
+    this.resume(); this.syncHUD();
+  }
+
+  private restoreBossEncounter(): void {
+    const encounter = this.bossEncounter;
+    if (!encounter) return;
+    // Disarm stale homing-projectile references when a challenge is cancelled.
+    encounter.boss.hp = 0;
+    this.processedEnemyDeaths.add(encounter.boss);
+    if (encounter.boss instanceof AnacondaBoss) encounter.boss.clearEffects();
+    this.enemies = encounter.hiddenEnemies.filter(enemy => enemy.hp > 0);
+    this.waveDirector.bossActive = encounter.previousBoss && encounter.previousBoss.hp > 0 ? encounter.previousBoss : null;
+    this.bossEncounter = null;
+    this.spatialGrid.clear(); this.bossProjectiles = []; this.bossHazards = [];
+  }
+
+  public startAnacondaCombat(): boolean {
+    if (!this.anacondaAvailable || !this.anacondaNpc?.canInteract(this.player) || this.isGameOver || !this.worldProps.isInUpperLake(this.player.x, this.player.y)) return false;
+    const minutes = this.waveDirector.survivalTime / 60;
+    const boss = new AnacondaBoss(this.challengeBossSerial--, this.anacondaNpc.x, this.anacondaNpc.y,
+      (1 + minutes * 0.3) * this.difficulty.enemyHp, this.worldProps);
+    boss.damage = Math.round(boss.damage * this.difficulty.enemyDamage);
+    this.beginBossEncounter('anaconda', boss);
+    this.sound.playWaterStep();
+    return true;
+  }
 
   private get gorillaAvailable(): boolean {
-    return !!this.gorillaNpc && !this.gorillaFight && !this.gorillaDefeated;
+    return !!this.gorillaNpc && !this.bossEncounter && !this.gorillaDefeated;
   }
 
   public startGorillaCombat(): boolean {
     if (!this.gorillaAvailable || !this.gorillaNpc?.canInteract(this.player) || this.isGameOver) return false;
     const minutes = this.waveDirector.survivalTime / 60;
-    const boss = new GorillaBoss(-1, this.gorillaNpc.x, this.gorillaNpc.y,
+    const boss = new GorillaBoss(this.challengeBossSerial--, this.gorillaNpc.x, this.gorillaNpc.y,
       (1 + minutes * 0.3) * this.difficulty.enemyHp);
     boss.damage = Math.round(boss.damage * this.difficulty.enemyDamage);
-    this.gorillaFight = { boss, hiddenEnemies: this.enemies, previousBoss: this.waveDirector.bossActive };
-    this.enemies = [boss];
-    this.spatialGrid.clear();
-    this.bossProjectiles = [];
-    this.bossHazards = [];
-    this.waveDirector.bossActive = boss;
+    this.beginBossEncounter('gorilla', boss);
     this.sound.playBossRoar();
-    this.resume();
-    this.syncHUD();
     return true;
   }
   public drops: Drop[] = [];
@@ -455,6 +492,7 @@ export class GameEngine {
     this.vfx = new VFXManager();
     this.worldProps = new WorldSystem(mapId);
     this.gorillaNpc = mapId === 'amazon_forest' ? new GorillaNpc() : null;
+    this.anacondaNpc = mapId === 'amazon_forest' ? new AnacondaNpc() : null;
     this.quizKeeper = mapId === 'amazon_forest' ? new QuizKeeper() : null;
     const inventory = savedData.inventories?.[character.id] ?? emptyInventory();
     this.caveRewardClaimed = inventory.items.some(item => item.id === GUARDIAN_BOW.id);
@@ -585,6 +623,7 @@ export class GameEngine {
   }
 
   private update(dt: number): void {
+    this.anacondaNpc?.update(dt);
     // The launch is a short cinematic: hazards and controls wait for the landing.
     if (this.quizLaunchRemaining > 0) {
       this.quizLaunchRemaining = Math.max(0, this.quizLaunchRemaining - dt);
@@ -601,6 +640,10 @@ export class GameEngine {
     this.quizKeeper?.update(dt);
     this.gorillaNpc?.update(dt);
     const interactRequested = this.input.consumeInteract();
+    if (interactRequested && this.anacondaAvailable && this.anacondaNpc?.canInteract(this.player) &&
+      this.worldProps.isInUpperLake(this.player.x, this.player.y) && this.callbacks.onAnacondaDialogue) {
+      this.pause(); this.input.handlePointerUp(); this.callbacks.onAnacondaDialogue(); return;
+    }
     if (this.insideCave) {
       this.player.isWadingInWater = false;
       this.player.isInMud = false;
@@ -632,7 +675,7 @@ export class GameEngine {
       }
       return;
     }
-    if (interactRequested && !this.gorillaFight && this.quizKeeper && Math.hypot(this.player.x + 1950, this.player.y - 1935) < 75) {
+    if (interactRequested && !this.bossEncounter && this.quizKeeper && Math.hypot(this.player.x + 1950, this.player.y - 1935) < 75) {
       if (this.forestQuiz.view().status !== 'rewarded') return;
       this.insideCave = true;
       this.sound.startCaveAmbience();
@@ -645,7 +688,7 @@ export class GameEngine {
       this.input.clearJump();
       return;
     }
-    if (interactRequested && !this.gorillaFight && this.quizKeeper?.canInteract(this.player) && this.callbacks.onForestQuiz) {
+    if (interactRequested && !this.bossEncounter && this.quizKeeper?.canInteract(this.player) && this.callbacks.onForestQuiz) {
       this.pause();
       this.input.handlePointerUp();
       this.forestQuizOpen = true;
@@ -688,6 +731,11 @@ export class GameEngine {
     }
 
     // 2.1. Refresh which Amazon elemental combos are currently on the field.
+    if (this.bossEncounter?.kind === 'anaconda' && !this.anacondaDefeated && !this.worldProps.isInUpperLake(this.player.x, this.player.y)) {
+      this.restoreBossEncounter();
+      this.syncHUD();
+      return;
+    }
     this.updateAmazonElementalCombos();
 
     // 1.5. Water trail for the hero (and timers for the animal trails below).
@@ -821,7 +869,10 @@ export class GameEngine {
       // out onto the beach but never leave the river/beach band. The
       // Cobra-Grande's Earth-combo trample is the exception and may cross land.
       const cobraTrampling = e.type === 'boss_cobra_grande' && e.comboChargeActive;
-      if (e.isRiverPredator && !cobraTrampling) {
+      if (e instanceof AnacondaBoss) {
+        const position = this.worldProps.resolveUpperLakeMovement(previousX, previousY, e.x, e.y, e.radius);
+        e.x = position.x; e.y = position.y;
+      } else if (e.isRiverPredator && !cobraTrampling) {
         const resolved = this.worldProps.resolveRiverBankMovement(
           previousX,
           previousY,
@@ -878,16 +929,29 @@ export class GameEngine {
         }
       }
 
-      if (e instanceof GorillaBoss && e.pendingLeapImpact) {
+      if (e instanceof AnacondaBoss) {
+        if (e.pendingLeapSound) { e.pendingLeapSound = false; this.sound.playWaterStep(); }
+        if (e.consumeBiteHit(this.player)) {
+          if (this.applyPlayerDamage(e.damage, false, true)) { this.handlePlayerDeath(); return; }
+        }
+        const ticks = e.acid.pendingTicks;
+        e.acid.pendingTicks = 0;
+        for (let tick = 0; tick < ticks; tick++) {
+          if (this.applyPlayerDamage(Math.max(1, Math.round(e.damage * ANACONDA.acid.damage)), true, false)) { this.handlePlayerDeath(); return; }
+        }
+      }
+      if ((e instanceof GorillaBoss || e instanceof AnacondaBoss) && e.pendingLeapImpact) {
+        const leap = e instanceof AnacondaBoss ? ANACONDA.leap : GORILLA_LEAP;
         e.pendingLeapImpact = false;
-        this.weaponSystem.spawnRingPulse(e.x, e.y, GORILLA_LEAP.radius, '#f59e0b', 0.4);
+        this.weaponSystem.spawnRingPulse(e.x, e.y, leap.radius, '#f59e0b', 0.4);
         this.camera.shake(0.25, 8);
-        this.sound.playThunder();
-        if (Math.hypot(this.player.x - e.x, this.player.y - e.y) <= GORILLA_LEAP.radius + this.player.radius &&
+        if (e instanceof AnacondaBoss) this.sound.playWaterStep();
+        else this.sound.playThunder();
+        if (Math.hypot(this.player.x - e.x, this.player.y - e.y) <= leap.radius + this.player.radius &&
           !this.player.isJumping && !this.player.godMode && this.player.invulnerableTimer <= 0) {
           const hp = this.player.hp;
           const fatal = this.applyPlayerDamage(e.damage, true, true);
-          if (this.player.hp < hp) this.player.applyStun(GORILLA_LEAP.stun);
+          if (this.player.hp < hp) this.player.applyStun(leap.stun);
           if (fatal) { this.handlePlayerDeath(); return; }
         }
       }
@@ -917,7 +981,8 @@ export class GameEngine {
       if (e.pendingNovaBurst) {
         e.pendingNovaBurst = false;
         this.weaponSystem.spawnRingPulse(e.x, e.y, e.novaRadius, '#ef4444', 0.32);
-        if (e instanceof GorillaBoss) this.sound.playGorillaGroundSlam();
+        if (e instanceof AnacondaBoss) this.sound.playWaterStep();
+        else if (e instanceof GorillaBoss) this.sound.playGorillaGroundSlam();
         else this.sound.playThunder();
         this.camera.shake(0.25, 6);
 
@@ -1324,7 +1389,8 @@ export class GameEngine {
       const bodyHit = e instanceof GorillaBoss && e.skillState === 'dashing'
         ? e.chargeHits(this.player, previousX, previousY)
         : dist < this.player.radius + e.radius;
-      if (!e.isSubmerged && !e.jaguarBusy && !(e instanceof GorillaBoss && (e.isLeaping || e.isRoaring)) && !this.player.isJumping && bodyHit) {
+      if (!e.isSubmerged && !e.jaguarBusy && !(e instanceof GorillaBoss && (e.isLeaping || e.isRoaring)) &&
+        !(e instanceof AnacondaBoss && !e.contactEnabled) && !this.player.isJumping && bodyHit) {
         // Fire combo: Caipora's mounted charge knocks the hero away, ideally
         // into the flame ring left by Boitatá and Curupira.
         if (e.type === 'boss_caipora' && e.skillState === 'dashing' && this.fireComboActive && dist > 0) {
@@ -1400,6 +1466,7 @@ export class GameEngine {
       if (collected) {
         this.handleDropCollected(drop);
         this.drops.splice(i, 1);
+        if (drop instanceof EquipmentDrop && this.isPaused) return;
         // A level-up or chest must finish before another pickup opens a modal.
         if (this.isPaused || this.isGameOver) {
           this.syncHUD();
@@ -1409,10 +1476,17 @@ export class GameEngine {
     }
 
     // 8. Update Wave Director (Spawns)
-    if (this.gorillaFight && this.gorillaDefeated) {
-      this.enemies = this.gorillaFight.hiddenEnemies.filter(enemy => enemy.hp > 0);
-      this.waveDirector.bossActive = this.gorillaFight.previousBoss;
-      this.gorillaFight = null;
+    if (this.bossEncounter?.kind === 'anaconda' && this.anacondaDefeated) {
+      const { x, y } = this.bossEncounter.boss;
+      this.restoreBossEncounter();
+      const inventory = loadSavedData().inventories[this.player.character.id] ?? emptyInventory();
+      if (!inventory.items.some(item => item.id === ANACONDA_GLOVES.id) &&
+        !this.drops.some(drop => drop instanceof EquipmentDrop && drop.item.id === ANACONDA_GLOVES.id)) {
+        this.drops.push(new EquipmentDrop(Date.now() + Math.random(), x, y, ANACONDA_GLOVES));
+      }
+    }
+    if (this.bossEncounter?.kind === 'gorilla' && this.gorillaDefeated) {
+      this.restoreBossEncounter();
       const data = loadSavedData();
       const id = this.player.character.id;
       const inventory = data.inventories[id] ?? emptyInventory();
@@ -1425,7 +1499,7 @@ export class GameEngine {
       this.bossHazards = [];
       this.spatialGrid.clear();
     }
-    if (!this.gorillaFight) this.waveDirector.update(
+    if (!this.bossEncounter) this.waveDirector.update(
       dt,
       this.player,
       this.camera,
@@ -1979,7 +2053,7 @@ export class GameEngine {
   }
 
   private trackAmazonObjectiveKill(enemy: Enemy): void {
-    if (enemy.type === 'boss_gorilla') return;
+    if (enemy.type === 'boss_gorilla' || enemy.type === 'boss_anaconda') return;
     if (!this.waveDirector.isAmazonForest) return;
     if (enemy.isAquatic) {
       this.amazonObjectives.waterKills += 1;
@@ -2176,7 +2250,10 @@ export class GameEngine {
   private onEnemyKilled(enemy: Enemy): void {
     if (this.processedEnemyDeaths.has(enemy)) return;
     this.processedEnemyDeaths.add(enemy);
-    if (enemy === this.gorillaFight?.boss) this.gorillaDefeated = true;
+    if (enemy === this.bossEncounter?.boss) {
+      if (this.bossEncounter.kind === 'gorilla') this.gorillaDefeated = true;
+      else { this.anacondaDefeated = true; (enemy as AnacondaBoss).clearEffects(); }
+    }
 
     this.trackAmazonObjectiveKill(enemy);
 
@@ -2190,6 +2267,7 @@ export class GameEngine {
 
     if (enemy.isBoss) {
       this.bossesDefeated += 1;
+      if (enemy.type === 'boss_anaconda') { this.persistRunStats(false); return; }
       const bossXp = Math.round(250 * this.difficulty.xpMultiplier);
       this.drops.push(new Drop(Date.now() + Math.random(), 'chest', enemy.x, enemy.y));
       this.drops.push(new Drop(Date.now() + 1 + Math.random(), 'gem_red', enemy.x + 22, enemy.y, bossXp));
@@ -2255,6 +2333,19 @@ export class GameEngine {
   }
 
   private handleDropCollected(drop: Drop): void {
+    if (drop instanceof EquipmentDrop) {
+      const data = loadSavedData();
+      const id = this.player.character.id;
+      const inventory = data.inventories[id] ?? emptyInventory();
+      if (!inventory.items.some(item => item.id === drop.item.id)) {
+        saveGameData({ ...data, inventories: { ...data.inventories, [id]: {
+          ...inventory, items: [...inventory.items, { ...drop.item, stats: { ...drop.item.stats } }],
+        } } });
+        this.pause(); this.input.handlePointerUp(); this.sound.playMissionClaim();
+        this.callbacks.onEquipmentReward(drop.item);
+      }
+      return;
+    }
     if (drop.type === 'gem_blue' || drop.type === 'gem_green' || drop.type === 'gem_red') {
       const leveledUp = this.player.addXp(drop.value);
 
@@ -2451,6 +2542,7 @@ export class GameEngine {
   }
 
   private handlePlayerDeath(): void {
+    if (this.bossEncounter?.kind === 'anaconda') this.restoreBossEncounter();
     this.isGameOver = true;
     this.sound.playGameOver();
     this.sound.stopCaveAmbience();
@@ -2629,6 +2721,7 @@ export class GameEngine {
 
     // 4. Render Ground Hazards & Auras beneath Enemies/Player
     this.weaponSystem.renderGround(ctx, camera, this.player);
+    if (this.bossEncounter?.boss instanceof AnacondaBoss) this.bossEncounter.boss.acid.renderGround(ctx, camera);
     this.renderBossHazards();
 
     // 5. Render Enemies & Player
@@ -2638,6 +2731,7 @@ export class GameEngine {
     }
 
     // Match the player's depth at the NPC's feet without adding it to combat.
+    if (this.anacondaAvailable && this.anacondaNpc && this.player.y >= this.anacondaNpc.y) this.anacondaNpc.render(ctx, camera);
     if (this.gorillaAvailable && this.gorillaNpc && this.player.y >= this.gorillaNpc.y) {
       this.gorillaNpc.render(ctx, camera);
     }
@@ -2654,9 +2748,10 @@ export class GameEngine {
     }
     this.player.render(ctx, camera);
     ctx.restore();
+    if (this.anacondaAvailable && this.anacondaNpc && this.player.y < this.anacondaNpc.y) this.anacondaNpc.render(ctx, camera);
     if (this.quizKeeper && this.player.y < this.quizKeeper.y) this.quizKeeper.render(ctx, camera);
     this.worldProps.renderForestCave(ctx, camera, this.player.y, true);
-    if (this.quizKeeper && !this.gorillaFight && Math.hypot(this.player.x + 1950, this.player.y - 1935) < 75) {
+    if (this.quizKeeper && !this.bossEncounter && Math.hypot(this.player.x + 1950, this.player.y - 1935) < 75) {
       const p = camera.worldToScreen(-1950, 1840);
       ctx.save(); ctx.font = 'bold 15px sans-serif'; ctx.textAlign = 'center';
       ctx.fillStyle = '#fde68a'; ctx.strokeStyle = '#101811'; ctx.lineWidth = 4;
@@ -2702,6 +2797,10 @@ export class GameEngine {
 
     // 7.3. Fire bosses shine through the jungle night.
     this.renderNightFireBossGlow();
+    if (this.bossEncounter?.boss instanceof AnacondaBoss) this.bossEncounter.boss.acid.renderAir(ctx, camera, this.player);
+    if (!this.isPaused && !this.isGameOver && this.anacondaAvailable && this.anacondaNpc?.canInteract(this.player)) {
+      this.anacondaNpc.renderPrompt(ctx, camera);
+    }
     if (this.quizLaunchRemaining > 0) {
       ctx.save();
       ctx.textAlign = 'center';
@@ -2714,7 +2813,7 @@ export class GameEngine {
       ctx.fillText(message, camera.viewportWidth / 2, camera.viewportHeight * 0.3);
       ctx.restore();
     }
-    if (!this.isPaused && !this.isGameOver && this.quizLaunchRemaining === 0 && !this.gorillaFight && this.quizKeeper?.canInteract(this.player)) {
+    if (!this.isPaused && !this.isGameOver && this.quizLaunchRemaining === 0 && !this.bossEncounter && this.quizKeeper?.canInteract(this.player)) {
       this.quizKeeper.renderPrompt(ctx, camera);
     }
     if (!this.isPaused && !this.isGameOver && this.gorillaAvailable && this.gorillaNpc?.canInteract(this.player)) {
@@ -3269,7 +3368,7 @@ export class GameEngine {
   // --- DevTools Public API ---
 
   public devSpawnEnemy(type: EnemyType, count: number = 1): void {
-    if (this.gorillaFight || type === 'boss_gorilla') return;
+    if (this.bossEncounter || type === 'boss_gorilla' || type === 'boss_anaconda') return;
     // The Minotaur is night-plain content and must never appear in the forest,
     // even when spawned manually through the developer tools.
     if (type === 'elite_minotaur' && this.waveDirector.isAmazonForest) return;
@@ -3291,7 +3390,7 @@ export class GameEngine {
   }
 
   public devSpawnDummy(): void {
-    if (this.gorillaFight) return;
+    if (this.bossEncounter) return;
     const angle = Math.random() * Math.PI * 2;
     const dist = 130;
     const x = this.player.x + Math.cos(angle) * dist;

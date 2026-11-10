@@ -19,6 +19,7 @@ export function EquipmentRewardModal({ item, onClose }: { item: EquipmentItem; o
     <h2 id="equipment-reward-title" className="mt-2 text-2xl font-bold">{item.name}</h2>
     <Image src={equipmentArtwork(item.id)!} alt={item.name} width={90} height={160} unoptimized className="mx-auto my-4" />
     <ul className="space-y-1 text-sm text-emerald-300">
+      {Object.keys(item.stats).length === 0 && <li>Sem bônus por enquanto</li>}
       {(Object.keys(item.stats) as (keyof EquipmentStats)[]).map(key => <li key={key}>{formatEquipmentStat(key, item.stats[key]!)}</li>)}
     </ul>
     <p className="mt-4 text-sm text-stone-300">Salvo no inventário deste personagem. Equipe no slot de {EQUIPMENT_SLOTS[item.slot].toLowerCase()} na seleção de personagem para ativar os bônus na próxima partida.</p>

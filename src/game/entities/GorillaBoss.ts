@@ -1,11 +1,11 @@
-import { Enemy } from './Enemy';
+import { ChallengeBoss, sweptCircleHits } from './ChallengeBoss';
 import { GorillaNpc } from './GorillaNpc';
 import { Player } from './Player';
 import { Camera } from '../engine/Camera';
 import combat from '../../../public/sprites/boss-gorilla/combat-animations.json';
 import { GORILLA_CHARGE, GORILLA_LEAP, GORILLA_SKILL_SPEED, GORILLA_ROAR } from '../data/gorilla';
 
-export class GorillaBoss extends Enemy {
+export class GorillaBoss extends ChallengeBoss {
   private readonly visual = new GorillaNpc();
   private readonly combatSprite: HTMLImageElement;
   private facing = 1;
@@ -38,16 +38,9 @@ export class GorillaBoss extends Enemy {
   }
 
   private updateRoar(dt: number, player: Player, separation: { vx: number; vy: number }): boolean {
-    const x = this.x;
-    const y = this.y;
-    const cooldown = this.skillCooldown;
-    this.skillCooldown = Number.MAX_SAFE_INTEGER;
-    const alive = super.update(dt, player, separation);
-    this.skillCooldown = cooldown;
-    this.x = x;
-    this.y = y;
-    this.previousX = x;
-    this.previousY = y;
+    const alive = this.updateAnchored(dt, player, separation);
+    this.previousX = this.x;
+    this.previousY = this.y;
     if (!alive) {
       this.pendingRoarTicks = 0;
       this.pendingRoarStart = false;
@@ -81,24 +74,11 @@ export class GorillaBoss extends Enemy {
   }
 
   public chargeHits(player: { x: number; y: number; radius: number }, fromX: number, fromY: number): boolean {
-    const dx = this.x - fromX;
-    const dy = this.y - fromY;
-    const lengthSquared = dx * dx + dy * dy;
-    const t = lengthSquared > 0
-      ? Math.max(0, Math.min(1, ((player.x - fromX) * dx + (player.y - fromY) * dy) / lengthSquared)) : 0;
-    return Math.hypot(player.x - fromX - t * dx, player.y - fromY - t * dy)
-      < this.radius * GORILLA_CHARGE.widthMultiplier + player.radius;
+    return sweptCircleHits(player, { x: fromX, y: fromY }, this, this.radius * GORILLA_CHARGE.widthMultiplier);
   }
 
   private updateLeap(dt: number, player: Player, separation: { vx: number; vy: number }): boolean {
-    const x = this.x;
-    const y = this.y;
-    const cooldown = this.skillCooldown;
-    this.skillCooldown = Number.MAX_SAFE_INTEGER;
-    const alive = super.update(dt, player, separation);
-    this.skillCooldown = cooldown;
-    this.x = x;
-    this.y = y;
+    const alive = this.updateAnchored(dt, player, separation);
     if (!alive) {
       this.pendingLeapImpact = false;
       this.pendingLeapSound = false;

@@ -1,0 +1,10 @@
+{
+  "image": "/sprites/boss-anaconda/spritesheet.png",
+  "columns": 4,
+  "rows": 3,
+  "animations": {
+    "idle": { "row": 0, "frames": [0, 1, 2, 1, 0, 3], "durations": [500, 300, 280, 300, 450, 350] },
+    "slither": { "row": 1, "frames": [0, 1, 2, 3], "durations": [180, 180, 180, 180] },
+    "bite": { "row": 2, "frames": [0, 1, 2, 3], "durations": [500, 120, 150, 400] }
+  }
+}

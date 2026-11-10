@@ -1682,6 +1682,29 @@ export class WorldSystem {
     return false;
   }
 
+  /** Specific upper-lake arena; river mouths and flood water never extend it. */
+  public isInUpperLake(x: number, y: number, radius = 0): boolean {
+    if (this.mapId !== 'amazon_forest' || !this.lakes[0]) return false;
+    const lake = this.lakes[0];
+    const rx = lake.rx - radius, ry = lake.ry - radius;
+    if (rx <= 0 || ry <= 0) return false;
+    const dx = x - lake.x, dy = y - lake.y;
+    const cos = Math.cos(-lake.rotation), sin = Math.sin(-lake.rotation);
+    const lx = dx * cos - dy * sin, ly = dx * sin + dy * cos;
+    return Math.hypot(lx / rx, ly / ry) <= this.getLakeEdgeScale(lake, this.getLakeNormalizedAngle(lake, x, y));
+  }
+
+  public resolveUpperLakeMovement(fromX: number, fromY: number, toX: number, toY: number, radius: number): { x: number; y: number } {
+    const steps = Math.max(1, Math.ceil(Math.hypot(toX - fromX, toY - fromY) / COLLISION_STEP));
+    let x = fromX, y = fromY;
+    for (let i = 1; i <= steps; i++) {
+      const nx = fromX + (toX - fromX) * i / steps, ny = fromY + (toY - fromY) * i / steps;
+      if (this.isInUpperLake(nx, ny, radius)) { x = nx; y = ny; }
+      else break;
+    }
+    return { x, y };
+  }
+
   /**
    * True when the point is over the open water surface of the river or a lake.
    * The sandy beach is deliberately excluded: this is what tells the engine

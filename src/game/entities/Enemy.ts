@@ -2,6 +2,7 @@ import { EnemyType, WeaponId } from '../types';
 import { Camera } from '../engine/Camera';
 import { Player } from './Player';
 import { GORILLA_CHARGE, GORILLA_SKILL_SPEED, GORILLA_SLAM_COOLDOWN } from '../data/gorilla';
+import { ANACONDA } from '../data/anaconda';
 
 export type BossOrEliteState =
   | 'idle'
@@ -160,6 +161,17 @@ export class Enemy {
         // Double the slam's circular area (area scales with radius squared).
         this.novaRadius = 185 * Math.SQRT2;
         this.skillCooldown = 2;
+        break;
+      case 'boss_anaconda':
+        this.name = 'Sucuri Gigante — Senhora do Lago';
+        this.radius = ANACONDA.radius;
+        this.maxHp = Math.round(ANACONDA.hp * hpMultiplier);
+        this.speed = ANACONDA.speed;
+        this.damage = ANACONDA.damage;
+        this.xpValue = 800;
+        this.isBoss = true;
+        this.isAquatic = true;
+        this.knockbackResistance = 0.04;
         break;
       case 'bat':
         this.name = 'Morcego Carniceiro';

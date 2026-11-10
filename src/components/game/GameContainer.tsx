@@ -16,11 +16,12 @@ import { EndGameModal } from './EndGameModal';
 import { PauseModal } from './PauseModal';
 import { DevTools } from './DevTools';
 import { GorillaDialogue } from './GorillaDialogue';
+import { AnacondaDialogue } from './AnacondaDialogue';
 import { ForestQuizDialogue } from './ForestQuizDialogue';
 import { EquipmentRewardModal } from './EquipmentRewardModal';
 import { ForestQuizView } from '@/game/data/forestQuiz';
 
-type GameState = 'menu' | 'playing' | 'paused' | 'level_up' | 'chest' | 'game_over' | 'victory' | 'dialogue' | 'quiz' | 'equipment_reward';
+type GameState = 'menu' | 'playing' | 'paused' | 'level_up' | 'chest' | 'game_over' | 'victory' | 'dialogue' | 'anaconda_dialogue' | 'quiz' | 'equipment_reward';
 
 const DEFAULT_HUD: HUDState = {
   playerHp: 100,
@@ -95,6 +96,9 @@ export const GameContainer: React.FC = () => {
       }
 
       const engine = new GameEngine(canvas, character, currentSavedData, difficulty, mapId, {
+        onAnacondaDialogue: () => {
+          gameStateRef.current = 'anaconda_dialogue'; setGameState('anaconda_dialogue');
+        },
         onEquipmentReward: (item) => {
           setEquipmentReward(item);
           setSavedData(loadSavedData());
@@ -312,6 +316,13 @@ export const GameContainer: React.FC = () => {
       )}
 
       {/* Overlays / Modals */}
+      {gameState === 'anaconda_dialogue' && <AnacondaDialogue onStartCombat={() => {
+        if (engineRef.current?.startAnacondaCombat()) {
+          gameStateRef.current = 'playing'; setGameState('playing');
+        }
+      }} onClose={() => {
+        engineRef.current?.resume(); gameStateRef.current = 'playing'; setGameState('playing');
+      }} />}
       {gameState === 'equipment_reward' && equipmentReward && <EquipmentRewardModal item={equipmentReward} onClose={() => {
         engineRef.current?.resume();
         gameStateRef.current = 'playing';

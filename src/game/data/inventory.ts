@@ -5,7 +5,9 @@ export const GUARDIAN_BOW: EquipmentItem = {
   stats: { attackSpeed: 0.1, bonusAmount: 1, critChance: 0.05 },
 };
 export const FOREST_ARMOR: EquipmentItem = { id: 'forest_armor', name: 'Armadura da Mata', slot: 'armor', stats: { armor: 3, maxHp: 20, recovery: 2, damageReduction: 0.05 } };
+export const ANACONDA_GLOVES: EquipmentItem = { id: 'anaconda_gloves', name: 'Luvas da Sucuri', slot: 'gloves', stats: {} };
 export function equipmentArtwork(id: string): string | undefined {
+  if (id === ANACONDA_GLOVES.id) return '/sprites/equipment/anaconda-gloves.svg';
   if (id === FOREST_ARMOR.id) return '/sprites/equipment/forest-armor.png';
   return id === GUARDIAN_BOW.id ? '/sprites/equipment/guardian-bow.svg' : undefined;
 }
