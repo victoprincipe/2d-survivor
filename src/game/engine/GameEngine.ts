@@ -32,7 +32,7 @@ import { AnacondaBoss } from '../entities/AnacondaBoss';
 import { AnacondaNpc } from '../entities/AnacondaNpc';
 import { EquipmentDrop } from '../entities/EquipmentDrop';
 import { ANACONDA } from '../data/anaconda';
-import { GORILLA_LEAP, GORILLA_ROAR } from '../data/gorilla';
+import { GORILLA_ARENA, GORILLA_LEAP, GORILLA_ROAR } from '../data/gorilla';
 import { Drop } from '../entities/Drops';
 import { VFXManager } from '../entities/VFX';
 import { WeaponSystem } from '../weapons/WeaponSystem';
@@ -364,6 +364,7 @@ export class GameEngine {
     this.resume();
   }
   private gorillaDefeated = false;
+  private gorillaArena: { x: number; y: number; radius: number } | null = null;
   private bossEncounter: { kind: 'gorilla' | 'anaconda'; boss: GorillaBoss | AnacondaBoss; hiddenEnemies: Enemy[]; previousBoss: Enemy | null } | null = null;
 
   private get anacondaAvailable(): boolean {
@@ -381,6 +382,7 @@ export class GameEngine {
   private restoreBossEncounter(): void {
     const encounter = this.bossEncounter;
     if (!encounter) return;
+    if (encounter.kind === 'gorilla') this.gorillaArena = null;
     // Disarm stale homing-projectile references when a challenge is cancelled.
     encounter.boss.hp = 0;
     this.processedEnemyDeaths.add(encounter.boss);
@@ -406,14 +408,45 @@ export class GameEngine {
     return !!this.gorillaNpc && !this.bossEncounter && !this.gorillaDefeated;
   }
 
+  private isNearGorilla(): boolean {
+    if (!this.gorillaNpc) return false;
+    return Math.hypot(this.player.x - this.gorillaNpc.x, this.player.y - this.gorillaNpc.y) <= GORILLA_ARENA.triggerRadius;
+  }
+
+  private activateGorillaArena(boss: GorillaBoss): void {
+    const distance = Math.hypot(this.player.x - boss.x, this.player.y - boss.y);
+    // The guardian is the centre of the plateau arena; the minimum 600 radius
+    // matches a medium plateau's 1200-unit diameter and always encloses the hero.
+    this.gorillaArena = {
+      x: boss.x,
+      y: boss.y,
+      radius: Math.max(GORILLA_ARENA.radius, distance + this.player.radius + 32),
+    };
+    this.camera.shake(0.35, 11);
+    this.sound.playGorillaGroundSlam();
+    this.weaponSystem.spawnRingPulse(this.gorillaArena.x, this.gorillaArena.y, this.gorillaArena.radius, '#a8a29e', 0.65);
+  }
+
+  private clampToGorillaArena(x: number, y: number, radius: number): { x: number; y: number } {
+    const arena = this.gorillaArena;
+    if (!arena) return { x, y };
+    const dx = x - arena.x;
+    const dy = y - arena.y;
+    const limit = arena.radius - radius;
+    const distance = Math.hypot(dx, dy);
+    if (distance <= limit || distance === 0) return { x, y };
+    return { x: arena.x + (dx / distance) * limit, y: arena.y + (dy / distance) * limit };
+  }
+
   public startGorillaCombat(): boolean {
-    if (!this.gorillaAvailable || !this.gorillaNpc?.canInteract(this.player) || this.isGameOver) return false;
+    if (!this.gorillaAvailable || !this.isNearGorilla() || this.isGameOver) return false;
+    const npc = this.gorillaNpc;
+    if (!npc) return false;
     const minutes = this.waveDirector.survivalTime / 60;
-    const boss = new GorillaBoss(this.challengeBossSerial--, this.gorillaNpc.x, this.gorillaNpc.y,
+    const boss = new GorillaBoss(this.challengeBossSerial--, npc.x, npc.y,
       (1 + minutes * 0.3) * this.difficulty.enemyHp);
     boss.damage = Math.round(boss.damage * this.difficulty.enemyDamage);
     this.beginBossEncounter('gorilla', boss);
-    this.sound.playBossRoar();
     return true;
   }
   public drops: Drop[] = [];
@@ -515,9 +548,12 @@ export class GameEngine {
     this.camera.x = spawn.x;
     this.camera.y = spawn.y;
     this.player.levelUpHealFraction = this.difficulty.levelUpHealFraction;
-    this.player.setCollisionResolver((fromX, fromY, dx, dy, radius, airborne) =>
-      this.insideCave ? this.caveInterior.resolveMovement(fromX, fromY, dx, dy, radius) : this.worldProps.resolvePlayerMovement(fromX, fromY, dx, dy, radius, airborne)
-    );
+    this.player.setCollisionResolver((fromX, fromY, dx, dy, radius, airborne) => {
+      const resolved = this.insideCave
+        ? this.caveInterior.resolveMovement(fromX, fromY, dx, dy, radius)
+        : this.worldProps.resolvePlayerMovement(fromX, fromY, dx, dy, radius, airborne);
+      return this.clampToGorillaArena(resolved.x, resolved.y, radius);
+    });
     this.weaponSystem = new WeaponSystem(
       mapId === 'amazon_forest'
         ? (AMAZON_STARTING_WEAPON_BY_CHARACTER[character.id] ?? 'garras_onca')
@@ -677,6 +713,11 @@ export class GameEngine {
         this.camera.x = this.player.x;
         this.camera.y = this.player.y;
       }
+      return;
+    }
+    // The forest guardian engages by itself the moment the hero is spotted.
+    if (this.gorillaAvailable && this.isNearGorilla()) {
+      this.startGorillaCombat();
       return;
     }
     if (interactRequested && !this.bossEncounter && this.quizKeeper && Math.hypot(this.player.x + 1950, this.player.y - 1935) < 75) {
@@ -919,7 +960,23 @@ export class GameEngine {
         e.y = resolved.y;
       }
 
+      if (this.gorillaArena) {
+        const clamped = this.clampToGorillaArena(e.x, e.y, e.radius);
+        e.x = clamped.x;
+        e.y = clamped.y;
+      }
+
       if (e instanceof GorillaBoss) {
+        if (e.pendingArenaSlam) {
+          e.pendingArenaSlam = false;
+          this.activateGorillaArena(e);
+        }
+        if (e.pendingEntranceRoar) {
+          e.pendingEntranceRoar = false;
+          this.sound.playGorillaRoar();
+          this.camera.shake(0.28, 8);
+          this.weaponSystem.spawnRingPulse(e.x, e.y, 240, '#fbbf24', 0.45);
+        }
         if (e.pendingLeapSound) {
           e.pendingLeapSound = false;
           this.sound.playGorillaLeap();
@@ -1418,7 +1475,7 @@ export class GameEngine {
       const bodyHit = e instanceof GorillaBoss && e.skillState === 'dashing'
         ? e.chargeHits(this.player, previousX, previousY)
         : dist < this.player.radius + e.radius;
-      if (!e.isSubmerged && !e.jaguarBusy && !(e instanceof GorillaBoss && (e.isLeaping || e.isRoaring)) &&
+      if (!e.isSubmerged && !e.jaguarBusy && !(e instanceof GorillaBoss && (e.isLeaping || e.isRoaring || e.isInEntrance)) &&
         !(e instanceof AnacondaBoss && !e.contactEnabled) && !this.player.isJumping && bodyHit) {
         // Fire combo: Caipora's mounted charge knocks the hero away, ideally
         // into the flame ring left by Boitatá and Curupira.
@@ -2280,8 +2337,13 @@ export class GameEngine {
     if (this.processedEnemyDeaths.has(enemy)) return;
     this.processedEnemyDeaths.add(enemy);
     if (enemy === this.bossEncounter?.boss) {
-      if (this.bossEncounter.kind === 'gorilla') this.gorillaDefeated = true;
-      else { this.anacondaDefeated = true; (enemy as AnacondaBoss).clearEffects(); }
+      if (this.bossEncounter.kind === 'gorilla') {
+        this.gorillaDefeated = true;
+        this.gorillaArena = null;
+      } else {
+        this.anacondaDefeated = true;
+        (enemy as AnacondaBoss).clearEffects();
+      }
     }
 
     this.trackAmazonObjectiveKill(enemy);
@@ -2807,6 +2869,7 @@ export class GameEngine {
     if (this.gorillaAvailable && this.gorillaNpc && this.player.y < this.gorillaNpc.y) {
       this.gorillaNpc.render(ctx, camera);
     }
+    this.renderGorillaArena();
 
     // Decorative canopies become translucent over anyone walking behind them.
     this.worldProps.renderDecorCanopyOverlay(ctx, camera, this.player, this.enemies);
@@ -2876,6 +2939,57 @@ export class GameEngine {
 
     // 9. Render Minimap Radar (fixed bottom-left)
     this.renderMinimap();
+  }
+
+  private renderGorillaArena(): void {
+    const arena = this.gorillaArena;
+    if (!arena) return;
+    const { ctx, camera } = this;
+    const origin = camera.worldToScreen(arena.x, arena.y);
+    if (origin.x + arena.radius < -60 || origin.x - arena.radius > camera.viewportWidth + 60 ||
+      origin.y + arena.radius < -60 || origin.y - arena.radius > camera.viewportHeight + 60) return;
+
+    ctx.save();
+    // Dusty floor scar where the ring burst out of the ground.
+    ctx.beginPath();
+    ctx.arc(origin.x, origin.y, arena.radius, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(41, 37, 36, 0.42)';
+    ctx.lineWidth = 18;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(origin.x, origin.y, arena.radius - 14, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(168, 162, 158, 0.22)';
+    ctx.lineWidth = 6;
+    ctx.stroke();
+
+    // Solid boulders form a visually closed barrier. Collision is the continuous
+    // circle handled by clampToGorillaArena, so no diagonal gap can be slipped through.
+    for (let i = 0; i < GORILLA_ARENA.stoneCount; i++) {
+      const angle = (i / GORILLA_ARENA.stoneCount) * Math.PI * 2;
+      const wobble = Math.sin(i * 12.9898) * 7;
+      const radius = arena.radius + wobble;
+      const stoneX = origin.x + Math.cos(angle) * radius;
+      const stoneY = origin.y + Math.sin(angle) * radius;
+      const halfWidth = 26 + (i % 3) * 5;
+      const halfHeight = 34 + ((i * 7) % 14);
+      ctx.save();
+      ctx.translate(stoneX, stoneY);
+      ctx.rotate(angle + Math.PI / 2);
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
+      ctx.beginPath();
+      ctx.ellipse(3, 10, halfWidth, halfHeight * 0.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = i % 2 === 0 ? '#78716c' : '#57534e';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, halfWidth, halfHeight, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(214, 211, 209, 0.28)';
+      ctx.beginPath();
+      ctx.ellipse(-halfWidth * 0.22, -halfHeight * 0.24, halfWidth * 0.55, halfHeight * 0.45, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+    ctx.restore();
   }
 
   private renderWaterRipples(): void {

@@ -30,3 +30,18 @@ export const GORILLA_ROAR = {
   healFraction: 0.2,
   damageMultiplier: 0.5,
 };
+
+// The guardian awakens as soon as the hero steps into its line of sight.
+// Its stone ring uses roughly the footprint of a medium forest plateau.
+export const GORILLA_ARENA = {
+  triggerRadius: 300,
+  radius: 600,
+  stoneCount: 64,
+};
+
+// Locked-in entrance: ground slam, stone ring, chest-beating roar, then combat.
+export const GORILLA_ENTRANCE = {
+  slamWindup: 0.75,
+  slamRecovery: 0.45,
+  roarDuration: 0.85,
+};

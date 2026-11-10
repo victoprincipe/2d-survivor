@@ -3,7 +3,7 @@ import { GorillaNpc } from './GorillaNpc';
 import { Player } from './Player';
 import { Camera } from '../engine/Camera';
 import combat from '../../../public/sprites/boss-gorilla/combat-animations.json';
-import { GORILLA_CHARGE, GORILLA_LEAP, GORILLA_SKILL_SPEED, GORILLA_ROAR } from '../data/gorilla';
+import { GORILLA_CHARGE, GORILLA_ENTRANCE, GORILLA_LEAP, GORILLA_SKILL_SPEED, GORILLA_ROAR } from '../data/gorilla';
 
 export class GorillaBoss extends ChallengeBoss {
   private readonly visual = new GorillaNpc();
@@ -32,9 +32,42 @@ export class GorillaBoss extends ChallengeBoss {
   public pendingRoarStart = false;
   public pendingRoarHeal = 0;
   public pendingRoarTicks = 0;
+  private entrancePhase: 'slam' | 'roar' | 'none' = 'slam';
+  private entranceTimer = GORILLA_ENTRANCE.slamWindup + GORILLA_ENTRANCE.slamRecovery;
+  private entranceSlammed = false;
+  public pendingArenaSlam = false;
+  public pendingEntranceRoar = false;
 
   public get isRoaring(): boolean {
     return this.roarPhase !== 'none';
+  }
+
+  public get isInEntrance(): boolean {
+    return this.entrancePhase !== 'none';
+  }
+
+  private updateEntrance(dt: number, player: Player): boolean {
+    this.entranceTimer = Math.max(0, this.entranceTimer - dt);
+    this.animation = 'slam';
+    if (Math.abs(player.x - this.x) > 1) this.facing = player.x < this.x ? -1 : 1;
+    if (this.entrancePhase === 'slam') {
+      // The ring rises on the exact frame the fists hit the ground.
+      if (!this.entranceSlammed && this.entranceTimer <= GORILLA_ENTRANCE.slamRecovery) {
+        this.entranceSlammed = true;
+        this.pendingArenaSlam = true;
+      }
+      if (this.entranceTimer === 0) {
+        this.entrancePhase = 'roar';
+        this.entranceTimer = GORILLA_ENTRANCE.roarDuration;
+        this.pendingEntranceRoar = true;
+      }
+      return true;
+    }
+    if (this.entranceTimer === 0) {
+      this.entrancePhase = 'none';
+      this.animation = 'idle';
+    }
+    return true;
   }
 
   private updateRoar(dt: number, player: Player, separation: { vx: number; vy: number }): boolean {
@@ -123,15 +156,19 @@ export class GorillaBoss extends ChallengeBoss {
 
   override update(dt: number, player: Player, separation: { vx: number; vy: number }): boolean {
     this.visual.update(dt);
-    this.leapCooldown = Math.max(0, this.leapCooldown - dt);
     if (this.hp <= 0) {
       this.pendingLeapImpact = false;
       this.pendingLeapSound = false;
       this.pendingRoarTicks = 0;
       this.pendingRoarStart = false;
+      this.pendingArenaSlam = false;
+      this.pendingEntranceRoar = false;
       this.roarPhase = 'none';
+      this.entrancePhase = 'none';
       return false;
     }
+    if (this.isInEntrance) return this.updateEntrance(dt, player);
+    this.leapCooldown = Math.max(0, this.leapCooldown - dt);
     if (this.isRoaring) return this.updateRoar(dt, player, separation);
     this.roarCooldown = Math.max(0, this.roarCooldown - dt);
     if (this.leapPhase !== 'none') return this.updateLeap(dt, player, separation);
@@ -267,7 +304,13 @@ export class GorillaBoss extends ChallengeBoss {
     const row = this.animation === 'slam' ? combat.slam
       : this.animation === 'walk' ? combat.walk : combat.run;
     let frame = 0;
-    if (this.animation === 'slam') {
+    if (this.entrancePhase !== 'none') {
+      const total = this.entrancePhase === 'slam'
+        ? GORILLA_ENTRANCE.slamWindup + GORILLA_ENTRANCE.slamRecovery
+        : GORILLA_ENTRANCE.roarDuration;
+      const progress = Math.min(1, Math.max(0, 1 - this.entranceTimer / total));
+      frame = Math.min(combat.frameCount - 1, Math.floor(progress * combat.frameCount));
+    } else if (this.animation === 'slam') {
       frame = this.leapPhase === 'airborne' ? 2
         : this.leapPhase === 'warning' ? Math.min(2, Math.floor((1 - this.leapTimer / GORILLA_LEAP.warning) * 3))
         : this.leapLanded && this.remainingLeaps > 0 ? 4
