@@ -81,9 +81,9 @@ const ACAI_MINIMAP_ICON_DRAW_SIZE = 16;
 // Amazon field plants: dangerous thorn bushes and the medicinal São-Caetano
 // herb. Both are scattered over dry land and the herb respawns elsewhere after
 // being harvested, so the player always has a way to cure the wound.
-const THORN_BUSH_COUNT = 56 * 30;
+const THORN_BUSH_COUNT = 28 * 30;
 const THORN_BUSH_RADIUS = 24;
-const HERB_COUNT = 14 * 30;
+const HERB_COUNT = 7 * 30;
 const HERB_RESPAWN = 35;
 const HERB_PICKUP_RADIUS = 34;
 const HERB_PROMPT_WIDTH = 262;
