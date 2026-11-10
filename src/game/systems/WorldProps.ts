@@ -1032,6 +1032,24 @@ export class WorldSystem {
   }
 
   /**
+   * Distance from the hilltop centre to its organic outer rim along a
+   * direction. Null when (x, y) is not standing on a plateau.
+   */
+  public getPlateauRimRadius(x: number, y: number, dirX: number, dirY: number): number | null {
+    if (this.mapId !== 'amazon_forest') return null;
+    const length = Math.hypot(dirX, dirY) || 1;
+    const nx = dirX / length;
+    const ny = dirY / length;
+    for (let i = 0; i < this.plateaus.length; i++) {
+      const plateau = this.plateaus[i];
+      if (this.isInsidePlateauTop(plateau, x, y)) {
+        return this.getPlateauBoundaryRadius(plateau, nx, ny);
+      }
+    }
+    return null;
+  }
+
+  /**
    * The raised rim is only crossable through the ramp. Jumping lets the hero
    * leave the hilltop (down the cliff), but never climb it from below.
    */

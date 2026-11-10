@@ -2786,6 +2786,7 @@ export class GameEngine {
     }
     // 1. Clear & Render Floor Tile Pattern
     this.worldProps.renderFloor(ctx, camera);
+    this.renderGorillaArenaFloor();
 
     // 1.2. Aquatic ambushers stay invisible until the hero enters the river,
     // but a faint dark silhouette hints at them below the surface.
@@ -2941,52 +2942,220 @@ export class GameEngine {
     this.renderMinimap();
   }
 
+  private gorillaStoneNoise(seed: number): number {
+    const value = Math.sin(seed * 12.9898 + 4.1414) * 43758.5453;
+    return value - Math.floor(value);
+  }
+
+  private drawGorillaCrack(
+    ctx: CanvasRenderingContext2D,
+    startX: number,
+    startY: number,
+    angle: number,
+    length: number,
+    seed: number,
+    depth: number
+  ): void {
+    const segments = 3 + Math.floor(this.gorillaStoneNoise(seed) * 3);
+    let x = startX;
+    let y = startY;
+    let heading = angle;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    for (let i = 0; i < segments; i++) {
+      heading += (this.gorillaStoneNoise(seed + i * 7.13) - 0.5) * 0.9;
+      const step = length / segments;
+      x += Math.cos(heading) * step;
+      y += Math.sin(heading) * step;
+      // Snap to a 2 px grid so the fissures read as pixel art.
+      ctx.lineTo(Math.round(x / 2) * 2, Math.round(y / 2) * 2);
+    }
+    ctx.stroke();
+    if (depth <= 0) return;
+    const branchAt = 0.32 + this.gorillaStoneNoise(seed + 2.7) * 0.35;
+    const branchX = startX + Math.cos(angle) * length * branchAt;
+    const branchY = startY + Math.sin(angle) * length * branchAt;
+    const side = this.gorillaStoneNoise(seed + 5.9) < 0.5 ? -1 : 1;
+    const branchAngle = angle + side * (0.5 + this.gorillaStoneNoise(seed + 8.3) * 0.6);
+    this.drawGorillaCrack(ctx, branchX, branchY, branchAngle, length * 0.52, seed + 17.31, depth - 1);
+  }
+
+  private drawGorillaBoulder(
+    ctx: CanvasRenderingContext2D,
+    seed: number,
+    halfWidth: number,
+    halfHeight: number
+  ): void {
+    const segments = 9;
+    const points: Array<{ x: number; y: number }> = [];
+    for (let i = 0; i < segments; i++) {
+      const angle = (i / segments) * Math.PI * 2;
+      const rx = halfWidth * (0.82 + this.gorillaStoneNoise(seed + i * 4.37) * 0.3);
+      const ry = halfHeight * (0.8 + this.gorillaStoneNoise(seed + 40 + i * 3.11) * 0.32);
+      points.push({
+        x: Math.round((Math.cos(angle) * rx) / 2) * 2,
+        y: Math.round((Math.sin(angle) * ry) / 2) * 2,
+      });
+    }
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+    ctx.closePath();
+    const tone = this.gorillaStoneNoise(seed * 1.37);
+    ctx.fillStyle = tone < 0.34 ? '#57534e' : tone < 0.67 ? '#6b6660' : '#78716c';
+    ctx.fill();
+    ctx.strokeStyle = '#1c1917';
+    ctx.lineWidth = 3;
+    ctx.lineJoin = 'miter';
+    ctx.stroke();
+
+    // Angular highlight facet on the upper-left, like raw chipped stone.
+    const facet = [
+      [-halfWidth * 0.78, -halfHeight * 0.32],
+      [-halfWidth * 0.38, -halfHeight * 0.78],
+      [halfWidth * 0.12, -halfHeight * 0.64],
+      [-halfWidth * 0.06, -halfHeight * 0.12],
+      [-halfWidth * 0.58, -halfHeight * 0.02],
+    ];
+    ctx.beginPath();
+    ctx.moveTo(Math.round(facet[0][0] / 2) * 2, Math.round(facet[0][1] / 2) * 2);
+    for (let i = 1; i < facet.length; i++) {
+      ctx.lineTo(Math.round(facet[i][0] / 2) * 2, Math.round(facet[i][1] / 2) * 2);
+    }
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(214, 211, 209, 0.2)';
+    ctx.fill();
+
+    // Internal hairline cracks.
+    ctx.strokeStyle = 'rgba(24, 20, 17, 0.75)';
+    ctx.lineWidth = 1.6;
+    ctx.lineCap = 'square';
+    ctx.beginPath();
+    ctx.moveTo(-halfWidth * 0.56, -halfHeight * 0.22);
+    ctx.lineTo(-halfWidth * 0.18, -halfHeight * 0.02);
+    ctx.lineTo(-halfWidth * 0.28, halfHeight * 0.36);
+    ctx.lineTo(halfWidth * 0.02, halfHeight * 0.52);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-halfWidth * 0.18, -halfHeight * 0.02);
+    ctx.lineTo(halfWidth * 0.22, -halfHeight * 0.2);
+    ctx.lineTo(halfWidth * 0.46, -halfHeight * 0.04);
+    ctx.stroke();
+
+    // Pixel chipping / rough speckles.
+    ctx.fillStyle = 'rgba(28, 25, 23, 0.45)';
+    for (let i = 0; i < 3; i++) {
+      const px = (this.gorillaStoneNoise(seed + i * 9.1) - 0.5) * halfWidth * 1.2;
+      const py = (this.gorillaStoneNoise(seed + i * 4.7) - 0.5) * halfHeight * 1.2;
+      const size = 2 + Math.round(this.gorillaStoneNoise(seed + i * 2.3) * 3);
+      ctx.fillRect(Math.round(px / 2) * 2, Math.round(py / 2) * 2, size, 2);
+    }
+  }
+
+  private renderGorillaArenaFloor(): void {
+    const arena = this.gorillaArena;
+    if (!arena) return;
+    const { ctx, camera } = this;
+    const origin = camera.worldToScreen(arena.x, arena.y);
+    const maxRadius = arena.radius * 1.5;
+    if (origin.x + maxRadius < -80 || origin.x - maxRadius > camera.viewportWidth + 80 ||
+      origin.y + maxRadius < -80 || origin.y - maxRadius > camera.viewportHeight + 80) return;
+
+    const rimRadius = (angle: number) =>
+      this.worldProps.getPlateauRimRadius(arena.x, arena.y, Math.cos(angle), Math.sin(angle)) ?? arena.radius;
+
+    ctx.save();
+    // Dusty floor scar follows the plateau rim, with the dark picket ring
+    // where the boulders tore out of the hilltop.
+    const traceRim = (extra: number) => {
+      ctx.beginPath();
+      for (let step = 0; step <= 96; step++) {
+        const angle = (step / 96) * Math.PI * 2;
+        const radius = rimRadius(angle) + extra;
+        const x = origin.x + Math.cos(angle) * radius;
+        const y = origin.y + Math.sin(angle) * radius;
+        if (step === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+    };
+
+    traceRim(0);
+    ctx.strokeStyle = 'rgba(41, 37, 36, 0.42)';
+    ctx.lineWidth = 18;
+    ctx.stroke();
+    traceRim(-14);
+    ctx.strokeStyle = 'rgba(168, 162, 158, 0.22)';
+    ctx.lineWidth = 6;
+    ctx.stroke();
+
+    // Impact fissures radiating from the ape's feet.
+    ctx.strokeStyle = 'rgba(12, 10, 8, 0.86)';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'square';
+    ctx.lineJoin = 'miter';
+    for (let i = 0; i < 9; i++) {
+      const angle = (i / 9) * Math.PI * 2 + 0.31;
+      const length = 74 + this.gorillaStoneNoise(i * 7.7 + 1) * 90;
+      this.drawGorillaCrack(ctx, origin.x, origin.y, angle, length, i * 13.7 + 2, 2);
+    }
+
+    // Smaller fissures along the base where each boulder broke through.
+    ctx.strokeStyle = 'rgba(14, 11, 9, 0.75)';
+    ctx.lineWidth = 2.2;
+    for (let i = 0; i < 16; i++) {
+      const angle = (i / 16) * Math.PI * 2 + 0.17;
+      const radius = rimRadius(angle);
+      const startX = origin.x + Math.cos(angle) * (radius - 4);
+      const startY = origin.y + Math.sin(angle) * (radius - 4);
+      const inward = angle + Math.PI + (this.gorillaStoneNoise(i * 3.9 + 5) - 0.5) * 0.7;
+      const length = 20 + this.gorillaStoneNoise(i * 5.3 + 9) * 32;
+      this.drawGorillaCrack(ctx, startX, startY, inward, length, i * 4.1 + 17, 1);
+    }
+    ctx.restore();
+  }
+
   private renderGorillaArena(): void {
     const arena = this.gorillaArena;
     if (!arena) return;
     const { ctx, camera } = this;
     const origin = camera.worldToScreen(arena.x, arena.y);
-    if (origin.x + arena.radius < -60 || origin.x - arena.radius > camera.viewportWidth + 60 ||
-      origin.y + arena.radius < -60 || origin.y - arena.radius > camera.viewportHeight + 60) return;
+    const maxRadius = arena.radius * 1.5;
+    if (origin.x + maxRadius < -80 || origin.x - maxRadius > camera.viewportWidth + 80 ||
+      origin.y + maxRadius < -80 || origin.y - maxRadius > camera.viewportHeight + 80) return;
+
+    const rimRadius = (angle: number) =>
+      this.worldProps.getPlateauRimRadius(arena.x, arena.y, Math.cos(angle), Math.sin(angle)) ?? arena.radius;
 
     ctx.save();
-    // Dusty floor scar where the ring burst out of the ground.
-    ctx.beginPath();
-    ctx.arc(origin.x, origin.y, arena.radius, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(41, 37, 36, 0.42)';
-    ctx.lineWidth = 18;
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(origin.x, origin.y, arena.radius - 14, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(168, 162, 158, 0.22)';
-    ctx.lineWidth = 6;
-    ctx.stroke();
-
-    // Solid boulders form a visually closed barrier. Collision is the continuous
-    // circle handled by clampToGorillaArena, so no diagonal gap can be slipped through.
+    // Solid boulders form a visually closed barrier along the plateau rim.
+    // Collision is still the continuous circle handled by clampToGorillaArena.
     for (let i = 0; i < GORILLA_ARENA.stoneCount; i++) {
       const angle = (i / GORILLA_ARENA.stoneCount) * Math.PI * 2;
-      const wobble = Math.sin(i * 12.9898) * 7;
-      const radius = arena.radius + wobble;
+      const radius = rimRadius(angle);
       const stoneX = origin.x + Math.cos(angle) * radius;
       const stoneY = origin.y + Math.sin(angle) * radius;
-      const halfWidth = 26 + (i % 3) * 5;
-      const halfHeight = 34 + ((i * 7) % 14);
+      const seed = i + 1;
+      const halfWidth = 24 + this.gorillaStoneNoise(seed * 5.1) * 12;
+      const halfHeight = 32 + this.gorillaStoneNoise(seed * 7.3) * 15;
       ctx.save();
       ctx.translate(stoneX, stoneY);
       ctx.rotate(angle + Math.PI / 2);
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.34)';
       ctx.beginPath();
-      ctx.ellipse(3, 10, halfWidth, halfHeight * 0.5, 0, 0, Math.PI * 2);
+      ctx.ellipse(2, 8, halfWidth * 1.02, halfHeight * 0.42, 0, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = i % 2 === 0 ? '#78716c' : '#57534e';
-      ctx.beginPath();
-      ctx.ellipse(0, 0, halfWidth, halfHeight, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = 'rgba(214, 211, 209, 0.28)';
-      ctx.beginPath();
-      ctx.ellipse(-halfWidth * 0.22, -halfHeight * 0.24, halfWidth * 0.55, halfHeight * 0.45, 0, 0, Math.PI * 2);
-      ctx.fill();
+      this.drawGorillaBoulder(ctx, seed, halfWidth, halfHeight);
+      if (i % 2 === 0) {
+        // A smaller chipped boulder caps every other block, giving the wall a
+        // stacked, hand-piled silhouette.
+        ctx.save();
+        ctx.translate(
+          halfWidth * 0.58 * (i % 4 === 0 ? 1 : -1),
+          -halfHeight * 0.12
+        );
+        this.drawGorillaBoulder(ctx, seed + 101, halfWidth * 0.55, halfHeight * 0.5);
+        ctx.restore();
+      }
       ctx.restore();
     }
     ctx.restore();
