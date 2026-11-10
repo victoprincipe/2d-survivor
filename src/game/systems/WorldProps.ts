@@ -304,8 +304,9 @@ interface RockProp {
 }
 
 // Elevated plateaus in the middle of the forest. The ellipse is the walkable
-// hilltop and its rim is an impassable earth/stone wall, except for the single
-// dirt ramp described by rampAngle/rampHalfWidth/rampLength.
+// hilltop and its rim is an earth/stone wall. The hero may only cross it via
+// the single dirt ramp described by rampAngle/rampHalfWidth/rampLength, while
+// land animals can climb the wall directly.
 interface PlateauProp {
   x: number;
   y: number;
@@ -791,8 +792,8 @@ export class WorldSystem {
 
   private generatePlateaus(): void {
     // Two hand-placed hills around the centre of the map. Each one has a
-    // single dirt ramp at a different side, so the player and the animals must
-    // walk around the rim and climb through that opening.
+    // single dirt ramp at a different side, so the hero must walk around the
+    // rim and climb through that opening. Land animals can scale the wall.
     this.plateaus = [
       {
         x: 2100,
@@ -1003,6 +1004,29 @@ export class WorldSystem {
   private isOnPlateauRamp(x: number, y: number, padding: number = 0): boolean {
     for (let i = 0; i < this.plateaus.length; i++) {
       if (this.isInsidePlateauRamp(this.plateaus[i], x, y, padding)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * True when (x, y) is on the exposed vertical wall of a plateau, outside the
+   * dirt ramp. Land animals use this to apply the climbing speed penalty while
+   * they scale the cliff.
+   */
+  public isOnPlateauWall(x: number, y: number): boolean {
+    if (this.mapId !== 'amazon_forest') return false;
+
+    for (let i = 0; i < this.plateaus.length; i++) {
+      const plateau = this.plateaus[i];
+      const dx = x - plateau.x;
+      const dy = y - plateau.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      if (distance < 0.0001) continue;
+
+      const boundary = this.getPlateauBoundaryRadius(plateau, dx / distance, dy / distance);
+      if (distance < boundary || distance > boundary + PLATEAU_RIM_WIDTH) continue;
+      if (this.isInsidePlateauRamp(plateau, x, y)) continue;
+      return true;
     }
     return false;
   }
@@ -4736,8 +4760,9 @@ export class WorldSystem {
   }
 
   /**
-   * Constrains a ground animal to the plateau geometry. Unlike the hero they
-   * cannot jump, so both the climb and the descent must use a dirt ramp.
+   * Constrains a ground animal to solid props and the cave. Plateau cliffs are
+   * deliberately not checked: land animals can scale the vertical wall in any
+   * direction, straight towards the hero, without needing the dirt ramp.
    */
   public resolveLandMovement(
     fromX: number,
@@ -4768,7 +4793,6 @@ export class WorldSystem {
     for (let i = 0; i < steps; i++) {
       const nextX = x + stepX;
       if (
-        !this.blocksOnPlateauRim(x, y, nextX, y, false, radius) &&
         (startedInsideTree || !this.collidesWithDecorTree(nextX, y, radius)) &&
         (startedInsideCave || !this.forestCave?.collides(nextX, y, radius))
       ) {
@@ -4777,7 +4801,6 @@ export class WorldSystem {
 
       const nextY = y + stepY;
       if (
-        !this.blocksOnPlateauRim(x, y, x, nextY, false, radius) &&
         (startedInsideTree || !this.collidesWithDecorTree(x, nextY, radius)) &&
         (startedInsideCave || !this.forestCave?.collides(x, nextY, radius))
       ) {

@@ -114,6 +114,10 @@ const ECOLOGY_FRUIT_FEED_COOLDOWN = 8;
 const SUCURI_WATER_SPEED_MULTIPLIER = 1.5;
 const SUCURI_SHORE_SPEED_MULTIPLIER = 1.3;
 
+// Land animals climb a plateau's vertical wall 20% slower than they walk on
+// flat ground, simulating the effort of scaling it.
+const PLATEAU_CLIMB_SPEED_MULTIPLIER = 0.8;
+
 // Amazon thorn bushes: immediate damage, a 40% slow and a 10s bleeding wound.
 const THORN_BUSH_DAMAGE = 7;
 const THORN_BUSH_BLEED_DPS = 2;
@@ -820,6 +824,13 @@ export class GameEngine {
               : 1.0;
       }
 
+      // Scaling a plateau's vertical wall is slower than walking on flat
+      // ground; the penalty ends as soon as the animal reaches the top or the
+      // forest floor.
+      if (!e.isWaterDweller && this.worldProps.isOnPlateauWall(e.x, e.y)) {
+        e.terrainSpeedMultiplier *= PLATEAU_CLIMB_SPEED_MULTIPLIER;
+      }
+
       const sep = e.isSubmerged
         ? { vx: 0, vy: 0 }
         : this.spatialGrid.applySeparation(e, e.radius * 2, 0.45);
@@ -895,8 +906,8 @@ export class GameEngine {
         e.y = resolved.y;
       } else if (!(e instanceof GorillaBoss && (e.isLeaping || e.pendingLeapImpact)) && !(e.isJaguarPredator && e.jaguarAttack === 'leap' &&
         (e.jaguarState === 'active' || e.pendingJaguarStrike === 'leap'))) {
-        // Land animals cannot cross the plateau cliffs either: they must use
-        // the dirt ramps, just like the hero.
+        // Land animals may scale the plateau cliffs in any direction, straight
+        // towards the hero; only solid trunks and the cave still block them.
         const resolved = this.worldProps.resolveLandMovement(
           previousX,
           previousY,
