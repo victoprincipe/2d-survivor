@@ -549,8 +549,11 @@ export class WaveDirector {
 
     const bossTypes: EnemyType[] = [];
     if (combo) {
-      for (let i = 0; i < simultaneous; i++) {
-        bossTypes.push(combo.types[(comboAppearance + i) % combo.types.length]);
+      const availableTypes = combo.types.filter(
+        (bossType) => bossType !== 'boss_boitata' || this.survivalTime >= 600
+      );
+      for (let i = 0; i < Math.min(simultaneous, availableTypes.length); i++) {
+        bossTypes.push(availableTypes[(comboAppearance + i) % availableTypes.length]);
       }
     } else {
       bossTypes.push(type);

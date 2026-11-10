@@ -14,7 +14,8 @@ export class SoundEngine {
   private lastPlayerHurtVariant = -1;
   private playerHurtNoise: AudioBuffer | null = null;
   private amazonHurtBuffer: AudioBuffer | null = null;
-  private bowHitBuffer: Promise<AudioBuffer | null> | null = null;
+  private bowHitBuffer: AudioBuffer | null = null;
+  private bowHitOffset = 0;
   private bowShotBuffer: Promise<AudioBuffer | null> | null = null;
   private deathBuffer: Promise<AudioBuffer | null> | null = null;
   private jaguarBuffer: Promise<AudioBuffer | null> | null = null;
@@ -23,6 +24,16 @@ export class SoundEngine {
   private gorillaChargeBuffer: Promise<AudioBuffer | null> | null = null;
   private gorillaGroundSlamBuffer: Promise<AudioBuffer | null> | null = null;
   private quizFailureScreamBuffer: Promise<AudioBuffer | null> | null = null;
+  private quizLandingBuffer: AudioBuffer | null = null;
+
+  playQuizLanding(): void {
+    if (this.muted || !this.initCtx() || !this.ctx || !this.sfxGain || !this.quizLandingBuffer) return;
+    const source = this.ctx.createBufferSource();
+    source.buffer = this.quizLandingBuffer;
+    source.connect(this.sfxGain);
+    source.onended = () => source.disconnect();
+    source.start();
+  }
 
   playGorillaGroundSlam(): void {
     if (this.muted || !this.initCtx() || !this.ctx || !this.sfxGain) return;
@@ -82,24 +93,19 @@ export class SoundEngine {
   }
 
   playBowHit(): void {
-    if (this.muted || !this.initCtx() || !this.ctx || !this.sfxGain) return;
+    if (this.muted || !this.initCtx() || !this.ctx || !this.sfxGain || !this.bowHitBuffer) return;
     if (this.shouldRateLimit('bowHit', 80)) return;
-    const ctx = this.ctx;
-    const gain = this.sfxGain;
-    void this.bowHitBuffer?.then(buffer => {
-      if (!buffer || this.ctx !== ctx || ctx.state === 'closed' || this.muted) return;
-      const source = ctx.createBufferSource();
-      source.buffer = buffer;
-      const impactGain = ctx.createGain();
-      impactGain.gain.value = 0.25;
-      source.connect(impactGain);
-      impactGain.connect(gain);
-      source.onended = () => {
-        source.disconnect();
-        impactGain.disconnect();
-      };
-      source.start();
-    });
+    const source = this.ctx.createBufferSource();
+    source.buffer = this.bowHitBuffer;
+    const impactGain = this.ctx.createGain();
+    impactGain.gain.value = 0.275;
+    source.connect(impactGain);
+    impactGain.connect(this.sfxGain);
+    source.onended = () => {
+      source.disconnect();
+      impactGain.disconnect();
+    };
+    source.start(this.ctx.currentTime, this.bowHitOffset);
   }
 
   playBowShot(): void {
@@ -165,10 +171,26 @@ export class SoundEngine {
       if (!AudioCtx) return false;
       this.ctx = new AudioCtx();
       const ctx = this.ctx;
-      this.bowHitBuffer = fetch('/audio/amazon-bow-hit.mp3')
+      void fetch('/audio/amazon-bow-hit.mp3')
         .then(response => { if (!response.ok) throw new Error('Bow impact audio unavailable'); return response.arrayBuffer(); })
         .then(data => ctx.decodeAudioData(data))
-        .catch(() => null);
+        .then(buffer => {
+          if (this.ctx !== ctx || ctx.state === 'closed') return;
+          // Skip leading silence while retaining a short attack transient.
+          let onset = buffer.length;
+          for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
+            const samples = buffer.getChannelData(channel);
+            let peak = 0;
+            for (let i = 0; i < samples.length; i++) peak = Math.max(peak, Math.abs(samples[i]));
+            const threshold = Math.max(0.003, peak * 0.03);
+            for (let i = 0; i < onset; i++) {
+              if (Math.abs(samples[i]) > threshold) { onset = i; break; }
+            }
+          }
+          this.bowHitOffset = onset < buffer.length ? Math.max(0, onset / buffer.sampleRate - 0.004) : 0;
+          this.bowHitBuffer = buffer;
+        })
+        .catch(() => {});
       this.bowShotBuffer = fetch('/audio/amazon-bow-shot.mp3')
         .then(response => { if (!response.ok) throw new Error('Bow audio unavailable'); return response.arrayBuffer(); })
         .then(data => ctx.decodeAudioData(data))
@@ -207,6 +229,11 @@ export class SoundEngine {
         .then(response => { if (!response.ok) throw new Error('Quiz failure scream audio unavailable'); return response.arrayBuffer(); })
         .then(data => ctx.decodeAudioData(data))
         .catch(() => null);
+      void fetch('/audio/quiz-landing.mp3')
+        .then(response => { if (!response.ok) throw new Error('Quiz landing audio unavailable'); return response.arrayBuffer(); })
+        .then(data => ctx.decodeAudioData(data))
+        .then(buffer => { if (this.ctx === ctx && ctx.state !== 'closed') this.quizLandingBuffer = buffer; })
+        .catch(() => {});
 
       this.masterGain = this.ctx.createGain();
       this.masterGain.gain.value = this.muted ? 0 : 1;
@@ -832,6 +859,7 @@ export class SoundEngine {
     this.bowHitBuffer = null;
     this.bowShotBuffer = null;
     this.quizFailureScreamBuffer = null;
+    this.quizLandingBuffer = null;
     this.gorillaGroundSlamBuffer = null;
     this.gorillaChargeBuffer = null;
     this.gorillaLeapBuffer = null;

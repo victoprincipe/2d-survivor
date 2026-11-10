@@ -592,6 +592,7 @@ export class GameEngine {
       this.input.clearInteract();
       this.input.clearJump();
       if (this.quizLaunchRemaining === 0) {
+        this.sound.playQuizLanding();
         this.player.hp = 0;
         this.handlePlayerDeath();
       }
@@ -983,9 +984,9 @@ export class GameEngine {
           this.bossHazards.push({
             x: e.x + Math.cos(angle) * offset,
             y: e.y + Math.sin(angle) * offset,
-            radius: isBoitata ? 26 : 28,
-            life: isBoitata ? 3.5 : 4.5,
-            maxLife: isBoitata ? 3.5 : 4.5,
+            radius: isBoitata ? 22 : 28,
+            life: isBoitata ? 2.5 : 4.5,
+            maxLife: isBoitata ? 2.5 : 4.5,
             kind: 'ember',
             tickTimer: 0,
             damage: Math.max(1, Math.round(e.damage * (isBoitata ? 0.25 : 0.3))),

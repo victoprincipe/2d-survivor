@@ -975,7 +975,7 @@ export class WeaponSystem {
     damageScale: number = 1.0,
     widthScale: number = 1.0
   ): void {
-    sound.playWhip();
+    if (w.id === player.character.startingWeapon) sound.playWhip();
     const facing = player.facingX < 0 ? -1 : 1;
     const dmgTable = [0, 22, 29, 34, 40, 44];
     const baseDamage = (w.evolved ? 46 : this.tableValue(dmgTable, w.level, 22)) * player.might * damageScale;
@@ -1062,7 +1062,7 @@ export class WeaponSystem {
       }
     }
 
-    if (hitCount > 0) sound.playHit();
+    if ((hitCount > 0) && w.id === player.character.startingWeapon) sound.playHit();
   }
 
   private triggerWhip(
@@ -1157,7 +1157,7 @@ export class WeaponSystem {
       });
     }
 
-    sound.playShoot();
+    if (w.id === player.character.startingWeapon) sound.playShoot();
   }
 
   private triggerKnife(w: WeaponInstance, player: Player, sound: SoundEngine): void {
@@ -1199,7 +1199,7 @@ export class WeaponSystem {
       });
     }
 
-    sound.playKnife();
+    if (w.id === player.character.startingWeapon) sound.playKnife();
   }
 
   private triggerBow(
@@ -1262,7 +1262,7 @@ export class WeaponSystem {
       });
     }
 
-    if (player.character.id === 'kayrurururu') sound.playBowShot();
+    if ((player.character.id === 'kayrurururu') && w.id === player.character.startingWeapon) sound.playBowShot();
   }
 
   private triggerSyringe(
@@ -1324,7 +1324,7 @@ export class WeaponSystem {
       });
     }
 
-    sound.playShoot();
+    if (w.id === player.character.startingWeapon) sound.playShoot();
   }
 
   private triggerDersonCombo(
@@ -1391,7 +1391,7 @@ export class WeaponSystem {
           hitEnemyIds: new Set(),
         });
       }
-      sound.playShoot();
+      if (w.id === player.character.startingWeapon) sound.playShoot();
     }
 
     if (fireCoffee) {
@@ -1431,7 +1431,7 @@ export class WeaponSystem {
           },
         });
       }
-      if (!fireCheeseBread) sound.playShoot();
+      if ((!fireCheeseBread) && w.id === player.character.startingWeapon) sound.playShoot();
     }
 
     if (fireCake) {
@@ -1464,7 +1464,7 @@ export class WeaponSystem {
           hitEnemyIds: new Set(),
         });
       }
-      sound.playKnife();
+      if (w.id === player.character.startingWeapon) sound.playKnife();
     }
   }
 
@@ -1534,7 +1534,7 @@ export class WeaponSystem {
       });
     }
 
-    sound.playKnife();
+    if (w.id === player.character.startingWeapon) sound.playKnife();
   }
 
   private triggerBottle51(
@@ -1575,7 +1575,7 @@ export class WeaponSystem {
         },
       });
     }
-    sound.playShoot();
+    if (w.id === player.character.startingWeapon) sound.playShoot();
   }
 
   private triggerFireFlask(
@@ -1650,7 +1650,7 @@ export class WeaponSystem {
       });
     }
 
-    sound.playShoot();
+    if (w.id === player.character.startingWeapon) sound.playShoot();
   }
 
   private triggerExecutionerAxe(
@@ -1689,7 +1689,7 @@ export class WeaponSystem {
           hitEnemyIds: new Set(),
         });
       }
-      sound.playWhip();
+      if (w.id === player.character.startingWeapon) sound.playWhip();
       return;
     }
 
@@ -1737,7 +1737,7 @@ export class WeaponSystem {
       });
     }
 
-    sound.playWhip();
+    if (w.id === player.character.startingWeapon) sound.playWhip();
   }
 
   private triggerPoderDoL(
@@ -1760,7 +1760,7 @@ export class WeaponSystem {
     this.spawnRingPulse(player.x, player.y, radius, LULA_SKILL.color, 0.42);
     this.spawnRingPulse(player.x, player.y, radius * 0.65, '#ff5252', 0.3);
     vfx.addSparks(player.x, player.y, LULA_SKILL.color, 12);
-    sound.playThunder();
+    if (w.id === player.character.startingWeapon) sound.playThunder();
 
     const victims = grid.queryRadius(player.x, player.y, radius);
     for (let i = 0; i < victims.length; i++) {
@@ -1849,7 +1849,7 @@ export class WeaponSystem {
       });
     }
     vfx.addSparks(player.x, player.y, supreme ? '#f97316' : '#fbbf24', supreme ? 12 : 6);
-    sound.playWhip();
+    if (w.id === player.character.startingWeapon) sound.playWhip();
   }
 
   private triggerPupunhaSpikes(w: WeaponInstance, player: Player, sound: SoundEngine): void {
@@ -1879,7 +1879,7 @@ export class WeaponSystem {
         hitEnemyIds: new Set(),
       });
     }
-    sound.playKnife();
+    if (w.id === player.character.startingWeapon) sound.playKnife();
   }
 
   private triggerBulletSting(
@@ -1922,7 +1922,7 @@ export class WeaponSystem {
         hitEnemyIds: new Set(),
       });
     }
-    sound.playShoot();
+    if (w.id === player.character.startingWeapon) sound.playShoot();
   }
 
   private triggerInoxTray(
@@ -1974,7 +1974,7 @@ export class WeaponSystem {
         },
       });
     }
-    sound.playKnife();
+    if (w.id === player.character.startingWeapon) sound.playKnife();
   }
 
   private triggerSaciCyclone(w: WeaponInstance, player: Player, sound: SoundEngine): void {
@@ -2013,7 +2013,7 @@ export class WeaponSystem {
       });
     }
     this.spawnRingPulse(player.x, player.y, 46 * player.areaMultiplier, supreme ? '#38bdf8' : '#a16207', 0.3);
-    sound.playWhip();
+    if (w.id === player.character.startingWeapon) sound.playWhip();
   }
 
   private triggerCaiporaSpear(
@@ -2048,7 +2048,7 @@ export class WeaponSystem {
       isEvolved: false,
       hitEnemyIds: new Set(),
     });
-    sound.playShoot();
+    if (w.id === player.character.startingWeapon) sound.playShoot();
   }
 
   private triggerVitoriaSpores(
@@ -2102,7 +2102,7 @@ export class WeaponSystem {
         },
       });
     }
-    sound.playShoot();
+    if (w.id === player.character.startingWeapon) sound.playShoot();
   }
 
   private triggerPiranhaBite(w: WeaponInstance, player: Player, sound: SoundEngine): void {
@@ -2134,7 +2134,7 @@ export class WeaponSystem {
         hitEnemyIds: new Set(),
       });
     }
-    sound.playKnife();
+    if (w.id === player.character.startingWeapon) sound.playKnife();
   }
 
   private triggerMapinguariRoar(
@@ -2150,7 +2150,7 @@ export class WeaponSystem {
     this.spawnRingPulse(player.x, player.y, radius, '#a16207', 0.42);
     this.spawnRingPulse(player.x, player.y, radius * 0.7, '#84cc16', 0.3);
     vfx.addSparks(player.x, player.y, '#a16207', 14);
-    sound.playThunder();
+    if (w.id === player.character.startingWeapon) sound.playThunder();
 
     const victims = grid.queryRadius(player.x, player.y, radius);
     for (let i = 0; i < victims.length; i++) {
@@ -2228,7 +2228,7 @@ export class WeaponSystem {
       enemy.applySlow(0.3, 1.6 * player.durationMultiplier);
       if (result.dead) continue;
     }
-    sound.playWhip();
+    if (w.id === player.character.startingWeapon) sound.playWhip();
   }
 
   private triggerMutucaSwarm(
@@ -2266,7 +2266,7 @@ export class WeaponSystem {
         hitEnemyIds: new Set(),
       });
     }
-    sound.playShoot();
+    if (w.id === player.character.startingWeapon) sound.playShoot();
   }
 
   private triggerResinDrop(
@@ -2319,7 +2319,7 @@ export class WeaponSystem {
         },
       });
     }
-    sound.playShoot();
+    if (w.id === player.character.startingWeapon) sound.playShoot();
   }
 
   private triggerTucanoFlight(
@@ -2358,7 +2358,7 @@ export class WeaponSystem {
         hitEnemyIds: new Set(),
       });
     }
-    sound.playShoot();
+    if (w.id === player.character.startingWeapon) sound.playShoot();
   }
 
   private triggerSpiderWeb(
@@ -2397,7 +2397,7 @@ export class WeaponSystem {
         hitEnemyIds: new Set(),
       });
     }
-    sound.playShoot();
+    if (w.id === player.character.startingWeapon) sound.playShoot();
   }
 
   private triggerSucuriCharge(
@@ -2433,7 +2433,7 @@ export class WeaponSystem {
       hitEnemyIds: new Set(),
     });
     this.spawnRingPulse(player.x, player.y, 50 * player.areaMultiplier, '#166534', 0.28);
-    sound.playWhip();
+    if (w.id === player.character.startingWeapon) sound.playWhip();
   }
 
   private performLightningBolt(
@@ -2450,7 +2450,7 @@ export class WeaponSystem {
     sound: SoundEngine,
     onEnemyKilled: (enemy: Enemy) => void
   ): void {
-    sound.playThunder();
+    if (w.id === player.character.startingWeapon) sound.playThunder();
     this.lightningStrikes.push({
       x: strikeX,
       y: strikeY,
@@ -2704,7 +2704,7 @@ export class WeaponSystem {
       }
     }
 
-    if (hitAny) sound.playHit();
+    if ((hitAny) && w.id === player.character.startingWeapon) sound.playHit();
   }
 
   private updateGarlic(
@@ -2728,7 +2728,7 @@ export class WeaponSystem {
 
     if (this.garlicTimer >= tickInterval) {
       this.garlicTimer = 0;
-      sound.playGarlicPulse();
+      if (w.id === player.character.startingWeapon) sound.playGarlicPulse();
 
       const dmgTable = [0, 11, 14, 18, 22, 26];
       const baseDamage = (w.evolved ? 32 : this.tableValue(dmgTable, w.level, 11)) * player.might;
@@ -2892,7 +2892,7 @@ export class WeaponSystem {
             player, grid, vfx, onEnemyKilled
           );
           vfx.addSparks(flight.targetX, flight.targetY, '#facc15', 8);
-          sound.playHit();
+          if (p.weaponId === player.character.startingWeapon) sound.playHit();
           this.projectiles.splice(i, 1);
         }
         continue;
@@ -2929,7 +2929,7 @@ export class WeaponSystem {
             zoneType === 'bio_cloud' ? '#34d399' : p.isEvolved ? '#38bdf8' : '#f97316',
             8
           );
-          sound.playHit();
+          if (p.weaponId === player.character.startingWeapon) sound.playHit();
           this.projectiles.splice(i, 1);
         }
         continue;
@@ -3056,7 +3056,7 @@ export class WeaponSystem {
 
       // Check collision with enemies
       const hits = grid.queryRadius(p.x, p.y, p.radius + 14);
-      let hitSomeone = false;
+
 
       for (let h = 0; h < hits.length; h++) {
         const enemy = hits[h];
@@ -3240,7 +3240,7 @@ export class WeaponSystem {
                                                 ? '#166534'
                                                 : '#e2e8f0';
         vfx.addSparks(p.x, p.y, sparkColor, 3);
-        hitSomeone = true;
+        if ((p.type === 'bow' && !enemy.isSubmerged) && p.weaponId === player.character.startingWeapon) sound.playBowHit();
 
         p.pierce -= 1;
         if (p.pierce <= 0) {
@@ -3263,7 +3263,7 @@ export class WeaponSystem {
         }
       }
 
-      if (hitSomeone && p.type === 'bow') sound.playBowHit();
+
     }
   }
 
