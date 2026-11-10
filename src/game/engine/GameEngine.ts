@@ -1395,6 +1395,11 @@ export class GameEngine {
       if (collected) {
         this.handleDropCollected(drop);
         this.drops.splice(i, 1);
+        // A level-up or chest must finish before another pickup opens a modal.
+        if (this.isPaused || this.isGameOver) {
+          this.syncHUD();
+          return;
+        }
       }
     }
 

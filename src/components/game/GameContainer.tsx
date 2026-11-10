@@ -113,10 +113,12 @@ export const GameContainer: React.FC = () => {
         },
         onLevelUp: (options) => {
           setLevelUpOptions(options);
+          gameStateRef.current = 'level_up';
           setGameState('level_up');
         },
         onTreasureChest: (gold, upgrade) => {
           setChestReward({ gold, upgrade });
+          gameStateRef.current = 'chest';
           setGameState('chest');
         },
         onGameOver: (summary) => {
@@ -151,22 +153,27 @@ export const GameContainer: React.FC = () => {
   };
 
   const handleSelectUpgrade = (option: UpgradeOption) => {
-    if (engineRef.current) {
-      engineRef.current.applyUpgrade(option);
-    }
+    const engine = engineRef.current;
+    if (!engine || gameStateRef.current !== 'level_up') return;
+    // applyUpgrade can synchronously open another choice for overflow XP.
+    // Let that callback own the final state instead of hiding its modal.
+    gameStateRef.current = 'playing';
     setGameState('playing');
+    engine.applyUpgrade(option);
   };
 
   const handleCloseChest = () => {
-    if (engineRef.current) {
-      if (chestReward?.upgrade) {
-        engineRef.current.applyUpgrade(chestReward.upgrade);
-      } else {
-        engineRef.current.resume();
-      }
-    }
+    const engine = engineRef.current;
+    if (!engine || gameStateRef.current !== 'chest') return;
+    const upgrade = chestReward?.upgrade;
     setChestReward(null);
+    gameStateRef.current = 'playing';
     setGameState('playing');
+    if (upgrade) {
+      engine.applyUpgrade(upgrade);
+    } else {
+      engine.resume();
+    }
   };
 
   const handlePause = () => {
