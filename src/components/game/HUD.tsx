@@ -43,6 +43,14 @@ export const HUD: React.FC<HUDProps> = ({
 
   return (
     <div className="pointer-events-none absolute inset-0 select-none flex flex-col justify-between p-3 font-sans text-white">
+          {/* Timer anchored at the top of the viewport */}
+          <div aria-label="Tempo de sobrevivência" className="absolute left-1/2 top-3 -translate-x-1/2 whitespace-nowrap bg-slate-900/90 border-2 border-slate-700 rounded-xl px-4 py-1.5 flex items-center gap-2 shadow-2xl backdrop-blur-md">
+            <Clock className="w-5 h-5 text-amber-400" />
+            <span className="font-mono text-xl sm:text-2xl font-black tracking-widest text-white">
+              {formatTime(hud.survivalTime)}
+            </span>
+          </div>
+
       {/* Difficulty Badge */}
       <div className="pointer-events-none absolute right-3 top-3 select-none">
         <div className="flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-900/90 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-200 shadow-md backdrop-blur-sm">
@@ -78,7 +86,7 @@ export const HUD: React.FC<HUDProps> = ({
           </div>
         )}
 
-        {/* Middle Stats Bar: HP, Kills, Gold, Timer, Audio/Pause Controls */}
+        {/* Middle Stats Bar: HP, Kills, Gold, Audio/Pause Controls */}
         <div className="flex justify-between items-start sm:items-center gap-2">
           {/* Left: Mission Objectives, HP & Inventory */}
           <div className="flex flex-col gap-1.5 max-w-[46%] sm:max-w-none">
@@ -254,14 +262,6 @@ export const HUD: React.FC<HUDProps> = ({
               ))}
             </div>
             )}
-          </div>
-
-          {/* Center: Clock */}
-          <div className="bg-slate-900/90 border-2 border-slate-700 rounded-xl px-4 py-1.5 flex items-center gap-2 shadow-2xl backdrop-blur-md">
-            <Clock className="w-5 h-5 text-amber-400" />
-            <span className="font-mono text-xl sm:text-2xl font-black tracking-widest text-white">
-              {formatTime(hud.survivalTime)}
-            </span>
           </div>
 
           {/* Right: Kills, Gold, and Controls */}

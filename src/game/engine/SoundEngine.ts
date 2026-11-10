@@ -111,6 +111,7 @@ export class SoundEngine {
   private lastPlayedTimestamps: Record<string, number> = {};
   private bgmAudio: HTMLAudioElement | null = null;
   private isBgmPlaying: boolean = false;
+  private caveAudio: HTMLAudioElement | null = null;
   private ambientSource: AudioBufferSourceNode | null = null;
   private ambientGain: GainNode | null = null;
   private ambientLfo: OscillatorNode | null = null;
@@ -757,8 +758,8 @@ export class SoundEngine {
 
   startBgm(mapId: MapId = 'night_plain'): void {
     if (this.isBgmPlaying) return;
-    this.isBgmPlaying = true;
     if (!this.initCtx() || !this.ctx || !this.bgmGain) return;
+    this.isBgmPlaying = true;
 
     // Route the soundtrack through bgmGain so mute and volume controls apply.
     if (!this.bgmAudio) {
@@ -775,6 +776,25 @@ export class SoundEngine {
     });
   }
 
+  startCaveAmbience(): void {
+    this.stopBgm();
+    this.stopAmazonAmbient();
+    if (!this.initCtx() || !this.ctx || !this.bgmGain) return;
+    if (!this.caveAudio) {
+      // Stream the recording instead of decoding the full file into memory.
+      this.caveAudio = new Audio('/audio/cave-river.mp3');
+      this.caveAudio.loop = true;
+      this.caveAudio.preload = 'auto';
+      this.ctx.createMediaElementSource(this.caveAudio).connect(this.bgmGain);
+    }
+    // Reuse the element so subsequent visits resume the water recording.
+    void this.caveAudio.play().catch(() => {});
+  }
+
+  stopCaveAmbience(): void {
+    this.caveAudio?.pause();
+  }
+
   stopBgm(): void {
     this.isBgmPlaying = false;
     this.bgmAudio?.pause();
@@ -789,7 +809,11 @@ export class SoundEngine {
     this.deathBuffer = null;
     this.amazonHurtBuffer = null;
     this.stopBgm();
+    this.stopCaveAmbience();
     this.stopAmazonAmbient();
+    this.caveAudio?.removeAttribute('src');
+    this.caveAudio?.load();
+    this.caveAudio = null;
     this.bgmAudio = null;
     if (this.ctx) {
       this.ctx.close().catch(() => {});

@@ -1,4 +1,5 @@
 import {
+  EquipmentItem,
   CharacterConfig,
   DifficultyConfig,
   DifficultyId,
@@ -15,7 +16,7 @@ import {
   DevTelemetrySnapshot,
   EnemyType,
 } from '../types';
-import { claimGuardianBow, emptyInventory, GUARDIAN_BOW, withEquipment } from '../data/inventory';
+import { claimGuardianBow, emptyInventory, FOREST_ARMOR, GUARDIAN_BOW, withEquipment } from '../data/inventory';
 import { Camera } from './Camera';
 import { InputManager } from './Input';
 import { SoundEngine } from './SoundEngine';
@@ -47,7 +48,7 @@ import { getDifficulty } from '../data/difficulties';
 import { applyRunToMissions } from '../data/missions';
 
 export interface GameEngineCallbacks {
-  onEquipmentReward: () => void;
+  onEquipmentReward: (item: EquipmentItem) => void;
   onForestQuiz?: (quiz: ForestQuizView) => void;
   onGorillaDialogue?: () => void;
   onHUDUpdate: (hud: HUDState) => void;
@@ -475,7 +476,7 @@ export class GameEngine {
     this.camera.y = spawn.y;
     this.player.levelUpHealFraction = this.difficulty.levelUpHealFraction;
     this.player.setCollisionResolver((fromX, fromY, dx, dy, radius, airborne) =>
-      this.insideCave ? this.caveInterior.resolveMovement(fromX + dx, fromY + dy, radius) : this.worldProps.resolvePlayerMovement(fromX, fromY, dx, dy, radius, airborne)
+      this.insideCave ? this.caveInterior.resolveMovement(fromX, fromY, dx, dy, radius) : this.worldProps.resolvePlayerMovement(fromX, fromY, dx, dy, radius, airborne)
     );
     this.weaponSystem = new WeaponSystem(
       mapId === 'amazon_forest'
@@ -608,6 +609,9 @@ export class GameEngine {
       if (!this.player.update(dt, this.input)) { this.handlePlayerDeath(); return; }
       if (interactRequested && this.caveInterior.nearExit(this.player)) {
         this.insideCave = false;
+        this.sound.stopCaveAmbience();
+        this.sound.startBgm('amazon_forest');
+        this.sound.startAmazonAmbient();
         this.player.x = -1950;
         this.player.y = 1980;
       } else if (interactRequested && this.caveInterior.nearReward(this.player) && this.forestQuiz.view().status === 'rewarded' && !this.caveRewardClaimed) {
@@ -620,19 +624,25 @@ export class GameEngine {
         this.sound.playChestOpen();
         this.syncHUD();
         this.pause();
-        this.callbacks.onEquipmentReward();
+        this.callbacks.onEquipmentReward(GUARDIAN_BOW);
       }
-      this.camera.x = this.player.x;
-      this.camera.y = this.player.y;
+      if (this.insideCave) this.caveInterior.updateCamera(this.camera, this.player);
+      else {
+        this.camera.x = this.player.x;
+        this.camera.y = this.player.y;
+      }
       return;
     }
     if (interactRequested && !this.gorillaFight && this.quizKeeper && Math.hypot(this.player.x + 1950, this.player.y - 1935) < 75) {
       if (this.forestQuiz.view().status !== 'rewarded') return;
       this.insideCave = true;
-      this.player.x = 0;
-      this.player.y = 120;
-      this.camera.x = 0;
-      this.camera.y = 120;
+      this.sound.startCaveAmbience();
+      this.player.x = this.caveInterior.spawn.x;
+      this.player.y = this.caveInterior.spawn.y;
+      this.player.knockbackVX = 0;
+      this.player.knockbackVY = 0;
+      this.player.dashTimer = 0;
+      this.caveInterior.updateCamera(this.camera, this.player);
       this.input.clearJump();
       return;
     }
@@ -1408,6 +1418,14 @@ export class GameEngine {
       this.enemies = this.gorillaFight.hiddenEnemies.filter(enemy => enemy.hp > 0);
       this.waveDirector.bossActive = this.gorillaFight.previousBoss;
       this.gorillaFight = null;
+      const data = loadSavedData();
+      const id = this.player.character.id;
+      const inventory = data.inventories[id] ?? emptyInventory();
+      if (!inventory.items.some(item => item.id === FOREST_ARMOR.id)) {
+        saveGameData({ ...data, inventories: { ...data.inventories, [id]: { ...inventory, items: [...inventory.items, { ...FOREST_ARMOR, stats: { ...FOREST_ARMOR.stats } }] } } });
+        this.bossProjectiles = []; this.bossHazards = []; this.spatialGrid.clear();
+        this.pause(); this.callbacks.onEquipmentReward(FOREST_ARMOR); return;
+      }
       this.bossProjectiles = [];
       this.bossHazards = [];
       this.spatialGrid.clear();
@@ -2443,6 +2461,7 @@ export class GameEngine {
   private handlePlayerDeath(): void {
     this.isGameOver = true;
     this.sound.playGameOver();
+    this.sound.stopCaveAmbience();
     this.sound.stopBgm();
     this.sound.stopAmazonAmbient();
     this.persistRunStats(false);

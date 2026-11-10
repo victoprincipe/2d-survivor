@@ -127,6 +127,7 @@ export interface CharacterConfig {
     pickupRadius?: number;
     armor?: number;
     recovery?: number;
+    damageReduction?: number;
     critChance?: number;
     attackSpeed?: number;
     bonusAmount?: number;
@@ -221,7 +222,7 @@ export interface MissionRunStats {
 export type EquipmentSlot = 'armor' | 'boots' | 'gloves' | 'helmet' | 'weapon';
 
 /** Percent bonuses use fractions: 0.05 means 5%. */
-export type EquipmentStats = Partial<Record<'maxHp' | 'armor' | 'might' | 'speed' | 'recovery' | 'critChance' | 'attackSpeed' | 'bonusAmount', number>>;
+export type EquipmentStats = Partial<Record<'maxHp' | 'armor' | 'might' | 'speed' | 'recovery' | 'critChance' | 'attackSpeed' | 'bonusAmount' | 'damageReduction', number>>;
 export interface EquipmentItem { id: string; name: string; slot: EquipmentSlot; stats: EquipmentStats; }
 export interface CharacterInventory { items: EquipmentItem[]; equipped: Partial<Record<EquipmentSlot, string>>; forestQuizCompleted?: boolean; }
 

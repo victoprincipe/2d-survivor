@@ -4,7 +4,9 @@ export const GUARDIAN_BOW: EquipmentItem = {
   id: 'guardian_bow', name: 'Arco do Guardião', slot: 'weapon',
   stats: { attackSpeed: 0.1, bonusAmount: 1, critChance: 0.05 },
 };
+export const FOREST_ARMOR: EquipmentItem = { id: 'forest_armor', name: 'Armadura da Mata', slot: 'armor', stats: { armor: 3, maxHp: 20, recovery: 2, damageReduction: 0.05 } };
 export function equipmentArtwork(id: string): string | undefined {
+  if (id === FOREST_ARMOR.id) return '/sprites/equipment/forest-armor.png';
   return id === GUARDIAN_BOW.id ? '/sprites/equipment/guardian-bow.svg' : undefined;
 }
 
@@ -18,6 +20,7 @@ export const EQUIPMENT_SLOTS: Record<EquipmentSlot, string> = {
   armor: 'Armadura', boots: 'Botas', gloves: 'Luvas', helmet: 'Capacete', weapon: 'Arma',
 };
 export const EQUIPMENT_STATS: Record<keyof EquipmentStats, { label: string; percent?: boolean }> = {
+  damageReduction: { label: 'Redução de dano', percent: true },
   maxHp: { label: 'Vida máxima' }, armor: { label: 'Armadura' },
   might: { label: 'Dano', percent: true }, speed: { label: 'Velocidade', percent: true },
   recovery: { label: 'Regeneração/s' }, critChance: { label: 'Chance crítica', percent: true },

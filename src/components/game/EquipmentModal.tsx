@@ -82,14 +82,14 @@ export function EquipmentModal({ character, savedData, onUpdateSave, onClose }: 
       onPointerCancel={() => { drag.current = null; setIsDragging(false); }}
       onLostPointerCapture={() => { drag.current = null; setIsDragging(false); }}
       className={`fixed bottom-3 left-3 z-50 touch-none select-none bg-transparent text-white drop-shadow-2xl ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}>
-      <div className="relative w-[min(45vw,26dvh,240px)]">
+      <div className="relative w-[min(45vw,26dvh,240px)]" style={{ aspectRatio: '2 / 3' }}>
         <button type="button" onClick={onClose} aria-label="Fechar equipamento"
           title="Fechar equipamento"
           className="absolute bottom-full right-0 mb-1 flex h-6 w-6 cursor-pointer items-center justify-center rounded border border-amber-600 bg-red-950 text-xs font-bold text-amber-100 shadow-lg hover:bg-red-900 focus-visible:outline-2 focus-visible:outline-amber-200">
           ✕
         </button>
         <Image src="/images/ui/equipment-panel-no-close.png" alt="Painel de equipamento com moldura de madeira e ouro na floresta"
-          width={1024} height={1536} priority unoptimized draggable={false} className="block h-auto w-full" />
+          fill sizes="240px" priority unoptimized draggable={false} className="pointer-events-none object-contain" />
         {ITEM_ARTWORK.map(({ slot, left, top }, index) => {
           const equipped = slot && inventory.items.some((item) => item.id === inventory.equipped[slot] && item.slot === slot);
           if (equipped) return null;
@@ -108,9 +108,8 @@ export function EquipmentModal({ character, savedData, onUpdateSave, onClose }: 
           const item = inventory.items.find((owned) => owned.id === inventory.equipped[slot] && owned.slot === slot);
           const label = `${EQUIPMENT_SLOTS[slot]}: ${item?.name ?? 'Espaço vazio'}`;
           return <button key={slot} type="button" aria-label={label} title={label} onClick={() => setSelectedSlot(slot)}
-            style={{ left, top }} className="group absolute h-[13.5%] w-[21%] cursor-pointer rounded-lg border-2 border-transparent hover:border-amber-300 focus-visible:border-amber-300 focus-visible:outline-none">
+            style={{ position: 'absolute', left, top, width: '21%', height: '13.5%' }} className="group cursor-pointer rounded-lg border-2 border-transparent hover:border-amber-300 focus-visible:border-amber-300 focus-visible:outline-none">
             {item && equipmentArtwork(item.id) && <span className="absolute inset-1 rounded bg-stone-950"><Image src={equipmentArtwork(item.id)!} alt={item.name} fill unoptimized className="object-contain" /></span>}
-            <span className="absolute inset-x-0 bottom-1 rounded bg-black/80 p-1 text-[clamp(8px,1.5dvh,13px)] text-amber-100 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100">{label}</span>
           </button>;
         })}
         {selectedSlot && (

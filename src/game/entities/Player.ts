@@ -465,7 +465,7 @@ export class Player {
 
     // Pupunha shield: halve incoming damage while the buff lasts.
     const shieldedAmount = this.shieldTimer > 0 ? amount * 0.5 : amount;
-    const reducedAmount = Math.max(1, Math.round(shieldedAmount - this.armor));
+    const reducedAmount = Math.max(1, Math.max(1, Math.round(shieldedAmount - this.armor)) * (1 - Math.min(0.9, Math.max(0, this.character.statBonuses.damageReduction ?? 0))));
     this.hp -= reducedAmount;
     this.invulnerableTimer = 0.5; // Half-second i-frames
 

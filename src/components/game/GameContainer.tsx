@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { CharacterConfig, DifficultyId, GameEndSummary, HUDState, MapId, SavedGameData, UpgradeOption } from '@/game/types';
+import { EquipmentItem, CharacterConfig, DifficultyId, GameEndSummary, HUDState, MapId, SavedGameData, UpgradeOption } from '@/game/types';
 import { CHARACTERS } from '@/game/data/characters';
 import { loadSavedData } from '@/game/data/persistence';
 import { getDifficulty } from '@/game/data/difficulties';
@@ -38,6 +38,7 @@ const DEFAULT_HUD: HUDState = {
 };
 
 export const GameContainer: React.FC = () => {
+  const [equipmentReward, setEquipmentReward] = useState<EquipmentItem | null>(null);
   const [gameState, setGameState] = useState<GameState>('menu');
   const [forestQuiz, setForestQuiz] = useState<ForestQuizView | null>(null);
   const [savedData, setSavedData] = useState<SavedGameData>(loadSavedData);
@@ -94,7 +95,8 @@ export const GameContainer: React.FC = () => {
       }
 
       const engine = new GameEngine(canvas, character, currentSavedData, difficulty, mapId, {
-        onEquipmentReward: () => {
+        onEquipmentReward: (item) => {
+          setEquipmentReward(item);
           setSavedData(loadSavedData());
           gameStateRef.current = 'equipment_reward';
           setGameState('equipment_reward');
@@ -310,7 +312,7 @@ export const GameContainer: React.FC = () => {
       )}
 
       {/* Overlays / Modals */}
-      {gameState === 'equipment_reward' && <EquipmentRewardModal onClose={() => {
+      {gameState === 'equipment_reward' && equipmentReward && <EquipmentRewardModal item={equipmentReward} onClose={() => {
         engineRef.current?.resume();
         gameStateRef.current = 'playing';
         setGameState('playing');
