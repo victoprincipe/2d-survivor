@@ -147,4 +147,22 @@ export const CHARACTERS: CharacterConfig[] = [
       maxHp: 15,
     },
   },
+  {
+    id: 'paje_xaman',
+    name: 'Pajé Aruanã',
+    title: 'Xamã Ancestral',
+    description: 'Ancião sábio da floresta que canaliza espíritos com seu cajado de caveira de pássaro para proteger a aldeia.',
+    startingWeapon: 'wand',
+    iconName: 'Feather',
+    color: '#8a6a3b',
+    portraitColor: '#2f2418',
+    sprite: '/paje-xaman.svg',
+    animationSprite: '/paje-xaman-spritesheet.svg',
+    statBonuses: {
+      maxHp: 10,
+      cooldownReduction: 0.08,
+      area: 0.08,
+      pickupRadius: 10,
+    },
+  },
 ];

@@ -1120,6 +1120,11 @@ export class WeaponSystem {
       return da - db;
     });
 
+    if (player.character.animationSprite) {
+      const targetX = nearby[0].x - player.x;
+      player.triggerAttackAnimation(0.3, Math.abs(targetX) > 0.01 ? targetX : player.facingX);
+    }
+
     const baseCount = w.evolved ? 3 : 1 + (w.level >= 2 ? 1 : 0) + (w.level >= 4 ? 1 : 0);
     const projectileCount = baseCount + player.bonusAmount;
     const speed = (w.evolved ? 470 : 370) * player.projectileSpeedMultiplier;

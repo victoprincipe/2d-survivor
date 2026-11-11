@@ -1,0 +1,325 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" shape-rendering="crispEdges" role="img" aria-label="Pajé xamã: quatro linhas com caminhada, salto, ataque com cajado e idle">
+  <defs>
+    <g id="skull">
+      <path d="M-10 -2 Q-12 -11 -2 -13 Q8 -15 12 -7 Q14 -2 8 2 L-6 3 Q-11 3 -10 -2 Z" fill="#ece5d3" stroke="#6b6250" stroke-width="2"/>
+      <path d="M10 -7 L20 -3 L9 -1 Z" fill="#d9a441" stroke="#7a4f16" stroke-width="1.5"/>
+      <circle cx="-3" cy="-4" r="2.5" fill="#2b2b2b"/>
+      <circle cx="4" cy="-4" r="2" fill="#2b2b2b"/>
+      <path d="M-1 -13 L0 -7" stroke="#b9b19c" stroke-width="1"/>
+      <path d="M-8 1 L-10 8" stroke="#b23a2a" stroke-width="2"/>
+    </g>
+
+    <g id="staffShape">
+      <path d="M0 14 L0 -62" stroke="#5a3a20" stroke-width="6" stroke-linecap="round"/>
+      <path d="M-1 12 L-1 -62" stroke="#8b5a2b" stroke-width="2" stroke-linecap="round"/>
+      <rect x="-5" y="-16" width="10" height="3" fill="#b23a2a"/>
+      <rect x="-5" y="-30" width="10" height="3" fill="#2a9d8f"/>
+      <path d="M-8 -58 Q-15 -46 -13 -36" stroke="#b23a2a" stroke-width="1.5" fill="none"/>
+      <path d="M-13 -40 L-17 -32 L-10 -34 Z" fill="#b23a2a"/>
+      <g transform="translate(0 -66) rotate(-8)">
+        <use href="#skull"/>
+      </g>
+    </g>
+
+    <g id="staffIdle" transform="translate(91 82) rotate(6)">
+      <use href="#staffShape"/>
+    </g>
+
+    <g id="legsStand">
+      <path d="M54 92 L51 110" stroke="#a8643c" stroke-width="9" stroke-linecap="round"/>
+      <ellipse cx="50" cy="113" rx="8" ry="3.5" fill="#3b2416"/>
+      <path d="M74 92 L77 110" stroke="#a8643c" stroke-width="9" stroke-linecap="round"/>
+      <ellipse cx="78" cy="113" rx="8" ry="3.5" fill="#3b2416"/>
+      <path d="M54 103 L51 110" stroke="#7a4a2c" stroke-width="3" opacity="0.55"/>
+      <path d="M74 103 L77 110" stroke="#7a4a2c" stroke-width="3" opacity="0.55"/>
+    </g>
+
+    <g id="legsWalk0">
+      <path d="M54 92 L48 108" stroke="#a8643c" stroke-width="9" stroke-linecap="round"/>
+      <ellipse cx="46" cy="112" rx="8" ry="3.5" fill="#3b2416"/>
+      <path d="M74 92 L80 108" stroke="#a8643c" stroke-width="9" stroke-linecap="round"/>
+      <ellipse cx="82" cy="112" rx="8" ry="3.5" fill="#3b2416"/>
+    </g>
+
+    <g id="legsWalk1">
+      <path d="M54 92 Q60 100 84 106" stroke="#a8643c" stroke-width="9" stroke-linecap="round" fill="none"/>
+      <ellipse cx="88" cy="109" rx="8" ry="3.5" fill="#3b2416"/>
+      <path d="M74 92 Q70 102 58 108" stroke="#a8643c" stroke-width="9" stroke-linecap="round" fill="none"/>
+      <ellipse cx="54" cy="111" rx="8" ry="3.5" fill="#3b2416"/>
+    </g>
+
+    <g id="legsWalk2">
+      <path d="M54 92 L55 109" stroke="#a8643c" stroke-width="9" stroke-linecap="round"/>
+      <ellipse cx="54" cy="113" rx="8" ry="3.5" fill="#3b2416"/>
+      <path d="M74 92 L73 109" stroke="#a8643c" stroke-width="9" stroke-linecap="round"/>
+      <ellipse cx="74" cy="113" rx="8" ry="3.5" fill="#3b2416"/>
+    </g>
+
+    <g id="legsWalk3">
+      <path d="M54 92 Q50 102 40 108" stroke="#a8643c" stroke-width="9" stroke-linecap="round" fill="none"/>
+      <ellipse cx="36" cy="111" rx="8" ry="3.5" fill="#3b2416"/>
+      <path d="M74 92 Q80 100 90 106" stroke="#a8643c" stroke-width="9" stroke-linecap="round" fill="none"/>
+      <ellipse cx="94" cy="109" rx="8" ry="3.5" fill="#3b2416"/>
+    </g>
+
+    <g id="legsJump0">
+      <path d="M54 92 L50 108" stroke="#a8643c" stroke-width="9" stroke-linecap="round"/>
+      <ellipse cx="49" cy="111" rx="8" ry="3.5" fill="#3b2416"/>
+      <path d="M74 92 L78 108" stroke="#a8643c" stroke-width="9" stroke-linecap="round"/>
+      <ellipse cx="79" cy="111" rx="8" ry="3.5" fill="#3b2416"/>
+    </g>
+
+    <g id="legsJump1">
+      <path d="M54 92 Q44 96 40 104" stroke="#a8643c" stroke-width="9" stroke-linecap="round" fill="none"/>
+      <ellipse cx="37" cy="106" rx="8" ry="3.5" fill="#3b2416"/>
+      <path d="M74 92 Q84 96 88 104" stroke="#a8643c" stroke-width="9" stroke-linecap="round" fill="none"/>
+      <ellipse cx="91" cy="106" rx="8" ry="3.5" fill="#3b2416"/>
+    </g>
+
+    <g id="legsJump2">
+      <path d="M54 92 Q42 88 38 94" stroke="#a8643c" stroke-width="9" stroke-linecap="round" fill="none"/>
+      <ellipse cx="35" cy="96" rx="8" ry="3.5" fill="#3b2416"/>
+      <path d="M74 92 Q86 88 90 94" stroke="#a8643c" stroke-width="9" stroke-linecap="round" fill="none"/>
+      <ellipse cx="93" cy="96" rx="8" ry="3.5" fill="#3b2416"/>
+    </g>
+
+    <g id="legsJump3">
+      <path d="M54 92 Q50 100 46 110" stroke="#a8643c" stroke-width="9" stroke-linecap="round" fill="none"/>
+      <ellipse cx="44" cy="113" rx="8" ry="3.5" fill="#3b2416"/>
+      <path d="M74 92 Q78 100 82 110" stroke="#a8643c" stroke-width="9" stroke-linecap="round" fill="none"/>
+      <ellipse cx="84" cy="113" rx="8" ry="3.5" fill="#3b2416"/>
+    </g>
+
+    <g id="body">
+      <path d="M45 64 Q38 76 40 88" stroke="#a8643c" stroke-width="8" fill="none" stroke-linecap="round"/>
+      <path d="M45 64 Q38 76 40 88" stroke="#6b3d22" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.6"/>
+      <circle cx="40" cy="90" r="3.5" fill="#b9744a" stroke="#5b3420" stroke-width="1"/>
+
+      <path d="M46 60 Q64 55 82 60 L86 86 Q64 94 42 86 Z" fill="#b9744a" stroke="#5b3420" stroke-width="2"/>
+      <path d="M82 60 L86 86 Q76 90 64 91" fill="none" stroke="#8a4f2d" stroke-width="2" opacity="0.8"/>
+      <path d="M52 68 Q58 71 64 68" stroke="#8a4f2d" stroke-width="2" fill="none"/>
+      <path d="M64 68 Q70 71 76 68" stroke="#8a4f2d" stroke-width="2" fill="none"/>
+      <path d="M55 79 Q64 83 73 79" stroke="#8a4f2d" stroke-width="2" fill="none"/>
+      <path d="M64 62 L64 84" stroke="#8a4f2d" stroke-width="1.5" opacity="0.7"/>
+
+      <path d="M42 66 L50 72 L48 78 L42 74 Z" fill="#b23a2a"/>
+      <path d="M76 64 L82 68 L78 76 L74 72 Z" fill="#b23a2a"/>
+      <path d="M47 62 Q64 58 79 62" stroke="#2a9d8f" stroke-width="2" fill="none"/>
+      <rect x="38" y="80" width="8" height="3" fill="#f2c14e"/>
+
+      <path d="M42 85 Q64 89 86 85 L82 102 Q64 106 46 102 Z" fill="#6b4226" stroke="#2f1c10" stroke-width="2"/>
+      <path d="M47 87 L58 87 L54 98 L46 96 Z" fill="#b23a2a"/>
+      <path d="M58 87 L70 87 L66 100 L54 98 Z" fill="#f2c14e"/>
+      <path d="M70 87 L81 87 L82 96 L66 100 Z" fill="#2a9d8f"/>
+      <rect x="44" y="83" width="40" height="4" fill="#3f2a16" stroke="#20150c" stroke-width="1"/>
+      <rect x="60" y="82" width="8" height="6" fill="#d9a441"/>
+    </g>
+
+    <g id="head">
+      <rect x="59" y="52" width="10" height="9" fill="#a8643c"/>
+
+      <path d="M46 32 Q40 48 44 70 Q48 78 52 72 L50 44 Z" fill="#e9e6d8" stroke="#bdb9a8" stroke-width="1"/>
+      <path d="M82 32 Q88 48 84 70 Q80 78 76 72 L78 44 Z" fill="#e9e6d8" stroke="#bdb9a8" stroke-width="1"/>
+
+      <ellipse cx="64" cy="42" rx="14" ry="15" fill="#b9744a" stroke="#5b3420" stroke-width="1.5"/>
+      <ellipse cx="49" cy="44" rx="3" ry="4" fill="#a8643c"/>
+      <ellipse cx="79" cy="44" rx="3" ry="4" fill="#a8643c"/>
+      <circle cx="48" cy="49" r="1.5" fill="#f2c14e"/>
+      <circle cx="80" cy="49" r="1.5" fill="#f2c14e"/>
+
+      <rect x="56" y="39" width="4" height="2" fill="#1f2937"/>
+      <rect x="68" y="39" width="4" height="2" fill="#1f2937"/>
+      <rect x="54" y="35" width="7" height="2" fill="#f4f1e8"/>
+      <rect x="67" y="35" width="7" height="2" fill="#f4f1e8"/>
+      <path d="M65 39 Q69 43 66 47 L63 46 Z" fill="#a8643c"/>
+      <path d="M53 45 Q57 47 60 46" stroke="#8a4f2d" stroke-width="1" fill="none"/>
+      <path d="M70 45 Q73 47 76 46" stroke="#8a4f2d" stroke-width="1" fill="none"/>
+
+      <path d="M55 49 Q64 54 73 49 Q72 55 64 57 Q56 55 55 49 Z" fill="#f4f1e8"/>
+      <path d="M51 47 Q50 60 58 68 Q64 73 70 68 Q78 60 77 47 Q73 56 64 57 Q55 56 51 47 Z" fill="#f4f1e8" stroke="#cfccbd" stroke-width="1"/>
+      <path d="M58 57 Q60 82 64 88 Q68 82 70 57 Q64 62 58 57 Z" fill="#f4f1e8" stroke="#cfccbd" stroke-width="1"/>
+      <path d="M50 36 Q48 54 51 66" stroke="#ffffff" stroke-width="1.5" fill="none"/>
+      <path d="M78 36 Q80 54 77 66" stroke="#ffffff" stroke-width="1.5" fill="none"/>
+
+      <rect x="48" y="27" width="32" height="6" fill="#8b1e1e" stroke="#3f0d0d" stroke-width="1"/>
+      <rect x="48" y="29" width="32" height="2" fill="#f2c14e"/>
+
+      <path d="M50 28 Q42 14 46 4 Q52 12 54 28 Z" fill="#e63946" stroke="#7a1218" stroke-width="1"/>
+      <path d="M56 27 Q52 10 58 0 Q64 10 62 27 Z" fill="#f2c14e" stroke="#9a7415" stroke-width="1"/>
+      <path d="M62 27 Q62 6 68 0 Q72 10 69 27 Z" fill="#2a9d8f" stroke="#165e55" stroke-width="1"/>
+      <path d="M69 27 Q75 10 82 5 Q80 16 75 29 Z" fill="#3a86ff" stroke="#1c4d99" stroke-width="1"/>
+      <path d="M74 29 Q84 16 90 14 Q87 24 80 31 Z" fill="#e63946" stroke="#7a1218" stroke-width="1"/>
+      <path d="M48 29 Q38 20 36 12 Q44 18 52 30 Z" fill="#f2c14e" stroke="#9a7415" stroke-width="1"/>
+      <circle cx="59" cy="9" r="1" fill="#ffffff"/>
+      <circle cx="67" cy="7" r="1" fill="#ffffff"/>
+      <circle cx="77" cy="17" r="1" fill="#ffffff"/>
+    </g>
+
+    <g id="rightArmIdle">
+      <path d="M82 64 Q88 72 91 82" stroke="#a8643c" stroke-width="8" fill="none" stroke-linecap="round"/>
+      <path d="M82 64 Q88 72 91 82" stroke="#c98a5c" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <rect x="88" y="73" width="8" height="3" fill="#f2c14e"/>
+      <circle cx="91" cy="82" r="4" fill="#b9744a" stroke="#5b3420" stroke-width="1.5"/>
+    </g>
+
+    <g id="rightArmAttack">
+      <path d="M82 64 Q94 66 104 79" stroke="#a8643c" stroke-width="8" fill="none" stroke-linecap="round"/>
+      <path d="M82 64 Q94 66 104 79" stroke="#c98a5c" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <rect x="96" y="72" width="9" height="3" fill="#f2c14e" transform="rotate(38 100 73)"/>
+      <circle cx="104" cy="80" r="4" fill="#b9744a" stroke="#5b3420" stroke-width="1.5"/>
+    </g>
+
+    <g id="staffAtk0">
+      <path d="M96 110 L122 38" stroke="#5a3a20" stroke-width="6" stroke-linecap="round"/>
+      <path d="M97 108 L122 39" stroke="#8b5a2b" stroke-width="2" stroke-linecap="round"/>
+      <rect x="104" y="86" width="10" height="3" fill="#b23a2a" transform="rotate(-71 109 87)"/>
+      <rect x="112" y="62" width="10" height="3" fill="#2a9d8f" transform="rotate(-71 117 63)"/>
+      <g transform="translate(123 33) rotate(10)"><use href="#skull"/></g>
+      <circle cx="125" cy="30" r="6" fill="#7ef0c0" opacity="0.3"/>
+    </g>
+
+    <g id="staffAtk1">
+      <path d="M92 112 L120 30" stroke="#5a3a20" stroke-width="6" stroke-linecap="round"/>
+      <path d="M93 110 L120 31" stroke="#8b5a2b" stroke-width="2" stroke-linecap="round"/>
+      <rect x="101" y="84" width="10" height="3" fill="#b23a2a" transform="rotate(-75 106 85)"/>
+      <rect x="109" y="54" width="10" height="3" fill="#2a9d8f" transform="rotate(-75 114 55)"/>
+      <g transform="translate(121 24) rotate(14)"><use href="#skull"/></g>
+      <circle cx="124" cy="21" r="8" fill="#7ef0c0" opacity="0.4"/>
+      <circle cx="124" cy="21" r="3" fill="#c8ffe9"/>
+    </g>
+
+    <g id="staffAtk2">
+      <path d="M88 112 L118 24" stroke="#5a3a20" stroke-width="6" stroke-linecap="round"/>
+      <path d="M89 110 L118 25" stroke="#8b5a2b" stroke-width="2" stroke-linecap="round"/>
+      <rect x="98" y="82" width="10" height="3" fill="#b23a2a" transform="rotate(-77 103 83)"/>
+      <rect x="106" y="48" width="10" height="3" fill="#2a9d8f" transform="rotate(-77 111 49)"/>
+      <g transform="translate(120 18) rotate(16)"><use href="#skull"/></g>
+      <circle cx="123" cy="15" r="10" fill="#7ef0c0" opacity="0.45"/>
+      <circle cx="123" cy="15" r="4" fill="#c8ffe9"/>
+    </g>
+
+    <g id="staffAtk3">
+      <path d="M94 110 L123 46" stroke="#5a3a20" stroke-width="6" stroke-linecap="round"/>
+      <path d="M95 108 L123 47" stroke="#8b5a2b" stroke-width="2" stroke-linecap="round"/>
+      <rect x="102" y="88" width="10" height="3" fill="#b23a2a" transform="rotate(-66 107 89)"/>
+      <rect x="111" y="68" width="10" height="3" fill="#2a9d8f" transform="rotate(-66 116 69)"/>
+      <g transform="translate(124 41) rotate(6)"><use href="#skull"/></g>
+      <circle cx="126" cy="39" r="6" fill="#7ef0c0" opacity="0.3"/>
+    </g>
+
+    <g id="walkPose0">
+      <use href="#legsWalk0"/>
+      <use href="#staffIdle"/>
+      <use href="#body"/>
+      <use href="#head"/>
+      <use href="#rightArmIdle"/>
+    </g>
+    <g id="walkPose1">
+      <use href="#legsWalk1"/>
+      <use href="#staffIdle"/>
+      <use href="#body"/>
+      <use href="#head"/>
+      <use href="#rightArmIdle"/>
+    </g>
+    <g id="walkPose2">
+      <use href="#legsWalk2"/>
+      <use href="#staffIdle"/>
+      <use href="#body"/>
+      <use href="#head"/>
+      <use href="#rightArmIdle"/>
+    </g>
+    <g id="walkPose3">
+      <use href="#legsWalk3"/>
+      <use href="#staffIdle"/>
+      <use href="#body"/>
+      <use href="#head"/>
+      <use href="#rightArmIdle"/>
+    </g>
+
+    <g id="jumpPose0">
+      <use href="#legsJump0"/>
+      <use href="#staffIdle"/>
+      <use href="#body"/>
+      <use href="#head"/>
+      <use href="#rightArmIdle"/>
+    </g>
+    <g id="jumpPose1">
+      <use href="#legsJump1"/>
+      <use href="#staffIdle"/>
+      <use href="#body"/>
+      <use href="#head"/>
+      <use href="#rightArmIdle"/>
+    </g>
+    <g id="jumpPose2">
+      <use href="#legsJump2"/>
+      <use href="#staffIdle"/>
+      <use href="#body"/>
+      <use href="#head"/>
+      <use href="#rightArmIdle"/>
+    </g>
+    <g id="jumpPose3">
+      <use href="#legsJump3"/>
+      <use href="#staffIdle"/>
+      <use href="#body"/>
+      <use href="#head"/>
+      <use href="#rightArmIdle"/>
+    </g>
+
+    <g id="attackPose0">
+      <use href="#legsStand"/>
+      <use href="#staffAtk0"/>
+      <use href="#body"/>
+      <use href="#head"/>
+      <use href="#rightArmAttack"/>
+    </g>
+    <g id="attackPose1">
+      <use href="#legsStand"/>
+      <use href="#staffAtk1"/>
+      <use href="#body"/>
+      <use href="#head"/>
+      <use href="#rightArmAttack"/>
+    </g>
+    <g id="attackPose2">
+      <use href="#legsStand"/>
+      <use href="#staffAtk2"/>
+      <use href="#body"/>
+      <use href="#head"/>
+      <use href="#rightArmAttack"/>
+    </g>
+    <g id="attackPose3">
+      <use href="#legsStand"/>
+      <use href="#staffAtk3"/>
+      <use href="#body"/>
+      <use href="#head"/>
+      <use href="#rightArmAttack"/>
+    </g>
+
+    <g id="idlePose">
+      <use href="#legsStand"/>
+      <use href="#staffIdle"/>
+      <use href="#body"/>
+      <use href="#head"/>
+      <use href="#rightArmIdle"/>
+    </g>
+  </defs>
+
+  <use href="#walkPose0" transform="translate(0 0)"/>
+  <use href="#walkPose1" transform="translate(128 0)"/>
+  <use href="#walkPose2" transform="translate(256 0)"/>
+  <use href="#walkPose3" transform="translate(384 0)"/>
+
+  <use href="#jumpPose0" transform="translate(0 128)"/>
+  <use href="#jumpPose1" transform="translate(128 128)"/>
+  <use href="#jumpPose2" transform="translate(256 128)"/>
+  <use href="#jumpPose3" transform="translate(384 128)"/>
+
+  <use href="#attackPose0" transform="translate(-16 256)"/>
+  <use href="#attackPose1" transform="translate(112 256)"/>
+  <use href="#attackPose2" transform="translate(240 256)"/>
+  <use href="#attackPose3" transform="translate(366 256)"/>
+
+  <use href="#idlePose" transform="translate(0 384)"/>
+  <use href="#idlePose" transform="translate(128 383)"/>
+  <use href="#idlePose" transform="translate(256 384)"/>
+  <use href="#idlePose" transform="translate(384 385)"/>
+</svg>
