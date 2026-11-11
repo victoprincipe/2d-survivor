@@ -93,6 +93,9 @@ export class Player {
   public stunTimer: number = 0;
   // Kopenawa's cave snuff: horizontal controls are inverted while it lasts.
   public transeTimer: number = 0;
+  // Kopenawa's offensive magic: one randomly drawn walk command is inverted.
+  public confusionTimer: number = 0;
+  public confusedDirection: 'up' | 'down' | 'left' | 'right' | null = null;
   /** 0–1 fraction of stun duration removed by Amazon passives. */
   public stunResistance: number = 0;
   // External impulse (Caipora's charge) that drags the hero through the world.
@@ -264,6 +267,17 @@ export class Player {
     this.transeTimer = Math.max(this.transeTimer, duration);
   }
 
+  /**
+   * Kopenawa's distortion draw: a single Math.random() roll picks exactly one
+   * of the four walk commands (25% each) to invert for the debuff duration.
+   */
+  public applyConfusion(duration: number): void {
+    if (duration <= 0) return;
+    const directions = ['up', 'down', 'left', 'right'] as const;
+    this.confusedDirection = directions[Math.floor(Math.random() * directions.length)];
+    this.confusionTimer = Math.max(this.confusionTimer, duration);
+  }
+
   /** Pushes the hero with an external impulse (Caipora's charge). */
   public applyKnockback(velocityX: number, velocityY: number): void {
     this.knockbackVX = velocityX;
@@ -318,6 +332,11 @@ export class Player {
 
     if (this.transeTimer > 0) {
       this.transeTimer = Math.max(0, this.transeTimer - dt);
+    }
+
+    if (this.confusionTimer > 0) {
+      this.confusionTimer = Math.max(0, this.confusionTimer - dt);
+      if (this.confusionTimer === 0) this.confusedDirection = null;
     }
 
     if (this.attackSpeedBoostTimer > 0) {
@@ -380,8 +399,17 @@ export class Player {
     const mired = this.isMired && !this.isJumping;
     if (mired) this.dashTimer = 0;
 
-    const dx = this.transeTimer > 0 ? -input.dx : input.dx;
-    const dy = input.dy;
+    // Movement input. A confused walk command flips only that axis/direction,
+    // then Kopenawa's snuff applies its horizontal inversion on top.
+    let dx = input.dx;
+    let dy = input.dy;
+    if (this.confusionTimer > 0) {
+      if (this.confusedDirection === 'up' && dy < -0.05) dy = Math.abs(dy);
+      else if (this.confusedDirection === 'down' && dy > 0.05) dy = -dy;
+      else if (this.confusedDirection === 'left' && dx < -0.05) dx = Math.abs(dx);
+      else if (this.confusedDirection === 'right' && dx > 0.05) dx = -dx;
+    }
+    if (this.transeTimer > 0) dx = -dx;
     const moving = !stunned && !mired && (Math.abs(dx) > 0.05 || Math.abs(dy) > 0.05);
 
     // Dash impulse (held SHIFT). Direction follows movement, or facing when idle.
@@ -427,8 +455,8 @@ export class Player {
       this.facingX = this.dashDirX;
       this.facingY = this.dashDirY;
     } else if (moving) {
-      this.facingX = this.transeTimer > 0 ? -input.facingX : input.facingX;
-      this.facingY = input.facingY;
+      this.facingX = dx;
+      this.facingY = dy;
     }
 
     if (!mired && (this.knockbackVX !== 0 || this.knockbackVY !== 0)) {
@@ -792,5 +820,63 @@ export class Player {
     ctx.fillText(hpText, textX, textY);
 
     ctx.restore();
+
+    // Confusion icon above the hero while one walk command stays scrambled.
+    if (this.confusionTimer > 0 && this.confusedDirection) {
+      const iconX = screen.x;
+      const iconY = barY - 16;
+      ctx.save();
+      const pulse = 1 + Math.sin(this.idleAnimTimer * 6) * 0.08;
+      const glow = ctx.createRadialGradient(iconX, iconY, 1, iconX, iconY, 20 * pulse);
+      glow.addColorStop(0, 'rgba(167, 139, 250, 0.55)');
+      glow.addColorStop(1, 'rgba(74, 222, 128, 0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(iconX, iconY, 20 * pulse, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = '#c4b5fd';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let step = 0; step <= 34; step++) {
+        const angle = step * 0.34 + this.idleAnimTimer * 2.4;
+        const radius = step * 0.38;
+        const px = iconX + Math.cos(angle) * radius;
+        const py = iconY + Math.sin(angle) * radius;
+        if (step === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+
+      ctx.fillStyle = '#bbf7d0';
+      ctx.beginPath();
+      ctx.arc(iconX, iconY, 3.2, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Small arrow marks which walk command is inverted.
+      const arrows = {
+        up: { x: 0, y: -1 },
+        down: { x: 0, y: 1 },
+        left: { x: -1, y: 0 },
+        right: { x: 1, y: 0 },
+      } as const;
+      const arrow = arrows[this.confusedDirection];
+      const tipX = iconX + arrow.x * 19;
+      const tipY = iconY + arrow.y * 19;
+      ctx.strokeStyle = '#86efac';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(iconX + arrow.x * 11, iconY + arrow.y * 11);
+      ctx.lineTo(tipX, tipY);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(tipX + arrow.x * 4, tipY + arrow.y * 4);
+      ctx.lineTo(tipX - arrow.y * 3, tipY + arrow.x * 3);
+      ctx.lineTo(tipX + arrow.y * 3, tipY - arrow.x * 3);
+      ctx.closePath();
+      ctx.fillStyle = '#86efac';
+      ctx.fill();
+      ctx.restore();
+    }
   }
 }

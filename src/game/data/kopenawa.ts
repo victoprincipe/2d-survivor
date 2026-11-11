@@ -17,6 +17,15 @@ export const KOPENAWAS = {
     damageMultiplier: 0.8,
     transeDuration: 3.5,
   },
+  magic: {
+    initialCooldown: 2.4,
+    cooldown: 4.6,
+    speed: 270,
+    radius: 11,
+    lifetime: 4,
+    damageMultiplier: 0.7,
+    confusionDuration: 3.2,
+  },
   smoke: {
     threshold: 0.5,
     invulnerable: 1,

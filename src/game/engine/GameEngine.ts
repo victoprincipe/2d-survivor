@@ -72,7 +72,7 @@ interface BossProjectile {
   damage: number;
   life: number;
   maxLife: number;
-  kind: 'fireball' | 'soundwave' | 'water' | 'sonic' | 'spore';
+  kind: 'fireball' | 'soundwave' | 'water' | 'sonic' | 'spore' | 'spirit';
 }
 
 interface BossHazard {
@@ -1015,6 +1015,24 @@ export class GameEngine {
           e.pendingArenaSlam = false;
           this.activateArena(e, 'roots');
           this.vfx.addDeathBurst(e.x, e.y, '#7c3aed', 22);
+        }
+        if (e.pendingSpell) {
+          e.pendingSpell = false;
+          const originY = e.y - 48;
+          const angle = Math.atan2(this.player.y - originY, this.player.x - e.x);
+          this.bossProjectiles.push({
+            x: e.x,
+            y: originY,
+            vx: Math.cos(angle) * KOPENAWAS.magic.speed,
+            vy: Math.sin(angle) * KOPENAWAS.magic.speed,
+            radius: KOPENAWAS.magic.radius,
+            damage: Math.max(1, Math.round(e.damage * KOPENAWAS.magic.damageMultiplier)),
+            life: KOPENAWAS.magic.lifetime,
+            maxLife: KOPENAWAS.magic.lifetime,
+            kind: 'spirit',
+          });
+          this.vfx.addSparks(e.x, originY, '#a78bfa', 12);
+          this.weaponSystem.spawnRingPulse(e.x, originY, 28, '#86efac', 0.22);
         }
         if (e.pendingBreathHit) {
           e.pendingBreathHit = false;
@@ -2323,6 +2341,11 @@ export class GameEngine {
         const fatal = this.applyPlayerDamage(p.damage, false, false);
         // Vitória-Régia's spores cling to the player as a mild venom slow.
         if (p.kind === 'spore') this.player.applySlow(0.25, 1.5);
+        if (p.kind === 'spirit') {
+          this.player.applyConfusion(KOPENAWAS.magic.confusionDuration);
+          this.camera.shake(0.16, 4);
+          this.vfx.addSparks(this.player.x, this.player.y - 28, '#a78bfa', 16);
+        }
         p.life = 0;
         if (fatal) return true;
       }
@@ -3675,6 +3698,36 @@ export class GameEngine {
         ctx.beginPath();
         ctx.arc(screen.x + Math.sin(p.life * 7) * 2, screen.y, p.radius * 0.25, 0, Math.PI * 2);
         ctx.fill();
+      } else if (p.kind === 'spirit') {
+        const glow = ctx.createRadialGradient(screen.x, screen.y, 1, screen.x, screen.y, p.radius * 2.6);
+        glow.addColorStop(0, `rgba(240, 253, 244, ${alpha})`);
+        glow.addColorStop(0.32, `rgba(134, 239, 172, ${0.95 * alpha})`);
+        glow.addColorStop(0.65, `rgba(168, 85, 247, ${0.75 * alpha})`);
+        glow.addColorStop(1, 'rgba(88, 28, 135, 0)');
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(screen.x, screen.y, p.radius * 2.6, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = `rgba(74, 222, 128, ${alpha})`;
+        ctx.beginPath();
+        ctx.arc(screen.x, screen.y, p.radius * 0.55, 0, Math.PI * 2);
+        ctx.fill();
+        for (let spark = 0; spark < 3; spark++) {
+          const sparkAngle = p.life * 5 + (spark * Math.PI * 2) / 3;
+          ctx.fillStyle = spark % 2 === 0
+            ? `rgba(216, 180, 254, ${0.9 * alpha})`
+            : `rgba(187, 247, 208, ${0.9 * alpha})`;
+          ctx.beginPath();
+          ctx.arc(
+            screen.x + Math.cos(sparkAngle) * p.radius * 1.45,
+            screen.y + Math.sin(sparkAngle) * p.radius * 1.45,
+            p.radius * 0.24,
+            0,
+            Math.PI * 2
+          );
+          ctx.fill();
+        }
       } else {
         const angle = Math.atan2(p.vy, p.vx);
         ctx.translate(screen.x, screen.y);

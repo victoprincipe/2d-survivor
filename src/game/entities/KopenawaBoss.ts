@@ -96,6 +96,9 @@ export class KopenawaBoss extends ChallengeBoss {
   private smokeTimer = 0;
   public pendingClones = 0;
 
+  private spellCooldown = KOPENAWAS.magic.initialCooldown;
+  public pendingSpell = false;
+
   public get isInEntrance(): boolean {
     return this.entrancePhase !== 'none';
   }
@@ -168,6 +171,7 @@ export class KopenawaBoss extends ChallengeBoss {
       this.pendingArenaSlam = false;
       this.pendingBreathHit = false;
       this.pendingClones = 0;
+      this.pendingSpell = false;
       return false;
     }
 
@@ -188,6 +192,13 @@ export class KopenawaBoss extends ChallengeBoss {
     }
 
     if (this.entrancePhase !== 'none') return this.updateEntrance(dt, player);
+
+    // Offensive magic: a periodic homing-aimed spirit orb fired at the hero.
+    this.spellCooldown = Math.max(0, this.spellCooldown - dt);
+    if (this.spellCooldown === 0) {
+      this.spellCooldown = KOPENAWAS.magic.cooldown;
+      this.pendingSpell = true;
+    }
 
     this.breathCooldown = Math.max(0, this.breathCooldown - dt);
 
