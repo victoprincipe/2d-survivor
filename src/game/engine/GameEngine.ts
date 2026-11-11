@@ -638,7 +638,9 @@ export class GameEngine {
   private loop(currentTime: number): void {
     if (!this.isRunning) return;
 
-    const frameTime = currentTime - this.lastTime;
+    // A queued RAF timestamp can precede performance.now() recorded by resume().
+    // Never rewind the simulation or index animation frames with negative time.
+    const frameTime = Math.max(0, currentTime - this.lastTime);
     this.currentFrameTimeMs = Math.round(frameTime * 10) / 10;
     this.frameCount++;
     this.fpsTimer += frameTime;
@@ -648,8 +650,8 @@ export class GameEngine {
       this.fpsTimer = 0;
     }
 
-    const rawDt = (currentTime - this.lastTime) / 1000;
-    this.lastTime = currentTime;
+    const rawDt = frameTime / 1000;
+    this.lastTime = Math.max(this.lastTime, currentTime);
     const timeScale = Math.max(0.1, Math.min(10, this.debugConfig.timeScale || 1.0));
     const dt = Math.min(rawDt, 0.1) * timeScale;
 

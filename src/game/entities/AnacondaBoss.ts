@@ -150,9 +150,6 @@ export class AnacondaBoss extends ChallengeBoss {
       ctx.strokeStyle = 'rgba(251,191,36,0.3)'; ctx.lineWidth = C.bite.radius * 2; ctx.lineCap = 'round'; ctx.stroke();
     }
     if (this.action === 'slam_warning') { ctx.beginPath(); ctx.arc(p.x, p.y, this.novaRadius, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
-    // Both body and shadow fade out completely during the dive.
-    ctx.globalAlpha *= 1 - this.dive.submersion;
-    ctx.fillStyle = 'rgba(4,47,46,0.3)'; ctx.beginPath(); ctx.ellipse(p.x, p.y + 20, 110, 35, 0, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
     if (this.usesBiteRig) this.visual.renderRig(ctx, camera, this.x, this.y, this.head, this.jawOpen, this.hitFlashTimer > 0);
     else {

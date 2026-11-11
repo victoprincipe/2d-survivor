@@ -141,7 +141,7 @@ console.log('PASS: smooth locked aiming, continuous neck geometry and consistent
     pulses += b.dive.pendingTicks; b.dive.pendingTicks = 0;
     if (started && b.action === 'idle') break;
   }
-  assert.equal(pulses, 5); assert.equal(dives, 1); assert.equal(b.diveCooldown, 2.25);
+  assert.equal(pulses, 5); assert.equal(dives, 1); assert.equal(b.diveCooldown, 6.75);
   assert.equal(C.dive.radius, 700); assert.equal('pendingLeapImpact' in b, false);
   assert.equal(b.dive.submersion, 0);
 }
@@ -305,4 +305,31 @@ console.log('PASS: pause freezes rain and poison; player death cleans encounter 
   assert.ok(states.has('dashing')); assert.ok(states.has('telegraph_nova'));
 }
 console.log('PASS: shared anchored simulation preserves gorilla charge, slam, leaps and roar');
+// A RAF already queued when the dialogue closes can be older than resume().
+{
+  const { e } = engine();
+  e.player.x = C.x + 180; e.player.y = C.y;
+  e.input.handleKeyDown({ code: 'KeyE' }); e.update(0.01); e.input.handleKeyUp({ code: 'KeyE' });
+  assert.equal(e.isPaused, true);
+  assert.equal(e.startAnacondaCombat(), true);
+  const boss = e.enemies[0], resumedAt = e.lastTime;
+  const camera = new Camera(); camera.x = C.x; camera.y = C.y;
+  e.render = () => boss.render(new Proxy({}, { get: () => () => {} }), camera);
+  const raf = globalThis.requestAnimationFrame;
+  let scheduled = 0;
+  globalThis.requestAnimationFrame = () => ++scheduled;
+  e.isRunning = true;
+  try {
+    e.loop(resumedAt - 1);
+    assert.equal(boss.visual.time, 0, 'Stale RAF cannot rewind a new animation');
+    assert.equal(e.lastTime, resumedAt, 'Stale RAF cannot move the clock backward');
+    e.loop(resumedAt + 16);
+    assert.ok(Math.abs(boss.visual.time - 0.016) < 1e-8);
+    assert.equal(scheduled, 2, 'Rendering must keep scheduling frames after dialogue');
+  } finally {
+    e.isRunning = false;
+    globalThis.requestAnimationFrame = raf;
+  }
+}
+console.log('PASS: E dialogue and combat resume tolerate stale RAF timestamps without freezing animation');
 console.log('All anaconda checks passed.');

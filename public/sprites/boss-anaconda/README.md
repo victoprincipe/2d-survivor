@@ -22,7 +22,7 @@ O pescoço usa uma curva cúbica cuja tangente final acompanha a cabeça, com a 
 
 O boss tem 16.000 de vida e 60 de dano base, com escala de dificuldade/tempo. Os ataques são bote duplo de alcance 357,5, mergulho com agitação do lago, caudada e chuva ácida. Cabeça e pescoço são espelhados ao mirar para a esquerda, preservando o ventre e a mandíbula na orientação correta. A chuva marca raio 500, prepara por 1 segundo, cura 20% da vida máxima uma vez e chove por 5 segundos. O dano por segundo é metade do dano base e continua por 2 segundos após sair da área, sem acumular efeitos. Pausa congela a simulação; cancelamento, vitória ou morte removem o veneno.
 
-O mergulho substitui os três pulos da sucuri, sem alterar os saltos do gorila. Após um aviso de 0,7 segundo, ela submerge e agita uma área de raio 700 por 5 segundos. Cada segundo causa 20 de dano antes do ajuste de dificuldade aos jogadores dentro do raio; cada tick que causa dano aplica 0,3 segundo de atordoamento, respeitando a resistência do jogador. Ela reaparece gradualmente em 0,5 segundo, causa um único impacto de 50 de dano base em raio 500 e inicia recarga de 2,25 segundos. Durante o efeito ativo, corpo e sombra ficam completamente invisíveis; ela continua podendo receber dano. Ondas e espuma são animadas pelo tempo da simulação, e todos os efeitos cessam ao cancelar ou encerrar o duelo.
+O mergulho substitui os três pulos da sucuri, sem alterar os saltos do gorila. Após um aviso de 0,7 segundo, ela submerge e agita uma área de raio 700 por 5 segundos. Cada segundo causa 20 de dano antes do ajuste de dificuldade aos jogadores dentro do raio; cada tick que causa dano aplica 0,3 segundo de atordoamento, respeitando a resistência do jogador. Ela reaparece gradualmente em 0,5 segundo, causa um único impacto de 50 de dano base em raio 500 e inicia recarga de 6,75 segundos. Durante o efeito ativo, corpo e sombra ficam completamente invisíveis; ela continua podendo receber dano. Ondas e espuma são animadas pelo tempo da simulação, e todos os efeitos cessam ao cancelar ou encerrar o duelo.
 
 Verificação: `node scripts/check-anaconda.mjs`. Prévia visual usando as classes reais: `node scripts/preview-anaconda.mjs`, disponível em `http://127.0.0.1:3018` enquanto o processo estiver aberto.
 
@@ -31,6 +31,8 @@ As camadas foram criadas com `image_gen` integrado e o desenho aprovado como ref
 Regenerar os quadros e as prévias com `node public/sprites/boss-anaconda/build-previews.mjs`.
 
 ## Geração
+
+Na espera e durante o combate, a linha da água passa pelo meio do corpo enrolado. A metade inferior aparece apenas como silhueta submersa, com ondulações na superfície; cabeça e pescoço permanecem acima da água. O mergulho continua ocultando completamente a sucuri durante sua fase ativa.
 
 Ferramenta: `image_gen` integrada, com o conceito aprovado como referência de identidade.
 

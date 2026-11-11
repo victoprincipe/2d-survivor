@@ -14,6 +14,26 @@ export class AnacondaVisual {
   private load(file: string): HTMLImageElement { const image = new Image(); image.src = `/sprites/boss-anaconda/${file}`; return image; }
   update(dt: number): void { this.time += dt; }
 
+  private renderSubmergedSprite(ctx: CanvasRenderingContext2D, image: HTMLImageElement,
+    x: number, y: number, width: number, height: number, waterY: number): void {
+    // The lake surface cuts through the middle of the coils. Keep a faint
+    // underwater silhouette without moving the head or its collision position.
+    ctx.save(); ctx.beginPath(); ctx.rect(x, y, width, Math.max(0, waterY - y)); ctx.clip();
+    ctx.drawImage(image, x, y, width, height); ctx.restore();
+    ctx.save(); ctx.beginPath(); ctx.rect(x, waterY, width, Math.max(0, y + height - waterY)); ctx.clip();
+    ctx.globalAlpha *= 0.12; ctx.drawImage(image, x, y, width, height); ctx.restore();
+  }
+
+  private renderWaterline(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+    ctx.save(); ctx.lineWidth = 2;
+    for (let i = 0; i < 3; i++) {
+      const wave = (this.time * 0.45 + i / 3) % 1;
+      ctx.strokeStyle = `rgba(165,243,252,${(1 - wave) * 0.5})`;
+      ctx.beginPath(); ctx.ellipse(x, y, 115 + wave * 30, 12 + wave * 10, 0, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   render(ctx: CanvasRenderingContext2D, camera: Camera, x: number, y: number,
     mode: 'idle' | 'slither' | 'bite' = 'idle', height = 0, flash = false): void {
     if (!camera.isInView(x, y, 300 + height)) return;
@@ -22,8 +42,9 @@ export class AnacondaVisual {
     if (!image.complete || !image.naturalWidth) return;
     const p = camera.worldToScreen(x, y);
     ctx.save(); ctx.imageSmoothingEnabled = true;
-    if (flash) ctx.globalAlpha = 0.65;
-    ctx.drawImage(image, p.x - 150, p.y - 190 - height, 300, 270);
+    if (flash) ctx.globalAlpha *= 0.65;
+    this.renderSubmergedSprite(ctx, image, p.x - 150, p.y - 190 - height, 300, 270, p.y - 10);
+    this.renderWaterline(ctx, p.x, p.y - 10);
     ctx.restore();
   }
 
@@ -33,8 +54,9 @@ export class AnacondaVisual {
     const tip = camera.worldToScreen(head.x, head.y);
     const base = { x: body.x, y: body.y - 40 };
     ctx.save(); ctx.imageSmoothingEnabled = true;
-    if (flash) ctx.globalAlpha = 0.65;
-    if (this.body.complete && this.body.naturalWidth) ctx.drawImage(this.body, body.x - 135, body.y - 95, 270, 170);
+    if (flash) ctx.globalAlpha *= 0.65;
+    if (this.body.complete && this.body.naturalWidth) this.renderSubmergedSprite(ctx, this.body, body.x - 135, body.y - 95, 270, 170, body.y - 10);
+    this.renderWaterline(ctx, body.x, body.y - 10);
     // End at the rear of the skull, not its centre. The final tangent matches
     // the head exactly; a cubic curve avoids the old hinge at the jaw.
     const angle = Math.atan2(tip.y - base.y, tip.x - base.x);
