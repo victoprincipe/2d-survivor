@@ -334,6 +334,7 @@ export class GameEngine {
   private challengeBossSerial = -1;
   private readonly kopenawaNpc: KopenawaNpc | null;
   private kopenawaDefeated = false;
+  private caveUnlocked = false;
   private readonly caveInterior = new CaveInterior();
   private insideCave = false;
   private caveRewardClaimed = false;
@@ -546,8 +547,10 @@ export class GameEngine {
     this.kopenawaNpc = mapId === 'amazon_forest' ? new KopenawaNpc() : null;
     const inventory = savedData.inventories?.[character.id] ?? emptyInventory();
     this.caveRewardClaimed = inventory.items.some(item => item.id === GUARDIAN_BOW.id);
-    this.kopenawaDefeated = inventory.kopenawaDefeated === true || this.caveRewardClaimed;
-    if (this.kopenawaDefeated) this.worldProps.unlockForestCave();
+    // Kopenawa respawns like the Gorilla and the Giant Anaconda: the save only
+    // keeps the cave unlocked, never the boss defeated for the next run.
+    this.caveUnlocked = inventory.kopenawaDefeated === true || this.caveRewardClaimed;
+    if (this.caveUnlocked) this.worldProps.unlockForestCave();
     this.difficulty = getDifficulty(difficultyId);
     this.waveDirector = new WaveDirector(this.difficulty, mapId, this.worldProps);
     this.amazonTurns = this.createAmazonMissionTurns();
@@ -696,7 +699,7 @@ export class GameEngine {
         this.sound.startAmazonAmbient();
         this.player.x = -1950;
         this.player.y = 1980;
-      } else if (interactRequested && this.caveInterior.nearReward(this.player) && this.kopenawaDefeated && !this.caveRewardClaimed) {
+      } else if (interactRequested && this.caveInterior.nearReward(this.player) && this.caveUnlocked && !this.caveRewardClaimed) {
         const data = loadSavedData();
         const id = this.player.character.id;
         const inventory = data.inventories[id] ?? emptyInventory();
@@ -724,7 +727,7 @@ export class GameEngine {
       this.startGorillaCombat();
       return;
     }
-    if (interactRequested && !this.bossEncounter && this.kopenawaDefeated && Math.hypot(this.player.x + 1950, this.player.y - 1935) < 75) {
+    if (interactRequested && !this.bossEncounter && this.caveUnlocked && Math.hypot(this.player.x + 1950, this.player.y - 1935) < 75) {
       this.insideCave = true;
       this.sound.startCaveAmbience();
       this.player.x = this.caveInterior.spawn.x;
@@ -2410,6 +2413,7 @@ export class GameEngine {
         this.gorillaArena = null;
       } else if (this.bossEncounter.kind === 'kopenawa') {
         this.kopenawaDefeated = true;
+        this.caveUnlocked = true;
         this.worldProps.unlockForestCave();
         this.gorillaArena = null;
       } else {
@@ -2859,7 +2863,7 @@ export class GameEngine {
     const { ctx, camera } = this;
 
     if (this.insideCave) {
-      this.caveInterior.render(ctx, camera, this.player, this.kopenawaDefeated, this.caveRewardClaimed);
+      this.caveInterior.render(ctx, camera, this.player, this.caveUnlocked, this.caveRewardClaimed);
       this.player.render(ctx, camera);
       return;
     }
@@ -2918,8 +2922,8 @@ export class GameEngine {
       const p = camera.worldToScreen(-1950, 1840);
       ctx.save(); ctx.font = 'bold 15px sans-serif'; ctx.textAlign = 'center';
       ctx.fillStyle = '#fde68a'; ctx.strokeStyle = '#101811'; ctx.lineWidth = 4;
-      const label = this.kopenawaDefeated ? '[E] Entrar na caverna' : 'Entrada selada. Derrote Kopenawa.';
-      if (this.kopenawaDefeated) { ctx.shadowColor = '#fbbf24'; ctx.shadowBlur = 12; }
+      const label = this.caveUnlocked ? '[E] Entrar na caverna' : 'Entrada selada. Derrote Kopenawa.';
+      if (this.caveUnlocked) { ctx.shadowColor = '#fbbf24'; ctx.shadowBlur = 12; }
       ctx.strokeText(label, p.x, p.y); ctx.fillText(label, p.x, p.y); ctx.restore();
     }
     if (this.player.stunTimer > 0) {
