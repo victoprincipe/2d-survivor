@@ -148,7 +148,7 @@ export class CaveInterior {
     ctx.font = '13px sans-serif';
     if (this.nearReward(player)) {
       ctx.font = '12px sans-serif';
-      ctx.fillText(opened ? 'Arco já resgatado' : unlocked ? '[E] Resgatar Arco do Guardião' : 'Conclua o quiz do velho', 0, -55);
+      ctx.fillText(opened ? 'Arco já resgatado' : unlocked ? '[E] Resgatar Arco do Guardião' : 'Derrote Kopenawa para entrar', 0, -55);
     }
     ctx.restore();
     ctx.restore();

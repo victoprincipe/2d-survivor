@@ -6,7 +6,7 @@ const CAVE_WALLS = [
   [58, -48, 150, 12],
 ] as const;
 
-/** Entrance beside the sage; interact at the mouth to visit the interior. */
+/** Entrance beside Kopenawa's clearing; interact at the mouth to visit the interior. */
 export class ForestCave {
   readonly x = -1950;
   readonly y = 1900;

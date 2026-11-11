@@ -14,7 +14,7 @@ export function equipmentArtwork(id: string): string | undefined {
 
 /** Repeated claims keep the same inventory and never duplicate the quest item. */
 export function claimGuardianBow(inventory: CharacterInventory): CharacterInventory {
-  if (!inventory.forestQuizCompleted || inventory.items.some(item => item.id === GUARDIAN_BOW.id)) return inventory;
+  if (!inventory.kopenawaDefeated || inventory.items.some(item => item.id === GUARDIAN_BOW.id)) return inventory;
   return { ...inventory, items: [...inventory.items, { ...GUARDIAN_BOW, stats: { ...GUARDIAN_BOW.stats } }] };
 }
 
@@ -38,7 +38,7 @@ export function normalizeInventories(value: unknown): Record<string, CharacterIn
   return Object.fromEntries(Object.entries(value).filter(([, data]) => isRecord(data)).map(([id, data]) => {
     const inventory = emptyInventory();
     const source = data as Record<string, unknown>;
-    inventory.forestQuizCompleted = source.forestQuizCompleted === true;
+    inventory.kopenawaDefeated = source.kopenawaDefeated === true;
     for (const item of Array.isArray(source.items) ? source.items : []) {
       if (!isRecord(item) || typeof item.id !== 'string' || !item.id ||
           typeof item.name !== 'string' || typeof item.slot !== 'string' ||
@@ -52,7 +52,7 @@ export function normalizeInventories(value: unknown): Record<string, CharacterIn
       }
       inventory.items.push({ id: item.id, name: item.name, slot: item.slot as EquipmentSlot, stats });
     }
-    if (inventory.items.some(item => item.id === GUARDIAN_BOW.id)) inventory.forestQuizCompleted = true;
+    if (inventory.items.some(item => item.id === GUARDIAN_BOW.id)) inventory.kopenawaDefeated = true;
     for (const slot of Object.keys(EQUIPMENT_SLOTS) as EquipmentSlot[]) {
       const equippedId = isRecord(source.equipped) ? source.equipped[slot] : undefined;
       if (inventory.items.some((item) => item.id === equippedId && item.slot === slot)) inventory.equipped[slot] = equippedId as string;

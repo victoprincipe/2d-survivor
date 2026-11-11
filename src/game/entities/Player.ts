@@ -91,6 +91,8 @@ export class Player {
   public slowTimer: number = 0;
   public slowFactor: number = 0;
   public stunTimer: number = 0;
+  // Kopenawa's cave snuff: horizontal controls are inverted while it lasts.
+  public transeTimer: number = 0;
   /** 0–1 fraction of stun duration removed by Amazon passives. */
   public stunResistance: number = 0;
   // External impulse (Caipora's charge) that drags the hero through the world.
@@ -257,6 +259,11 @@ export class Player {
     this.jumpTimer = 0;
   }
 
+  public applyTranse(duration: number): void {
+    if (duration <= 0) return;
+    this.transeTimer = Math.max(this.transeTimer, duration);
+  }
+
   /** Pushes the hero with an external impulse (Caipora's charge). */
   public applyKnockback(velocityX: number, velocityY: number): void {
     this.knockbackVX = velocityX;
@@ -307,6 +314,10 @@ export class Player {
 
     if (this.stunTimer > 0) {
       this.stunTimer = Math.max(0, this.stunTimer - dt);
+    }
+
+    if (this.transeTimer > 0) {
+      this.transeTimer = Math.max(0, this.transeTimer - dt);
     }
 
     if (this.attackSpeedBoostTimer > 0) {
@@ -369,7 +380,7 @@ export class Player {
     const mired = this.isMired && !this.isJumping;
     if (mired) this.dashTimer = 0;
 
-    const dx = input.dx;
+    const dx = this.transeTimer > 0 ? -input.dx : input.dx;
     const dy = input.dy;
     const moving = !stunned && !mired && (Math.abs(dx) > 0.05 || Math.abs(dy) > 0.05);
 
@@ -416,7 +427,7 @@ export class Player {
       this.facingX = this.dashDirX;
       this.facingY = this.dashDirY;
     } else if (moving) {
-      this.facingX = input.facingX;
+      this.facingX = this.transeTimer > 0 ? -input.facingX : input.facingX;
       this.facingY = input.facingY;
     }
 

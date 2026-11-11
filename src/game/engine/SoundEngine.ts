@@ -23,17 +23,6 @@ export class SoundEngine {
   private gorillaLeapBuffer: Promise<AudioBuffer | null> | null = null;
   private gorillaChargeBuffer: Promise<AudioBuffer | null> | null = null;
   private gorillaGroundSlamBuffer: Promise<AudioBuffer | null> | null = null;
-  private quizFailureScreamBuffer: Promise<AudioBuffer | null> | null = null;
-  private quizLandingBuffer: AudioBuffer | null = null;
-
-  playQuizLanding(): void {
-    if (this.muted || !this.initCtx() || !this.ctx || !this.sfxGain || !this.quizLandingBuffer) return;
-    const source = this.ctx.createBufferSource();
-    source.buffer = this.quizLandingBuffer;
-    source.connect(this.sfxGain);
-    source.onended = () => source.disconnect();
-    source.start();
-  }
 
   playGorillaGroundSlam(): void {
     if (this.muted || !this.initCtx() || !this.ctx || !this.sfxGain) return;
@@ -225,15 +214,6 @@ export class SoundEngine {
         .then(response => { if (!response.ok) throw new Error('Gorilla ground slam audio unavailable'); return response.arrayBuffer(); })
         .then(data => ctx.decodeAudioData(data))
         .catch(() => null);
-      this.quizFailureScreamBuffer = fetch('/audio/quiz-failure-scream.mp3')
-        .then(response => { if (!response.ok) throw new Error('Quiz failure scream audio unavailable'); return response.arrayBuffer(); })
-        .then(data => ctx.decodeAudioData(data))
-        .catch(() => null);
-      void fetch('/audio/quiz-landing.mp3')
-        .then(response => { if (!response.ok) throw new Error('Quiz landing audio unavailable'); return response.arrayBuffer(); })
-        .then(data => ctx.decodeAudioData(data))
-        .then(buffer => { if (this.ctx === ctx && ctx.state !== 'closed') this.quizLandingBuffer = buffer; })
-        .catch(() => {});
 
       this.masterGain = this.ctx.createGain();
       this.masterGain.gain.value = this.muted ? 0 : 1;
@@ -385,21 +365,6 @@ export class SoundEngine {
     chimeGain.connect(this.sfxGain);
     chime.start(chimeStart);
     chime.stop(chimeStart + 0.21);
-  }
-
-  /** User-provided recording, played at its original speed and pitch. */
-  playQuizFailureScream(): void {
-    if (this.muted || !this.initCtx() || !this.ctx || !this.sfxGain) return;
-    const ctx = this.ctx;
-    const gain = this.sfxGain;
-    void this.quizFailureScreamBuffer?.then(buffer => {
-      if (!buffer || this.ctx !== ctx || ctx.state === 'closed') return;
-      const source = ctx.createBufferSource();
-      source.buffer = buffer;
-      source.connect(gain);
-      source.onended = () => source.disconnect();
-      source.start();
-    });
   }
 
   /** Deep folklore boss roar: a low sweep plus a short rumble. */
@@ -858,8 +823,6 @@ export class SoundEngine {
   destroy(): void {
     this.bowHitBuffer = null;
     this.bowShotBuffer = null;
-    this.quizFailureScreamBuffer = null;
-    this.quizLandingBuffer = null;
     this.gorillaGroundSlamBuffer = null;
     this.gorillaChargeBuffer = null;
     this.gorillaLeapBuffer = null;

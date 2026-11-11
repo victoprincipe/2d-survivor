@@ -162,6 +162,16 @@ export class Enemy {
         this.novaRadius = 185 * Math.SQRT2;
         this.skillCooldown = 2;
         break;
+      case 'boss_kopenawa':
+        this.name = 'Kopenawa — Guardião da Floresta Ilusória';
+        this.radius = 24;
+        this.maxHp = Math.round(12000 * hpMultiplier);
+        this.speed = 94;
+        this.damage = 34;
+        this.xpValue = 600;
+        this.isBoss = true;
+        this.knockbackResistance = 0.05;
+        break;
       case 'boss_anaconda':
         this.name = 'Sucuri Gigante — Senhora do Lago';
         this.radius = ANACONDA.radius;

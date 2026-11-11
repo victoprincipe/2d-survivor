@@ -25,14 +25,15 @@ import { Player } from '../entities/Player';
 import { Enemy } from '../entities/Enemy';
 import { GorillaNpc } from '../entities/GorillaNpc';
 import { CaveInterior } from '../entities/CaveInterior';
-import { QuizKeeper } from '../entities/QuizKeeper';
-import { ForestQuiz, ForestQuizView } from '../data/forestQuiz';
+import { KopenawaNpc } from '../entities/KopenawaNpc';
+import { KopenawaBoss, KopenawaClone } from '../entities/KopenawaBoss';
 import { GorillaBoss } from '../entities/GorillaBoss';
 import { AnacondaBoss } from '../entities/AnacondaBoss';
 import { AnacondaNpc } from '../entities/AnacondaNpc';
 import { EquipmentDrop } from '../entities/EquipmentDrop';
 import { ANACONDA } from '../data/anaconda';
 import { GORILLA_ARENA, GORILLA_LEAP, GORILLA_ROAR } from '../data/gorilla';
+import { KOPENAWAS } from '../data/kopenawa';
 import { Drop } from '../entities/Drops';
 import { VFXManager } from '../entities/VFX';
 import { WeaponSystem } from '../weapons/WeaponSystem';
@@ -54,7 +55,6 @@ import { applyRunToMissions } from '../data/missions';
 export interface GameEngineCallbacks {
   onAnacondaDialogue?: () => void;
   onEquipmentReward: (item: EquipmentItem) => void;
-  onForestQuiz?: (quiz: ForestQuizView) => void;
   onGorillaDialogue?: () => void;
   onHUDUpdate: (hud: HUDState) => void;
   onLevelUp: (options: UpgradeOption[]) => void;
@@ -331,51 +331,21 @@ export class GameEngine {
   private readonly anacondaNpc: AnacondaNpc | null;
   private anacondaDefeated = false;
   private challengeBossSerial = -1;
-  private readonly quizKeeper: QuizKeeper | null;
-  private readonly forestQuiz: ForestQuiz;
-  private forestQuizOpen = false;
+  private readonly kopenawaNpc: KopenawaNpc | null;
+  private kopenawaDefeated = false;
   private readonly caveInterior = new CaveInterior();
   private insideCave = false;
   private caveRewardClaimed = false;
-  private quizLaunchRemaining = 0;
-  private readonly quizLaunchDuration = 2.2;
-
-  public answerForestQuiz(choice: number): ForestQuizView {
-    if (this.forestQuizOpen && this.isPaused && !this.isGameOver) {
-      const reward = this.forestQuiz.answer(choice);
-      if (this.forestQuiz.view().status === 'failed') {
-        this.forestQuizOpen = false;
-        this.quizLaunchRemaining = this.quizLaunchDuration;
-        this.input.handlePointerUp();
-        this.sound.playQuizFailureScream();
-        this.resume();
-      }
-      if (reward) {
-        const data = loadSavedData();
-        const id = this.player.character.id;
-        const inventory = data.inventories[id] ?? emptyInventory();
-        saveGameData({ ...data, inventories: { ...data.inventories, [id]: { ...inventory, forestQuizCompleted: true } } });
-        this.sound.playMissionClaim();
-        this.syncHUD();
-      }
-    }
-    return this.forestQuiz.view();
-  }
-
-  public closeForestQuiz(): void {
-    if (!this.forestQuizOpen) return;
-    this.forestQuizOpen = false;
-    this.resume();
-  }
   private gorillaDefeated = false;
   private gorillaArena: { x: number; y: number; radius: number } | null = null;
-  private bossEncounter: { kind: 'gorilla' | 'anaconda'; boss: GorillaBoss | AnacondaBoss; hiddenEnemies: Enemy[]; previousBoss: Enemy | null } | null = null;
+  private arenaKind: 'stone' | 'roots' = 'stone';
+  private bossEncounter: { kind: 'gorilla' | 'anaconda' | 'kopenawa'; boss: GorillaBoss | AnacondaBoss | KopenawaBoss; hiddenEnemies: Enemy[]; previousBoss: Enemy | null } | null = null;
 
   private get anacondaAvailable(): boolean {
     return !!this.anacondaNpc && !this.bossEncounter && !this.anacondaDefeated;
   }
 
-  private beginBossEncounter(kind: 'gorilla' | 'anaconda', boss: GorillaBoss | AnacondaBoss): void {
+  private beginBossEncounter(kind: 'gorilla' | 'anaconda' | 'kopenawa', boss: GorillaBoss | AnacondaBoss | KopenawaBoss): void {
     this.bossEncounter = { kind, boss, hiddenEnemies: this.enemies, previousBoss: this.waveDirector.bossActive };
     this.enemies = [boss];
     this.spatialGrid.clear(); this.bossProjectiles = []; this.bossHazards = [];
@@ -386,7 +356,7 @@ export class GameEngine {
   private restoreBossEncounter(): void {
     const encounter = this.bossEncounter;
     if (!encounter) return;
-    if (encounter.kind === 'gorilla') this.gorillaArena = null;
+    if (encounter.kind === 'gorilla' || encounter.kind === 'kopenawa') this.gorillaArena = null;
     // Disarm stale homing-projectile references when a challenge is cancelled.
     encounter.boss.hp = 0;
     this.processedEnemyDeaths.add(encounter.boss);
@@ -417,10 +387,11 @@ export class GameEngine {
     return Math.hypot(this.player.x - this.gorillaNpc.x, this.player.y - this.gorillaNpc.y) <= GORILLA_ARENA.triggerRadius;
   }
 
-  private activateGorillaArena(boss: GorillaBoss): void {
+  private activateArena(boss: { x: number; y: number }, kind: 'stone' | 'roots'): void {
     const distance = Math.hypot(this.player.x - boss.x, this.player.y - boss.y);
-    // The guardian is the centre of the plateau arena; the minimum 600 radius
-    // matches a medium plateau's 1200-unit diameter and always encloses the hero.
+    // Both guardians use a 1200-unit diameter arena; the minimum always
+    // encloses the hero on the exact frame the staff/fists strike the ground.
+    this.arenaKind = kind;
     this.gorillaArena = {
       x: boss.x,
       y: boss.y,
@@ -428,7 +399,13 @@ export class GameEngine {
     };
     this.camera.shake(0.35, 11);
     this.sound.playGorillaGroundSlam();
-    this.weaponSystem.spawnRingPulse(this.gorillaArena.x, this.gorillaArena.y, this.gorillaArena.radius, '#a8a29e', 0.65);
+    this.weaponSystem.spawnRingPulse(
+      this.gorillaArena.x,
+      this.gorillaArena.y,
+      this.gorillaArena.radius,
+      kind === 'roots' ? '#7c3aed' : '#a8a29e',
+      0.65
+    );
   }
 
   private clampToGorillaArena(x: number, y: number, radius: number): { x: number; y: number } {
@@ -451,6 +428,27 @@ export class GameEngine {
       (1 + minutes * 0.3) * this.difficulty.enemyHp);
     boss.damage = Math.round(boss.damage * this.difficulty.enemyDamage);
     this.beginBossEncounter('gorilla', boss);
+    return true;
+  }
+
+  private get kopenawaAvailable(): boolean {
+    return !!this.kopenawaNpc && !this.bossEncounter && !this.kopenawaDefeated;
+  }
+
+  private isNearKopenawa(): boolean {
+    if (!this.kopenawaNpc) return false;
+    return Math.hypot(this.player.x - this.kopenawaNpc.x, this.player.y - this.kopenawaNpc.y) <= KOPENAWAS.triggerRadius;
+  }
+
+  public startKopenawaCombat(): boolean {
+    if (!this.kopenawaAvailable || !this.isNearKopenawa() || this.isGameOver) return false;
+    const npc = this.kopenawaNpc;
+    if (!npc) return false;
+    const minutes = this.waveDirector.survivalTime / 60;
+    const boss = new KopenawaBoss(this.challengeBossSerial--, npc.x, npc.y,
+      (1 + minutes * 0.3) * this.difficulty.enemyHp);
+    boss.damage = Math.round(boss.damage * this.difficulty.enemyDamage);
+    this.beginBossEncounter('kopenawa', boss);
     return true;
   }
   public drops: Drop[] = [];
@@ -534,10 +532,10 @@ export class GameEngine {
     this.worldProps = new WorldSystem(mapId);
     this.gorillaNpc = mapId === 'amazon_forest' ? new GorillaNpc() : null;
     this.anacondaNpc = mapId === 'amazon_forest' ? new AnacondaNpc() : null;
-    this.quizKeeper = mapId === 'amazon_forest' ? new QuizKeeper() : null;
+    this.kopenawaNpc = mapId === 'amazon_forest' ? new KopenawaNpc() : null;
     const inventory = savedData.inventories?.[character.id] ?? emptyInventory();
     this.caveRewardClaimed = inventory.items.some(item => item.id === GUARDIAN_BOW.id);
-    this.forestQuiz = new ForestQuiz(inventory.forestQuizCompleted === true || this.caveRewardClaimed);
+    this.kopenawaDefeated = inventory.kopenawaDefeated === true || this.caveRewardClaimed;
     this.difficulty = getDifficulty(difficultyId);
     this.waveDirector = new WaveDirector(this.difficulty, mapId, this.worldProps);
     this.amazonTurns = this.createAmazonMissionTurns();
@@ -670,20 +668,7 @@ export class GameEngine {
 
   private update(dt: number): void {
     this.anacondaNpc?.update(dt);
-    // The launch is a short cinematic: hazards and controls wait for the landing.
-    if (this.quizLaunchRemaining > 0) {
-      this.quizLaunchRemaining = Math.max(0, this.quizLaunchRemaining - dt);
-      this.quizKeeper?.update(dt);
-      this.input.clearInteract();
-      this.input.clearJump();
-      if (this.quizLaunchRemaining === 0) {
-        this.sound.playQuizLanding();
-        this.player.hp = 0;
-        this.handlePlayerDeath();
-      }
-      return;
-    }
-    this.quizKeeper?.update(dt);
+    this.kopenawaNpc?.update(dt);
     this.gorillaNpc?.update(dt);
     const interactRequested = this.input.consumeInteract();
     if (interactRequested && this.anacondaAvailable && this.anacondaNpc?.canInteract(this.player) &&
@@ -703,11 +688,11 @@ export class GameEngine {
         this.sound.startAmazonAmbient();
         this.player.x = -1950;
         this.player.y = 1980;
-      } else if (interactRequested && this.caveInterior.nearReward(this.player) && this.forestQuiz.view().status === 'rewarded' && !this.caveRewardClaimed) {
+      } else if (interactRequested && this.caveInterior.nearReward(this.player) && this.kopenawaDefeated && !this.caveRewardClaimed) {
         const data = loadSavedData();
         const id = this.player.character.id;
         const inventory = data.inventories[id] ?? emptyInventory();
-        const next = claimGuardianBow({ ...inventory, forestQuizCompleted: true });
+        const next = claimGuardianBow({ ...inventory, kopenawaDefeated: true });
         saveGameData({ ...data, inventories: { ...data.inventories, [id]: next } });
         this.caveRewardClaimed = true;
         this.sound.playChestOpen();
@@ -722,13 +707,16 @@ export class GameEngine {
       }
       return;
     }
-    // The forest guardian engages by itself the moment the hero is spotted.
+    // The forest guardians engage by themselves the moment the hero is spotted.
+    if (this.kopenawaAvailable && this.isNearKopenawa()) {
+      this.startKopenawaCombat();
+      return;
+    }
     if (this.gorillaAvailable && this.isNearGorilla()) {
       this.startGorillaCombat();
       return;
     }
-    if (interactRequested && !this.bossEncounter && this.quizKeeper && Math.hypot(this.player.x + 1950, this.player.y - 1935) < 75) {
-      if (this.forestQuiz.view().status !== 'rewarded') return;
+    if (interactRequested && !this.bossEncounter && this.kopenawaDefeated && Math.hypot(this.player.x + 1950, this.player.y - 1935) < 75) {
       this.insideCave = true;
       this.sound.startCaveAmbience();
       this.player.x = this.caveInterior.spawn.x;
@@ -738,13 +726,6 @@ export class GameEngine {
       this.player.dashTimer = 0;
       this.caveInterior.updateCamera(this.camera, this.player);
       this.input.clearJump();
-      return;
-    }
-    if (interactRequested && !this.bossEncounter && this.quizKeeper?.canInteract(this.player) && this.callbacks.onForestQuiz) {
-      this.pause();
-      this.input.handlePointerUp();
-      this.forestQuizOpen = true;
-      this.callbacks.onForestQuiz(this.forestQuiz.begin());
       return;
     }
     if (interactRequested && this.gorillaAvailable && this.gorillaNpc?.canInteract(this.player) && this.callbacks.onGorillaDialogue) {
@@ -999,7 +980,7 @@ export class GameEngine {
       if (e instanceof GorillaBoss) {
         if (e.pendingArenaSlam) {
           e.pendingArenaSlam = false;
-          this.activateGorillaArena(e);
+          this.activateArena(e, 'stone');
         }
         if (e.pendingEntranceRoar) {
           e.pendingEntranceRoar = false;
@@ -1024,6 +1005,44 @@ export class GameEngine {
           if (Math.hypot(this.player.x - e.x, this.player.y - e.y) > GORILLA_ROAR.radius + this.player.radius) continue;
           const fatal = this.applyPlayerDamage(Math.max(1, Math.round(e.damage * GORILLA_ROAR.damageMultiplier)), true, false);
           if (fatal) { this.handlePlayerDeath(); return; }
+        }
+      }
+
+      if (e instanceof KopenawaBoss) {
+        if (e.pendingArenaSlam) {
+          e.pendingArenaSlam = false;
+          this.activateArena(e, 'roots');
+          this.vfx.addDeathBurst(e.x, e.y, '#7c3aed', 22);
+        }
+        if (e.pendingBreathHit) {
+          e.pendingBreathHit = false;
+          this.camera.shake(0.14, 4);
+          this.weaponSystem.spawnRingPulse(e.x, e.y, KOPENAWAS.breath.range, '#a78bfa', 0.35);
+          this.vfx.addSparks(e.x, e.y - 40, '#c4b5fd', 14);
+          if (e.breathHits(this.player)) {
+            this.player.applyTranse(KOPENAWAS.breath.transeDuration);
+            const fatal = this.applyPlayerDamage(
+              Math.max(1, Math.round(e.damage * KOPENAWAS.breath.damageMultiplier)),
+              false,
+              true
+            );
+            if (fatal) { this.handlePlayerDeath(); return; }
+          }
+        }
+        if (e.pendingClones > 0) {
+          const count = e.pendingClones;
+          e.pendingClones = 0;
+          const arena = this.gorillaArena;
+          const radius = Math.max(160, (arena?.radius ?? KOPENAWAS.arenaRadius) - 90);
+          for (let clone = 0; clone < count; clone++) {
+            const angle = Math.random() * Math.PI * 2;
+            const distance = 110 + Math.random() * Math.max(40, radius - 110);
+            const cx = e.x + Math.cos(angle) * distance;
+            const cy = e.y + Math.sin(angle) * distance;
+            this.enemies.push(new KopenawaClone(this.challengeBossSerial--, cx, cy));
+            this.vfx.addDeathBurst(cx, cy, '#a78bfa', 16);
+          }
+          this.camera.shake(0.2, 6);
         }
       }
 
@@ -1506,6 +1525,8 @@ export class GameEngine {
         ? e.chargeHits(this.player, previousX, previousY)
         : dist < this.player.radius + e.radius;
       if (!e.isSubmerged && !e.jaguarBusy && !(e instanceof GorillaBoss && (e.isLeaping || e.isRoaring || e.isInEntrance)) &&
+        !(e instanceof KopenawaBoss && (e.isInEntrance || e.isInSmoke)) &&
+        !(e instanceof KopenawaClone) &&
         !(e instanceof AnacondaBoss && !e.contactEnabled) && !this.player.isJumping && bodyHit) {
         // Fire combo: Caipora's mounted charge knocks the hero away, ideally
         // into the flame ring left by Boitatá and Curupira.
@@ -1610,6 +1631,24 @@ export class GameEngine {
         saveGameData({ ...data, inventories: { ...data.inventories, [id]: { ...inventory, items: [...inventory.items, { ...FOREST_ARMOR, stats: { ...FOREST_ARMOR.stats } }] } } });
         this.bossProjectiles = []; this.bossHazards = []; this.spatialGrid.clear();
         this.pause(); this.callbacks.onEquipmentReward(FOREST_ARMOR); return;
+      }
+      this.bossProjectiles = [];
+      this.bossHazards = [];
+      this.spatialGrid.clear();
+    }
+    if (this.bossEncounter?.kind === 'kopenawa' && this.kopenawaDefeated) {
+      const { x, y } = this.bossEncounter.boss;
+      this.restoreBossEncounter();
+      const data = loadSavedData();
+      const id = this.player.character.id;
+      const inventory = data.inventories[id] ?? emptyInventory();
+      saveGameData({
+        ...data,
+        inventories: { ...data.inventories, [id]: { ...inventory, kopenawaDefeated: true } },
+      });
+      if (!inventory.items.some(item => item.id === GUARDIAN_BOW.id) &&
+        !this.drops.some(drop => drop instanceof EquipmentDrop && drop.item.id === GUARDIAN_BOW.id)) {
+        this.drops.push(new EquipmentDrop(Date.now() + Math.random(), x, y, GUARDIAN_BOW));
       }
       this.bossProjectiles = [];
       this.bossHazards = [];
@@ -2366,9 +2405,17 @@ export class GameEngine {
   private onEnemyKilled(enemy: Enemy): void {
     if (this.processedEnemyDeaths.has(enemy)) return;
     this.processedEnemyDeaths.add(enemy);
+    // Illusory duplicates dissolve in herbal smoke and grant no loot or kills.
+    if (enemy instanceof KopenawaClone) {
+      this.vfx.addDeathBurst(enemy.x, enemy.y, '#c4b5fd', 18);
+      return;
+    }
     if (enemy === this.bossEncounter?.boss) {
       if (this.bossEncounter.kind === 'gorilla') {
         this.gorillaDefeated = true;
+        this.gorillaArena = null;
+      } else if (this.bossEncounter.kind === 'kopenawa') {
+        this.kopenawaDefeated = true;
         this.gorillaArena = null;
       } else {
         this.anacondaDefeated = true;
@@ -2462,6 +2509,7 @@ export class GameEngine {
         saveGameData({ ...data, inventories: { ...data.inventories, [id]: {
           ...inventory, items: [...inventory.items, { ...drop.item, stats: { ...drop.item.stats } }],
         } } });
+        if (drop.item.id === GUARDIAN_BOW.id) this.caveRewardClaimed = true;
         this.pause(); this.input.handlePointerUp(); this.sound.playMissionClaim();
         this.callbacks.onEquipmentReward(drop.item);
       }
@@ -2810,7 +2858,7 @@ export class GameEngine {
     const { ctx, camera } = this;
 
     if (this.insideCave) {
-      this.caveInterior.render(ctx, camera, this.player, this.forestQuiz.view().status === 'rewarded', this.caveRewardClaimed);
+      this.caveInterior.render(ctx, camera, this.player, this.kopenawaDefeated, this.caveRewardClaimed);
       this.player.render(ctx, camera);
       return;
     }
@@ -2860,29 +2908,17 @@ export class GameEngine {
     if (this.gorillaAvailable && this.gorillaNpc && this.player.y >= this.gorillaNpc.y) {
       this.gorillaNpc.render(ctx, camera);
     }
-    if (this.quizKeeper && this.player.y >= this.quizKeeper.y) this.quizKeeper.render(ctx, camera);
-    ctx.save();
-    if (this.quizLaunchRemaining > 0) {
-      const progress = 1 - this.quizLaunchRemaining / this.quizLaunchDuration;
-      const arc = Math.sin(progress * Math.PI);
-      const origin = camera.worldToScreen(this.player.x, this.player.y);
-      ctx.translate(origin.x + arc * 100, origin.y - arc * (camera.viewportHeight + 220));
-      ctx.rotate(arc * Math.PI * 2);
-      ctx.scale(1 - arc * 0.6, 1 - arc * 0.6);
-      ctx.translate(-origin.x, -origin.y);
-    }
+    if (this.kopenawaAvailable && this.kopenawaNpc && this.player.y >= this.kopenawaNpc.y) this.kopenawaNpc.render(ctx, camera);
     this.player.render(ctx, camera);
-    ctx.restore();
     if (this.anacondaAvailable && this.anacondaNpc && this.player.y < this.anacondaNpc.y) this.anacondaNpc.render(ctx, camera);
-    if (this.quizKeeper && this.player.y < this.quizKeeper.y) this.quizKeeper.render(ctx, camera);
+    if (this.kopenawaAvailable && this.kopenawaNpc && this.player.y < this.kopenawaNpc.y) this.kopenawaNpc.render(ctx, camera);
     this.worldProps.renderForestCave(ctx, camera, this.player.y, true);
-    if (this.quizKeeper && !this.bossEncounter && Math.hypot(this.player.x + 1950, this.player.y - 1935) < 75) {
+    if (!this.bossEncounter && Math.hypot(this.player.x + 1950, this.player.y - 1935) < 75) {
       const p = camera.worldToScreen(-1950, 1840);
       ctx.save(); ctx.font = 'bold 15px sans-serif'; ctx.textAlign = 'center';
       ctx.fillStyle = '#fde68a'; ctx.strokeStyle = '#101811'; ctx.lineWidth = 4;
-      const unlocked = this.forestQuiz.view().status === 'rewarded';
-      const label = unlocked ? '[E] Entrar na caverna' : 'Entrada selada. Conclua o quiz do velho.';
-      if (unlocked) { ctx.shadowColor = '#fbbf24'; ctx.shadowBlur = 12; }
+      const label = this.kopenawaDefeated ? '[E] Entrar na caverna' : 'Entrada selada. Derrote Kopenawa.';
+      if (this.kopenawaDefeated) { ctx.shadowColor = '#fbbf24'; ctx.shadowBlur = 12; }
       ctx.strokeText(label, p.x, p.y); ctx.fillText(label, p.x, p.y); ctx.restore();
     }
     if (this.player.stunTimer > 0) {
@@ -2895,6 +2931,18 @@ export class GameEngine {
       ctx.fillStyle = '#fde047';
       ctx.strokeText('ATORDOADO', playerScreen.x, playerScreen.y - 64);
       ctx.fillText('ATORDOADO', playerScreen.x, playerScreen.y - 64);
+      ctx.restore();
+    }
+    if (this.player.transeTimer > 0) {
+      const playerScreen = camera.worldToScreen(this.player.x, this.player.y);
+      ctx.save();
+      ctx.font = 'bold 12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#1c1917';
+      ctx.fillStyle = '#c4b5fd';
+      ctx.strokeText('TRANSE', playerScreen.x, playerScreen.y - 80);
+      ctx.fillText('TRANSE', playerScreen.x, playerScreen.y - 80);
       ctx.restore();
     }
     if (this.gorillaAvailable && this.gorillaNpc && this.player.y < this.gorillaNpc.y) {
@@ -2926,21 +2974,6 @@ export class GameEngine {
     if (this.bossEncounter?.boss instanceof AnacondaBoss) this.bossEncounter.boss.acid.renderAir(ctx, camera, this.player);
     if (!this.isPaused && !this.isGameOver && this.anacondaAvailable && this.anacondaNpc?.canInteract(this.player)) {
       this.anacondaNpc.renderPrompt(ctx, camera);
-    }
-    if (this.quizLaunchRemaining > 0) {
-      ctx.save();
-      ctx.textAlign = 'center';
-      ctx.font = 'bold 22px sans-serif';
-      ctx.lineWidth = 4;
-      ctx.strokeStyle = '#1c1917';
-      ctx.fillStyle = '#fde68a';
-      const message = 'Resposta errada, viajante!';
-      ctx.strokeText(message, camera.viewportWidth / 2, camera.viewportHeight * 0.3);
-      ctx.fillText(message, camera.viewportWidth / 2, camera.viewportHeight * 0.3);
-      ctx.restore();
-    }
-    if (!this.isPaused && !this.isGameOver && this.quizLaunchRemaining === 0 && !this.bossEncounter && this.quizKeeper?.canInteract(this.player)) {
-      this.quizKeeper.renderPrompt(ctx, camera);
     }
     if (!this.isPaused && !this.isGameOver && this.gorillaAvailable && this.gorillaNpc?.canInteract(this.player)) {
       this.gorillaNpc.renderPrompt(ctx, camera);
@@ -3085,6 +3118,7 @@ export class GameEngine {
   private renderGorillaArenaFloor(): void {
     const arena = this.gorillaArena;
     if (!arena) return;
+    if (this.arenaKind === 'roots') { this.renderRootArenaFloor(); return; }
     const { ctx, camera } = this;
     const origin = camera.worldToScreen(arena.x, arena.y);
     const maxRadius = arena.radius * 1.5;
@@ -3144,9 +3178,118 @@ export class GameEngine {
     ctx.restore();
   }
 
+  private renderRootArenaFloor(): void {
+    const arena = this.gorillaArena;
+    if (!arena) return;
+    const { ctx, camera } = this;
+    const origin = camera.worldToScreen(arena.x, arena.y);
+    const maxRadius = arena.radius * 1.5;
+    if (origin.x + maxRadius < -80 || origin.x - maxRadius > camera.viewportWidth + 80 ||
+      origin.y + maxRadius < -80 || origin.y - maxRadius > camera.viewportHeight + 80) return;
+
+    const rimRadius = (angle: number) =>
+      this.worldProps.getPlateauRimRadius(arena.x, arena.y, Math.cos(angle), Math.sin(angle)) ?? arena.radius;
+
+    ctx.save();
+    // Mossy ground and creeping roots replace the gorilla's cracked stone.
+    ctx.beginPath();
+    for (let step = 0; step <= 96; step++) {
+      const angle = (step / 96) * Math.PI * 2;
+      const radius = rimRadius(angle);
+      const x = origin.x + Math.cos(angle) * radius;
+      const y = origin.y + Math.sin(angle) * radius;
+      if (step === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.fillStyle = 'rgba(22, 40, 24, 0.22)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(63, 42, 24, 0.45)';
+    ctx.lineWidth = 14;
+    ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(74, 222, 128, 0.18)';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 26; i++) {
+      const angle = (i / 26) * Math.PI * 2 + this.gorillaStoneNoise(i * 3.1) * 0.2;
+      const length = 40 + this.gorillaStoneNoise(i * 7.3 + 2) * 110;
+      const startX = origin.x + Math.cos(angle) * (rimRadius(angle) - 6);
+      const startY = origin.y + Math.sin(angle) * (rimRadius(angle) - 6);
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      ctx.quadraticCurveTo(
+        startX + Math.cos(angle + 0.4) * length * 0.55,
+        startY + Math.sin(angle + 0.4) * length * 0.55,
+        startX + Math.cos(angle) * length,
+        startY + Math.sin(angle) * length
+      );
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  private renderRootArena(): void {
+    const arena = this.gorillaArena;
+    if (!arena) return;
+    const { ctx, camera } = this;
+    const origin = camera.worldToScreen(arena.x, arena.y);
+    const maxRadius = arena.radius * 1.5;
+    if (origin.x + maxRadius < -80 || origin.x - maxRadius > camera.viewportWidth + 80 ||
+      origin.y + maxRadius < -80 || origin.y - maxRadius > camera.viewportHeight + 80) return;
+
+    const rimRadius = (angle: number) =>
+      this.worldProps.getPlateauRimRadius(arena.x, arena.y, Math.cos(angle), Math.sin(angle)) ?? arena.radius;
+
+    ctx.save();
+    // A dense palisade of interlaced roots crowned with sharp thorns.
+    for (let i = 0; i < GORILLA_ARENA.stoneCount; i++) {
+      const angle = (i / GORILLA_ARENA.stoneCount) * Math.PI * 2;
+      const radius = rimRadius(angle);
+      const rootX = origin.x + Math.cos(angle) * radius;
+      const rootY = origin.y + Math.sin(angle) * radius;
+      const seed = i + 1;
+      const height = 30 + this.gorillaStoneNoise(seed * 6.7) * 20;
+      const halfWidth = 20 + this.gorillaStoneNoise(seed * 4.3) * 11;
+      ctx.save();
+      ctx.translate(rootX, rootY);
+      ctx.rotate(angle + Math.PI / 2);
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+      ctx.beginPath();
+      ctx.ellipse(2, 8, halfWidth * 1.15, 8, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = i % 2 === 0 ? '#4d3320' : '#3b2a1a';
+      ctx.lineWidth = 9 + this.gorillaStoneNoise(seed * 2.9) * 6;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-halfWidth, 2);
+      ctx.bezierCurveTo(-halfWidth * 0.4, -height * 0.5, halfWidth * 0.5, -height, halfWidth * 0.25, -height);
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(74, 222, 128, 0.34)';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(-halfWidth * 0.5, -height * 0.15);
+      ctx.quadraticCurveTo(0, -height * 0.55, halfWidth * 0.5, -height * 0.8);
+      ctx.stroke();
+      // Sharp thorn tips.
+      ctx.fillStyle = '#e7e5e4';
+      for (let thorn = 0; thorn < 3; thorn++) {
+        const tx = (thorn - 1) * halfWidth * 0.55;
+        const ty = -height * (0.3 + thorn * 0.18);
+        ctx.beginPath();
+        ctx.moveTo(tx - 3, ty);
+        ctx.lineTo(tx, ty - 11);
+        ctx.lineTo(tx + 3, ty);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
   private renderGorillaArena(): void {
     const arena = this.gorillaArena;
     if (!arena) return;
+    if (this.arenaKind === 'roots') { this.renderRootArena(); return; }
     const { ctx, camera } = this;
     const origin = camera.worldToScreen(arena.x, arena.y);
     const maxRadius = arena.radius * 1.5;
