@@ -114,8 +114,9 @@ const ECOLOGY_FRUIT_FEED_COOLDOWN = 8;
 const SUCURI_WATER_SPEED_MULTIPLIER = 1.5;
 const SUCURI_SHORE_SPEED_MULTIPLIER = 1.3;
 
-// Entering the Sucuri's combat detection radius transforms the upper lake's
-// shore into dense quicksand. Reuse her dive radius as the detection range.
+// Entering the Sucuri's combat detection radius automatically starts the duel
+// and seals the upper lake with small stone mountains. Reuse her dive radius
+// as the detection range.
 const SUCURI_ARENA_TRIGGER_RADIUS = ANACONDA.dive.radius;
 
 // Land animals climb a plateau's vertical wall 20% slower than they walk on
@@ -357,6 +358,7 @@ export class GameEngine {
     const encounter = this.bossEncounter;
     if (!encounter) return;
     if (encounter.kind === 'gorilla' || encounter.kind === 'kopenawa') this.gorillaArena = null;
+    if (encounter.kind === 'anaconda') this.worldProps.deactivateAnacondaArena();
     // Disarm stale homing-projectile references when a challenge is cancelled.
     encounter.boss.hp = 0;
     this.processedEnemyDeaths.add(encounter.boss);
@@ -367,10 +369,19 @@ export class GameEngine {
     this.spatialGrid.clear(); this.bossProjectiles = []; this.bossHazards = [];
   }
 
+  private isNearAnaconda(): boolean {
+    if (!this.anacondaNpc) return false;
+    return Math.hypot(this.player.x - this.anacondaNpc.x, this.player.y - this.anacondaNpc.y) <= SUCURI_ARENA_TRIGGER_RADIUS;
+  }
+
   public startAnacondaCombat(): boolean {
-    if (!this.anacondaAvailable || !this.anacondaNpc?.canInteract(this.player) || this.isGameOver || !this.worldProps.isInUpperLake(this.player.x, this.player.y)) return false;
+    const npc = this.anacondaNpc;
+    if (!this.anacondaAvailable || !npc || !this.isNearAnaconda() || this.isGameOver ||
+      !this.worldProps.isInUpperLake(this.player.x, this.player.y)) return false;
+    // The arena becomes solid on the exact frame combat begins.
+    this.worldProps.activateAnacondaArena();
     const minutes = this.waveDirector.survivalTime / 60;
-    const boss = new AnacondaBoss(this.challengeBossSerial--, this.anacondaNpc.x, this.anacondaNpc.y,
+    const boss = new AnacondaBoss(this.challengeBossSerial--, npc.x, npc.y,
       (1 + minutes * 0.3) * this.difficulty.enemyHp, this.worldProps);
     boss.damage = Math.round(boss.damage * this.difficulty.enemyDamage);
     this.beginBossEncounter('anaconda', boss);
@@ -671,10 +682,6 @@ export class GameEngine {
     this.kopenawaNpc?.update(dt);
     this.gorillaNpc?.update(dt);
     const interactRequested = this.input.consumeInteract();
-    if (interactRequested && this.anacondaAvailable && this.anacondaNpc?.canInteract(this.player) &&
-      this.worldProps.isInUpperLake(this.player.x, this.player.y) && this.callbacks.onAnacondaDialogue) {
-      this.pause(); this.input.handlePointerUp(); this.callbacks.onAnacondaDialogue(); return;
-    }
     if (this.insideCave) {
       this.player.isWadingInWater = false;
       this.player.isInMud = false;
@@ -738,15 +745,10 @@ export class GameEngine {
     // Iara's Dynamic Flood cycle (rising / hold / recede) before terrain physics.
     this.updateFloodCycle(dt);
 
-    // Sucuri proximity trigger: approaching the upper-lake boss transforms the
-    // arena, turning her muddy shore into dense quicksand.
-    if (
-      this.anacondaNpc &&
-      !this.anacondaDefeated &&
-      Math.hypot(this.player.x - this.anacondaNpc.x, this.player.y - this.anacondaNpc.y) <=
-        SUCURI_ARENA_TRIGGER_RADIUS
-    ) {
-      this.worldProps.activateAnacondaArena();
+    // Sucuri proximity trigger: entering her detection radius starts the duel
+    // automatically and turns the upper-lake shore into solid stone mountains.
+    if (this.anacondaAvailable && this.isNearAnaconda() && this.startAnacondaCombat()) {
+      return;
     }
 
     // 1. Terrain physics: mud and water slow the hero down before the step.
@@ -755,29 +757,25 @@ export class GameEngine {
       !playerInWater &&
       this.floodPhysicsActive &&
       this.worldProps.isFloodWater(this.player.x, this.player.y);
+    const playerOnArenaRock = this.worldProps.isInAnacondaWall(
+      this.player.x,
+      this.player.y + this.player.radius * 0.6
+    );
     const playerInMud =
-      !playerInWater && !playerInFlood && this.worldProps.isMud(this.player.x, this.player.y);
-    // The feet hitbox sits slightly below the body centre; any pixel of the
-    // transformed upper-lake quicksand pins the hero completely.
-    const playerInAnacondaMud =
       !playerInWater &&
       !playerInFlood &&
-      this.worldProps.isInAnacondaMud(
-        this.player.x,
-        this.player.y + this.player.radius * 0.6
-      );
+      !playerOnArenaRock &&
+      this.worldProps.isMud(this.player.x, this.player.y);
     this.player.isWadingInWater = playerInWater || playerInFlood;
-    this.player.isInMud = (playerInMud || playerInAnacondaMud) && !this.player.isJumping;
-    this.player.isMired = playerInAnacondaMud && !this.player.isJumping;
+    this.player.isInMud = playerInMud && !this.player.isJumping;
+    this.player.isMired = false;
     this.player.terrainSpeedMultiplier = this.player.isJumping
       ? 1
-      : playerInAnacondaMud
-        ? 0
-        : playerInWater || playerInFlood
-          ? WATER_SPEED_MULTIPLIER
-          : playerInMud
-            ? MUD_SPEED_MULTIPLIER
-            : 1;
+      : playerInWater || playerInFlood
+        ? WATER_SPEED_MULTIPLIER
+        : playerInMud
+          ? MUD_SPEED_MULTIPLIER
+          : 1;
 
     // 2. Update Player
     const playerAlive = this.player.update(dt, this.input);
@@ -2972,9 +2970,6 @@ export class GameEngine {
     // 7.3. Fire bosses shine through the jungle night.
     this.renderNightFireBossGlow();
     if (this.bossEncounter?.boss instanceof AnacondaBoss) this.bossEncounter.boss.acid.renderAir(ctx, camera, this.player);
-    if (!this.isPaused && !this.isGameOver && this.anacondaAvailable && this.anacondaNpc?.canInteract(this.player)) {
-      this.anacondaNpc.renderPrompt(ctx, camera);
-    }
     if (!this.isPaused && !this.isGameOver && this.gorillaAvailable && this.gorillaNpc?.canInteract(this.player)) {
       this.gorillaNpc.renderPrompt(ctx, camera);
     }

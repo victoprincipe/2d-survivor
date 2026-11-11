@@ -412,8 +412,8 @@ export class WorldSystem {
   private floodLandSamples: { x: number; y: number }[] | null = null;
 
   // Sucuri arena: once the hero enters her combat detection radius the upper
-  // lake's muddy shore turns into dense, bubbling quicksand that pins the hero
-  // until they jump out of it.
+  // lake's brown shore instantly becomes a ring of small stone mountains that
+  // physically seals the lake until the duel ends.
   private anacondaArenaActive: boolean = false;
 
   constructor(mapId: MapId = 'night_plain') {
@@ -1741,17 +1741,23 @@ export class WorldSystem {
     return Math.hypot(lx / rx, ly / ry) <= this.getLakeEdgeScale(lake, this.getLakeNormalizedAngle(lake, x, y));
   }
 
-  /** Starts the Sucuri's arena transformation (upper lake shore turned to mud). */
+  /** Starts the Sucuri's arena transformation (upper lake shore turned to stone). */
   public activateAnacondaArena(): void {
     if (this.mapId === 'amazon_forest' && this.lakes.length > 0) this.anacondaArenaActive = true;
   }
 
+  /** Restores the normal lakeshore once the Sucuri's duel is over. */
+  public deactivateAnacondaArena(): void {
+    this.anacondaArenaActive = false;
+  }
+
   /**
-   * Dense quicksand ring around the upper lake. It only exists after the
-   * Sucuri's arena transformation and uses the same organic outline as the
-   * painted shore, so its footprint never leaks onto the grass.
+   * Solid stone ring around the upper lake. It only exists after the Sucuri's
+   * arena transformation and uses the same organic outline as the painted
+   * shore, so its footprint never leaks onto the grass. `inflate` expands the
+   * ring by the hero's body radius so the obstacle cannot be clipped.
    */
-  public isInAnacondaMud(x: number, y: number): boolean {
+  public isInAnacondaWall(x: number, y: number, inflate: number = 0): boolean {
     if (!this.anacondaArenaActive || this.mapId !== 'amazon_forest' || !this.lakes[0]) return false;
 
     const lake = this.lakes[0];
@@ -1763,20 +1769,21 @@ export class WorldSystem {
     const ly = dx * sin + dy * cos;
     const edgeScale = this.getLakeEdgeScale(lake, this.getLakeNormalizedAngle(lake, x, y));
 
+    // The open water remains walkable. Shrinking it by the body radius makes
+    // the hero stop as soon as their circle touches the stone.
+    const waterRx = Math.max(1, lake.rx - inflate);
+    const waterRy = Math.max(1, lake.ry - inflate);
     const waterRho = Math.sqrt(
-      (lx * lx) / (lake.rx * lake.rx) + (ly * ly) / (lake.ry * lake.ry)
+      (lx * lx) / (waterRx * waterRx) + (ly * ly) / (waterRy * waterRy)
     );
-    // Standing on the open water is handled by the normal water terrain.
     if (waterRho <= edgeScale) return false;
-    // The river mouth paints over this stretch of the rim with its own water
-    // and clay lips, so those pixels are not part of the transformed quicksand.
-    if (this.isRiverMouthWater(x, y, -30)) return false;
 
-    const mudRho = Math.sqrt(
-      (lx * lx) / ((lake.rx + MUD_BAND) * (lake.rx + MUD_BAND)) +
-      (ly * ly) / ((lake.ry + MUD_BAND) * (lake.ry + MUD_BAND))
+    const wallRx = lake.rx + MUD_BAND + inflate;
+    const wallRy = lake.ry + MUD_BAND + inflate;
+    const wallRho = Math.sqrt(
+      (lx * lx) / (wallRx * wallRx) + (ly * ly) / (wallRy * wallRy)
     );
-    return mudRho <= edgeScale;
+    return wallRho <= edgeScale;
   }
 
   public resolveUpperLakeMovement(fromX: number, fromY: number, toX: number, toY: number, radius: number): { x: number; y: number } {
@@ -4808,12 +4815,22 @@ export class WorldSystem {
       // Resolve each axis independently so the player can slide along props.
       const nextX = Math.max(-limit, Math.min(limit, x + stepX));
       if (!this.collidesWithTree(nextX, y, radius)) {
-        if (!this.blocksOnPlateauRim(x, y, nextX, y, airborne, radius)) x = nextX;
+        if (
+          !this.blocksOnPlateauRim(x, y, nextX, y, airborne, radius) &&
+          !this.isInAnacondaWall(nextX, y, radius)
+        ) {
+          x = nextX;
+        }
       }
 
       const nextY = Math.max(-limit, Math.min(limit, y + stepY));
       if (!this.collidesWithTree(x, nextY, radius)) {
-        if (!this.blocksOnPlateauRim(x, y, x, nextY, airborne, radius)) y = nextY;
+        if (
+          !this.blocksOnPlateauRim(x, y, x, nextY, airborne, radius) &&
+          !this.isInAnacondaWall(x, nextY, radius)
+        ) {
+          y = nextY;
+        }
       }
     }
 
@@ -5585,67 +5602,81 @@ export class WorldSystem {
   }
 
   /**
-   * Dense, bubbling quicksand replacing the upper lake's brown mud rim. It is
-   * painted in the lake's local space with the same organic outline as the
-   * water, so the swamp follows every curve and never spills onto the grass.
+   * Small stone mountains replacing the upper lake's brown mud rim during the
+   * Sucuri duel. The ring is painted in the lake's local space with the same
+   * organic outline as the water and its solid footprint, so the visual wall
+   * always matches the collision that traps the hero.
    */
-  private renderAnacondaMud(ctx: CanvasRenderingContext2D, lake: LakeProp): void {
-    ctx.fillStyle = '#1b110a';
+  private renderAnacondaMountains(ctx: CanvasRenderingContext2D, lake: LakeProp): void {
+    // Soft shadow under the mountain mass.
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    ctx.beginPath();
+    this.traceLakeShape(ctx, lake, lake.rx + MUD_BAND + 12, lake.ry + MUD_BAND + 12);
+    ctx.fill();
+
+    // Continuous rocky base filling the whole transformed band.
+    const stoneGradient = ctx.createLinearGradient(
+      0,
+      -lake.ry - MUD_BAND,
+      0,
+      lake.ry + MUD_BAND
+    );
+    stoneGradient.addColorStop(0, '#8a8580');
+    stoneGradient.addColorStop(0.45, '#6b7280');
+    stoneGradient.addColorStop(1, '#3f3f46');
+    ctx.fillStyle = stoneGradient;
     ctx.beginPath();
     this.traceLakeShape(ctx, lake, lake.rx + MUD_BAND, lake.ry + MUD_BAND);
     ctx.fill();
 
-    ctx.fillStyle = '#2a1b0f';
+    // Inner lip stays darker, reading as the steep face of the wall.
+    ctx.fillStyle = '#44403c';
     ctx.beginPath();
-    this.traceLakeShape(ctx, lake, lake.rx + MUD_BAND * 0.76, lake.ry + MUD_BAND * 0.76);
+    this.traceLakeShape(ctx, lake, lake.rx + MUD_BAND * 0.5, lake.ry + MUD_BAND * 0.5);
     ctx.fill();
 
-    ctx.fillStyle = '#120c08';
-    ctx.beginPath();
-    this.traceLakeShape(ctx, lake, lake.rx + MUD_BAND * 0.4, lake.ry + MUD_BAND * 0.4);
-    ctx.fill();
-
-    // Bubbles rise and pop around the ring. Their positions are deterministic,
-    // while the shared water animation clock keeps the swamp constantly moving.
-    const time = this.waterAnimTimer;
-    const bubbles = 72;
-    for (let i = 0; i < bubbles; i++) {
-      const cycle = (time * 0.55 + i * 0.137) % 1;
-      const life = Math.sin(cycle * Math.PI);
-      if (life < 0.18) continue;
-
-      const angle = (i / bubbles) * Math.PI * 2 + Math.sin(time * 0.6 + i) * 0.012;
+    // Deterministic cluster of small peaks around the organic shoreline.
+    const peaks = 96;
+    for (let i = 0; i < peaks; i++) {
+      const angle = (i / peaks) * Math.PI * 2 + Math.sin(i * 1.7) * 0.02;
       const edgeScale = this.getLakeEdgeScale(lake, angle);
-      const radial = 0.18 + ((i * 0.61803398875) % 1) * 0.64;
+      const radial = 0.14 + ((i * 0.61803398875) % 1) * 0.72;
       const px = Math.cos(angle) * (lake.rx + MUD_BAND * radial) * edgeScale;
       const py = Math.sin(angle) * (lake.ry + MUD_BAND * radial) * edgeScale;
-      const pyRisen = py - life * 5;
-      const radius = (1.2 + (i % 5) * 0.8) * (0.35 + 0.65 * life);
+      const size = 9 + (i % 5) * 3 + (i % 3) * 2;
+      const tone = i % 4;
 
-      ctx.globalAlpha = 0.35 + 0.5 * life;
-      ctx.fillStyle = '#0d0906';
+      // Ground shadow of each peak.
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
       ctx.beginPath();
-      ctx.arc(px, pyRisen, radius, 0, Math.PI * 2);
+      ctx.ellipse(px + 3, py + size * 0.55, size * 1.2, size * 0.55, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.strokeStyle = 'rgba(126, 92, 50, 0.8)';
-      ctx.lineWidth = 1;
+      // Jagged little mountain: two uneven summits per rock.
       ctx.beginPath();
-      ctx.arc(px, pyRisen, radius, 0, Math.PI * 2);
+      ctx.moveTo(px - size, py + size * 0.5);
+      ctx.lineTo(px - size * 0.55, py - size * 0.85);
+      ctx.lineTo(px - size * 0.12, py - size * 0.12);
+      ctx.lineTo(px + size * 0.2, py - size * 1.1);
+      ctx.lineTo(px + size * 0.56, py - size * 0.22);
+      ctx.lineTo(px + size, py + size * 0.5);
+      ctx.closePath();
+      ctx.fillStyle =
+        tone === 0 ? '#78716c' : tone === 1 ? '#6b7280' : tone === 2 ? '#57534e' : '#52525b';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(24, 24, 27, 0.85)';
+      ctx.lineWidth = 1.5;
+      ctx.lineJoin = 'round';
       ctx.stroke();
 
-      ctx.fillStyle = 'rgba(180, 140, 82, 0.55)';
+      // Lit ridge on the larger summit.
+      ctx.strokeStyle = 'rgba(214, 211, 209, 0.6)';
+      ctx.lineWidth = 1.2;
       ctx.beginPath();
-      ctx.arc(
-        px - radius * 0.3,
-        pyRisen - radius * 0.3,
-        Math.max(0.6, radius * 0.28),
-        0,
-        Math.PI * 2
-      );
-      ctx.fill();
+      ctx.moveTo(px + size * 0.2, py - size * 1.1);
+      ctx.lineTo(px + size * 0.02, py - size * 0.45);
+      ctx.stroke();
     }
-    ctx.globalAlpha = 1;
   }
 
   private renderAmazonWater(ctx: CanvasRenderingContext2D, camera: Camera): void {
@@ -5841,11 +5872,9 @@ export class WorldSystem {
       }
 
       // Muddy lakeshore ring before the water covers its inner edge. The
-      // Sucuri's arena replaces the upper lake's brown rim with dense,
-      // bubbling quicksand while keeping the exact same organic outline.
-      if (this.anacondaArenaActive && i === 0) {
-        this.renderAnacondaMud(ctx, lake);
-      } else {
+      // Sucuri's arena replaces the upper lake's brown rim with solid stone,
+      // painted after the river mouths so the dam also closes their channel.
+      if (!(this.anacondaArenaActive && i === 0)) {
         ctx.fillStyle = '#4a3322';
         ctx.beginPath();
         this.traceLakeShape(ctx, lake, lake.rx + MUD_BAND, lake.ry + MUD_BAND);
@@ -5870,6 +5899,20 @@ export class WorldSystem {
     // strip is removed and the dark water edge at the mouth ends is hidden
     // under the river/lake water instead of cutting across it.
     this.renderRiverMouth(ctx);
+
+    // Sucuri arena: the stone ring is drawn over the open river mouth as well,
+    // matching the continuous collider that prevents leaving the lake.
+    const arenaLake = this.anacondaArenaActive ? this.lakes[0] : null;
+    if (arenaLake) {
+      const margin = Math.max(arenaLake.rx, arenaLake.ry) + MUD_BAND + 160;
+      if (camera.isInView(arenaLake.x, arenaLake.y, margin)) {
+        ctx.save();
+        ctx.translate(arenaLake.x, arenaLake.y);
+        ctx.rotate(arenaLake.rotation);
+        this.renderAnacondaMountains(ctx, arenaLake);
+        ctx.restore();
+      }
+    }
 
     // Iara's Dynamic Flood: translucent water creeping over the dry land. It is
     // painted before the permanent water so the old river/lake surface stays
