@@ -138,6 +138,8 @@ export class Player {
   public isWadingInWater: boolean = false;
   // Set by the engine while the feet are on the Amazon muddy margins.
   public isInMud: boolean = false;
+  // Sucuri quicksand: movement and dashes are locked until the hero jumps.
+  public isMired: boolean = false;
   // Terrain speed penalty (water -30%, mud -20%), refreshed by the engine.
   public terrainSpeedMultiplier: number = 1;
 
@@ -362,13 +364,19 @@ export class Player {
     }
 
     // Movement input
+    // Quicksand pins the hero in place until a jump lifts them out; dashes and
+    // external impulses are also suspended while the feet are stuck.
+    const mired = this.isMired && !this.isJumping;
+    if (mired) this.dashTimer = 0;
+
     const dx = input.dx;
     const dy = input.dy;
-    const moving = !stunned && (Math.abs(dx) > 0.05 || Math.abs(dy) > 0.05);
+    const moving = !stunned && !mired && (Math.abs(dx) > 0.05 || Math.abs(dy) > 0.05);
 
     // Dash impulse (held SHIFT). Direction follows movement, or facing when idle.
     if (
       !stunned &&
+      !mired &&
       input.dashHeld &&
       this.dashCooldownTimer <= 0 &&
       this.dashTimer <= 0 &&
@@ -412,7 +420,7 @@ export class Player {
       this.facingY = input.facingY;
     }
 
-    if (this.knockbackVX !== 0 || this.knockbackVY !== 0) {
+    if (!mired && (this.knockbackVX !== 0 || this.knockbackVY !== 0)) {
       moveX += this.knockbackVX * dt;
       moveY += this.knockbackVY * dt;
       const decay = Math.pow(0.02, dt);

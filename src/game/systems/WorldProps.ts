@@ -411,6 +411,11 @@ export class WorldSystem {
   private maxFloodRadiusCache: number | null = null;
   private floodLandSamples: { x: number; y: number }[] | null = null;
 
+  // Sucuri arena: once the hero enters her combat detection radius the upper
+  // lake's muddy shore turns into dense, bubbling quicksand that pins the hero
+  // until they jump out of it.
+  private anacondaArenaActive: boolean = false;
+
   constructor(mapId: MapId = 'night_plain') {
     this.mapId = mapId;
     this.forestCave = mapId === 'amazon_forest' ? new ForestCave() : null;
@@ -1734,6 +1739,44 @@ export class WorldSystem {
     const cos = Math.cos(-lake.rotation), sin = Math.sin(-lake.rotation);
     const lx = dx * cos - dy * sin, ly = dx * sin + dy * cos;
     return Math.hypot(lx / rx, ly / ry) <= this.getLakeEdgeScale(lake, this.getLakeNormalizedAngle(lake, x, y));
+  }
+
+  /** Starts the Sucuri's arena transformation (upper lake shore turned to mud). */
+  public activateAnacondaArena(): void {
+    if (this.mapId === 'amazon_forest' && this.lakes.length > 0) this.anacondaArenaActive = true;
+  }
+
+  /**
+   * Dense quicksand ring around the upper lake. It only exists after the
+   * Sucuri's arena transformation and uses the same organic outline as the
+   * painted shore, so its footprint never leaks onto the grass.
+   */
+  public isInAnacondaMud(x: number, y: number): boolean {
+    if (!this.anacondaArenaActive || this.mapId !== 'amazon_forest' || !this.lakes[0]) return false;
+
+    const lake = this.lakes[0];
+    const dx = x - lake.x;
+    const dy = y - lake.y;
+    const cos = Math.cos(-lake.rotation);
+    const sin = Math.sin(-lake.rotation);
+    const lx = dx * cos - dy * sin;
+    const ly = dx * sin + dy * cos;
+    const edgeScale = this.getLakeEdgeScale(lake, this.getLakeNormalizedAngle(lake, x, y));
+
+    const waterRho = Math.sqrt(
+      (lx * lx) / (lake.rx * lake.rx) + (ly * ly) / (lake.ry * lake.ry)
+    );
+    // Standing on the open water is handled by the normal water terrain.
+    if (waterRho <= edgeScale) return false;
+    // The river mouth paints over this stretch of the rim with its own water
+    // and clay lips, so those pixels are not part of the transformed quicksand.
+    if (this.isRiverMouthWater(x, y, -30)) return false;
+
+    const mudRho = Math.sqrt(
+      (lx * lx) / ((lake.rx + MUD_BAND) * (lake.rx + MUD_BAND)) +
+      (ly * ly) / ((lake.ry + MUD_BAND) * (lake.ry + MUD_BAND))
+    );
+    return mudRho <= edgeScale;
   }
 
   public resolveUpperLakeMovement(fromX: number, fromY: number, toX: number, toY: number, radius: number): { x: number; y: number } {
@@ -5541,6 +5584,70 @@ export class WorldSystem {
     }
   }
 
+  /**
+   * Dense, bubbling quicksand replacing the upper lake's brown mud rim. It is
+   * painted in the lake's local space with the same organic outline as the
+   * water, so the swamp follows every curve and never spills onto the grass.
+   */
+  private renderAnacondaMud(ctx: CanvasRenderingContext2D, lake: LakeProp): void {
+    ctx.fillStyle = '#1b110a';
+    ctx.beginPath();
+    this.traceLakeShape(ctx, lake, lake.rx + MUD_BAND, lake.ry + MUD_BAND);
+    ctx.fill();
+
+    ctx.fillStyle = '#2a1b0f';
+    ctx.beginPath();
+    this.traceLakeShape(ctx, lake, lake.rx + MUD_BAND * 0.76, lake.ry + MUD_BAND * 0.76);
+    ctx.fill();
+
+    ctx.fillStyle = '#120c08';
+    ctx.beginPath();
+    this.traceLakeShape(ctx, lake, lake.rx + MUD_BAND * 0.4, lake.ry + MUD_BAND * 0.4);
+    ctx.fill();
+
+    // Bubbles rise and pop around the ring. Their positions are deterministic,
+    // while the shared water animation clock keeps the swamp constantly moving.
+    const time = this.waterAnimTimer;
+    const bubbles = 72;
+    for (let i = 0; i < bubbles; i++) {
+      const cycle = (time * 0.55 + i * 0.137) % 1;
+      const life = Math.sin(cycle * Math.PI);
+      if (life < 0.18) continue;
+
+      const angle = (i / bubbles) * Math.PI * 2 + Math.sin(time * 0.6 + i) * 0.012;
+      const edgeScale = this.getLakeEdgeScale(lake, angle);
+      const radial = 0.18 + ((i * 0.61803398875) % 1) * 0.64;
+      const px = Math.cos(angle) * (lake.rx + MUD_BAND * radial) * edgeScale;
+      const py = Math.sin(angle) * (lake.ry + MUD_BAND * radial) * edgeScale;
+      const pyRisen = py - life * 5;
+      const radius = (1.2 + (i % 5) * 0.8) * (0.35 + 0.65 * life);
+
+      ctx.globalAlpha = 0.35 + 0.5 * life;
+      ctx.fillStyle = '#0d0906';
+      ctx.beginPath();
+      ctx.arc(px, pyRisen, radius, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = 'rgba(126, 92, 50, 0.8)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(px, pyRisen, radius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.fillStyle = 'rgba(180, 140, 82, 0.55)';
+      ctx.beginPath();
+      ctx.arc(
+        px - radius * 0.3,
+        pyRisen - radius * 0.3,
+        Math.max(0.6, radius * 0.28),
+        0,
+        Math.PI * 2
+      );
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
   private renderAmazonWater(ctx: CanvasRenderingContext2D, camera: Camera): void {
     const start = -FOREST_HALF_SIZE - 1200;
     const end = FOREST_HALF_SIZE + 1200;
@@ -5733,21 +5840,27 @@ export class WorldSystem {
         ctx.globalAlpha = 1;
       }
 
-      // Muddy lakeshore ring before the water covers its inner edge.
-      ctx.fillStyle = '#4a3322';
-      ctx.beginPath();
-      this.traceLakeShape(ctx, lake, lake.rx + MUD_BAND, lake.ry + MUD_BAND);
-      ctx.fill();
+      // Muddy lakeshore ring before the water covers its inner edge. The
+      // Sucuri's arena replaces the upper lake's brown rim with dense,
+      // bubbling quicksand while keeping the exact same organic outline.
+      if (this.anacondaArenaActive && i === 0) {
+        this.renderAnacondaMud(ctx, lake);
+      } else {
+        ctx.fillStyle = '#4a3322';
+        ctx.beginPath();
+        this.traceLakeShape(ctx, lake, lake.rx + MUD_BAND, lake.ry + MUD_BAND);
+        ctx.fill();
 
-      ctx.fillStyle = '#3a2718';
-      ctx.beginPath();
-      this.traceLakeShape(
-        ctx,
-        lake,
-        lake.rx + MUD_BAND * 0.62,
-        lake.ry + MUD_BAND * 0.62
-      );
-      ctx.fill();
+        ctx.fillStyle = '#3a2718';
+        ctx.beginPath();
+        this.traceLakeShape(
+          ctx,
+          lake,
+          lake.rx + MUD_BAND * 0.62,
+          lake.ry + MUD_BAND * 0.62
+        );
+        ctx.fill();
+      }
 
       ctx.restore();
     }

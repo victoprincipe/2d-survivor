@@ -114,6 +114,10 @@ const ECOLOGY_FRUIT_FEED_COOLDOWN = 8;
 const SUCURI_WATER_SPEED_MULTIPLIER = 1.5;
 const SUCURI_SHORE_SPEED_MULTIPLIER = 1.3;
 
+// Entering the Sucuri's combat detection radius transforms the upper lake's
+// shore into dense quicksand. Reuse her dive radius as the detection range.
+const SUCURI_ARENA_TRIGGER_RADIUS = ANACONDA.dive.radius;
+
 // Land animals climb a plateau's vertical wall 20% slower than they walk on
 // flat ground, simulating the effort of scaling it.
 const PLATEAU_CLIMB_SPEED_MULTIPLIER = 0.8;
@@ -689,6 +693,7 @@ export class GameEngine {
     if (this.insideCave) {
       this.player.isWadingInWater = false;
       this.player.isInMud = false;
+      this.player.isMired = false;
       this.player.terrainSpeedMultiplier = 1;
       if (!this.player.update(dt, this.input)) { this.handlePlayerDeath(); return; }
       if (interactRequested && this.caveInterior.nearExit(this.player)) {
@@ -752,6 +757,17 @@ export class GameEngine {
     // Iara's Dynamic Flood cycle (rising / hold / recede) before terrain physics.
     this.updateFloodCycle(dt);
 
+    // Sucuri proximity trigger: approaching the upper-lake boss transforms the
+    // arena, turning her muddy shore into dense quicksand.
+    if (
+      this.anacondaNpc &&
+      !this.anacondaDefeated &&
+      Math.hypot(this.player.x - this.anacondaNpc.x, this.player.y - this.anacondaNpc.y) <=
+        SUCURI_ARENA_TRIGGER_RADIUS
+    ) {
+      this.worldProps.activateAnacondaArena();
+    }
+
     // 1. Terrain physics: mud and water slow the hero down before the step.
     const playerInWater = this.worldProps.isWaterSurface(this.player.x, this.player.y);
     const playerInFlood =
@@ -760,15 +776,27 @@ export class GameEngine {
       this.worldProps.isFloodWater(this.player.x, this.player.y);
     const playerInMud =
       !playerInWater && !playerInFlood && this.worldProps.isMud(this.player.x, this.player.y);
+    // The feet hitbox sits slightly below the body centre; any pixel of the
+    // transformed upper-lake quicksand pins the hero completely.
+    const playerInAnacondaMud =
+      !playerInWater &&
+      !playerInFlood &&
+      this.worldProps.isInAnacondaMud(
+        this.player.x,
+        this.player.y + this.player.radius * 0.6
+      );
     this.player.isWadingInWater = playerInWater || playerInFlood;
-    this.player.isInMud = playerInMud && !this.player.isJumping;
+    this.player.isInMud = (playerInMud || playerInAnacondaMud) && !this.player.isJumping;
+    this.player.isMired = playerInAnacondaMud && !this.player.isJumping;
     this.player.terrainSpeedMultiplier = this.player.isJumping
       ? 1
-      : playerInWater || playerInFlood
-        ? WATER_SPEED_MULTIPLIER
-        : playerInMud
-          ? MUD_SPEED_MULTIPLIER
-          : 1;
+      : playerInAnacondaMud
+        ? 0
+        : playerInWater || playerInFlood
+          ? WATER_SPEED_MULTIPLIER
+          : playerInMud
+            ? MUD_SPEED_MULTIPLIER
+            : 1;
 
     // 2. Update Player
     const playerAlive = this.player.update(dt, this.input);
