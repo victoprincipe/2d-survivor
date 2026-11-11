@@ -547,6 +547,7 @@ export class GameEngine {
     const inventory = savedData.inventories?.[character.id] ?? emptyInventory();
     this.caveRewardClaimed = inventory.items.some(item => item.id === GUARDIAN_BOW.id);
     this.kopenawaDefeated = inventory.kopenawaDefeated === true || this.caveRewardClaimed;
+    if (this.kopenawaDefeated) this.worldProps.unlockForestCave();
     this.difficulty = getDifficulty(difficultyId);
     this.waveDirector = new WaveDirector(this.difficulty, mapId, this.worldProps);
     this.amazonTurns = this.createAmazonMissionTurns();
@@ -1635,7 +1636,6 @@ export class GameEngine {
       this.spatialGrid.clear();
     }
     if (this.bossEncounter?.kind === 'kopenawa' && this.kopenawaDefeated) {
-      const { x, y } = this.bossEncounter.boss;
       this.restoreBossEncounter();
       const data = loadSavedData();
       const id = this.player.character.id;
@@ -1644,10 +1644,6 @@ export class GameEngine {
         ...data,
         inventories: { ...data.inventories, [id]: { ...inventory, kopenawaDefeated: true } },
       });
-      if (!inventory.items.some(item => item.id === GUARDIAN_BOW.id) &&
-        !this.drops.some(drop => drop instanceof EquipmentDrop && drop.item.id === GUARDIAN_BOW.id)) {
-        this.drops.push(new EquipmentDrop(Date.now() + Math.random(), x, y, GUARDIAN_BOW));
-      }
       this.bossProjectiles = [];
       this.bossHazards = [];
       this.spatialGrid.clear();
@@ -2414,6 +2410,7 @@ export class GameEngine {
         this.gorillaArena = null;
       } else if (this.bossEncounter.kind === 'kopenawa') {
         this.kopenawaDefeated = true;
+        this.worldProps.unlockForestCave();
         this.gorillaArena = null;
       } else {
         this.anacondaDefeated = true;
@@ -2434,6 +2431,12 @@ export class GameEngine {
     if (enemy.isBoss) {
       this.bossesDefeated += 1;
       if (enemy.type === 'boss_anaconda') { this.persistRunStats(false); return; }
+      // Kopenawa leaves no physical loot outside the cave; his bow waits inside.
+      if (enemy instanceof KopenawaBoss) {
+        if (!this.waveDirector.isEndless && !this.waveDirector.isAmazonForest) this.handleVictory();
+        else this.persistRunStats(false);
+        return;
+      }
       const bossXp = Math.round(250 * this.difficulty.xpMultiplier);
       this.drops.push(new Drop(Date.now() + Math.random(), 'chest', enemy.x, enemy.y));
       this.drops.push(new Drop(Date.now() + 1 + Math.random(), 'gem_red', enemy.x + 22, enemy.y, bossXp));

@@ -11,13 +11,20 @@ export class ForestCave {
   readonly x = -1950;
   readonly y = 1900;
   private readonly sprite: HTMLImageElement;
+  private unlocked = false;
 
   constructor() {
     this.sprite = new Image();
     this.sprite.src = '/sprites/forest-cave/entrance.png';
   }
 
+  /** Kopenawa's defeat removes the seal so the hero can walk into the cave. */
+  unlock(): void {
+    this.unlocked = true;
+  }
+
   collides(x: number, y: number, radius: number): boolean {
+    if (this.unlocked) return false;
     const dx = x - this.x;
     const dy = y - this.y;
     // Circle/rectangle tests share the foot of the painted outcrop. Leave a

@@ -355,6 +355,10 @@ export class WorldSystem {
     }
   }
 
+  public unlockForestCave(): void {
+    this.forestCave?.unlock();
+  }
+
   public torches: TorchProp[] = [];
   private nextTorchId: number = 1;
   private torchSpawnTimer: number = 0;
