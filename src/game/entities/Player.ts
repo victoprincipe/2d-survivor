@@ -156,6 +156,7 @@ export class Player {
   private walkSpriteImage: HTMLImageElement | null = null;
   private attackSpriteImage: HTMLImageElement | null = null;
   private animationSpriteImage: HTMLImageElement | null = null;
+  private movementSpriteImage: HTMLImageElement | null = null;
   private attackFacingX: number = 1;
 
   public static computeXpToNextLevel(level: number): number {
@@ -181,6 +182,11 @@ export class Player {
   constructor(character: CharacterConfig, initialPowerUps: PermanentPowerUps = {}) {
     this.character = character;
     this.powerUps = initialPowerUps;
+
+    if (character.movementSprite && typeof window !== 'undefined') {
+      this.movementSpriteImage = new Image();
+      this.movementSpriteImage.src = character.movementSprite;
+    }
 
     if (character.animationSprite && typeof window !== 'undefined') {
       this.animationSpriteImage = new Image();
@@ -499,7 +505,8 @@ export class Player {
 
     this.isMoving = moving || dashing;
     if (this.isMoving) {
-      this.walkAnimTimer += dt * 10;
+      this.walkAnimTimer += dt * 10 * (this.character.id === 'lula'
+        ? Math.max(0.4, effectiveSpeed / 160) : 1);
     } else {
       this.walkAnimTimer = 0;
     }
@@ -537,6 +544,19 @@ export class Player {
     this.hp = Math.min(this.maxHp, this.hp + amount);
   }
 
+  /** Bonuses start with the first level gained (level 2), without compounding. */
+  public get lulaLevelDamageBonus(): number {
+    return this.character.id === 'lula' ? Math.max(0, this.level - 1) * 0.008 : 0;
+  }
+
+  public get lulaLevelAttackSpeedBonus(): number {
+    return this.character.id === 'lula' ? Math.max(0, this.level - 1) * 0.008 : 0;
+  }
+
+  public get lulaLevelMovementBonus(): number {
+    return this.character.id === 'lula' ? Math.max(0, this.level - 1) * 0.004 : 0;
+  }
+
   checkLevelUp(): boolean {
     if (this.xp >= this.xpToNextLevel) {
       this.xp -= this.xpToNextLevel;
@@ -551,6 +571,112 @@ export class Player {
   addXp(amount: number): boolean {
     this.xp += amount * this.xpMultiplier;
     return this.checkLevelUp();
+  }
+
+  private renderLulaPose(
+    ctx: CanvasRenderingContext2D,
+    walkSheet: HTMLImageElement,
+    attackSheet: HTMLImageElement | null,
+    isDead: boolean
+  ): void {
+    let bodySheet = walkSheet;
+    let row = 0;
+    let frame = !isDead && this.isMoving ? Math.floor(this.walkAnimTimer) % 8 : 0;
+    const motion = this.movementSpriteImage;
+    const jumping = !isDead && this.isJumping;
+    const dashing = !isDead && this.dashTimer > 0;
+    if (motion && motion.complete && motion.naturalWidth > 0 && (jumping || dashing)) {
+      bodySheet = motion;
+      row = jumping ? 0 : 1;
+      const progress = jumping
+        ? 1 - this.jumpTimer / this.movementConfig.jumpDuration
+        : 1 - this.dashTimer / this.movementConfig.dashDuration;
+      frame = Math.min(7, Math.max(0, Math.floor(progress * 8)));
+    }
+
+    const attacking = !isDead && !!attackSheet && this.attackAnimTimer > 0;
+    const attackFrame = Math.min(7, Math.max(0, Math.floor(
+      (1 - this.attackAnimTimer / Math.max(0.01, this.attackAnimDuration)) * 8
+    )));
+    const width = 52 * 128 / 160;
+    const split = 116;
+    ctx.save();
+    // Apply direction once to both layers; feet and gesture always agree.
+    ctx.scale(this.facingX < 0 ? -1 : 1, 1);
+    ctx.translate(0, 14);
+    if (dashing) ctx.rotate(-0.18);
+    if (!isDead && !this.isMoving && !jumping && !attacking) {
+      ctx.scale(1, 1 + Math.sin(this.idleAnimTimer * Math.PI) * 0.012);
+    }
+    ctx.translate(0, -14);
+    const drawSlice = (sheet: HTMLImageElement, column: number, sheetRow: number,
+      top: number, height: number) => {
+      ctx.drawImage(sheet, column * 128, sheetRow * 160 + top, 128, height,
+        -width / 2, 14 - 52 + top * 52 / 160, width, height * 52 / 160);
+    };
+    // During the skill, only the upper body changes. Locomotion keeps its legs.
+    drawSlice(bodySheet, frame, row, split, 160 - split);
+    drawSlice(attacking && attackSheet ? attackSheet : bodySheet,
+      attacking ? attackFrame : frame, attacking ? 0 : row, 0, split);
+    ctx.restore();
+  }
+
+  private renderAnimationAtlas(ctx: CanvasRenderingContext2D, sheet: HTMLImageElement): void {
+    const columns = this.character.animationColumns ?? 4;
+    const rows = this.character.animationRows ?? 4;
+    const frameWidth = sheet.naturalWidth / columns;
+    const frameHeight = sheet.naturalHeight / rows;
+    const dead = this.hp <= 0;
+    const attacking = !dead && this.attackAnimTimer > 0;
+    let row = 3;
+    let frame = dead ? 0 : Math.floor(this.idleAnimTimer * 2) % columns;
+    if (!dead && this.isJumping) {
+      row = 1;
+      const progress = 1 - this.jumpTimer / this.movementConfig.jumpDuration;
+      frame = columns === 4
+        ? progress < 0.15 ? 0 : progress < 0.35 ? 1 : progress < 0.8 ? 2 : 3
+        : Math.min(columns - 1, Math.max(0, Math.floor(progress * columns)));
+    } else if (!dead && rows > 4 && this.dashTimer > 0) {
+      row = 4;
+      frame = Math.min(columns - 1, Math.max(0, Math.floor(
+        (1 - this.dashTimer / this.movementConfig.dashDuration) * columns
+      )));
+    } else if (!dead && this.isMoving) {
+      row = 0;
+      frame = Math.floor(this.walkAnimTimer) % columns;
+    }
+    const attackFrame = Math.min(columns - 1, Math.max(0, Math.floor(
+      (1 - this.attackAnimTimer / Math.max(0.01, this.attackAnimDuration)) * columns
+    )));
+    const height = 60;
+    const width = height * frameWidth / frameHeight;
+    ctx.save();
+    const facing = this.character.animationSplitY ? this.facingX
+      : attacking ? this.attackFacingX : this.facingX;
+    if (facing < 0) ctx.scale(-1, 1);
+    if (this.character.animationSplitY) {
+      ctx.translate(0, 14);
+      if (!dead && !this.isJumping && this.dashTimer > 0) ctx.rotate(-0.14);
+      if (!dead && !attacking && !this.isMoving && !this.isJumping) {
+        ctx.scale(1, 1 + Math.sin(this.idleAnimTimer * Math.PI) * 0.012);
+      }
+      ctx.translate(0, -14);
+    }
+    ctx.imageSmoothingEnabled = false;
+    const drawSlice = (column: number, sourceRow: number, top: number, sliceHeight: number) => {
+      ctx.drawImage(sheet, column * frameWidth, sourceRow * frameHeight + top,
+        frameWidth, sliceHeight, -width / 2, 14 - height * 0.96 + top * height / frameHeight,
+        width, sliceHeight * height / frameHeight);
+    };
+    const split = this.character.animationSplitY;
+    if (split && attacking) {
+      // Hip-aligned art keeps locomotion independent from the L gesture.
+      drawSlice(frame, row, split, frameHeight - split);
+      drawSlice(attackFrame, 2, 0, split);
+    } else {
+      drawSlice(attacking ? attackFrame : frame, attacking ? 2 : row, 0, frameHeight);
+    }
+    ctx.restore();
   }
 
   render(ctx: CanvasRenderingContext2D, camera: Camera): void {
@@ -606,37 +732,9 @@ export class Player {
     const flip = this.facingX < 0 ? -1 : 1;
 
     if (hasAnimationSheet && animationSheet) {
-      // Kayrurururu atlas: walk / jump / bow / idle, all facing right.
-      // The engine supplies the jump arc; poses remain anchored to the feet.
-      const attacking = !isDead && this.attackAnimTimer > 0;
-      let row = 3;
-      let frame = isDead ? 0 : Math.floor(this.idleAnimTimer * 2) % 4;
-      if (!isDead && this.isJumping) {
-        row = 1;
-        const progress = 1 - this.jumpTimer / this.movementConfig.jumpDuration;
-        frame = progress < 0.15 ? 0 : progress < 0.35 ? 1 : progress < 0.8 ? 2 : 3;
-      }
-      if (attacking) {
-        row = 2;
-        frame = Math.min(3, Math.max(0, Math.floor(
-          (1 - this.attackAnimTimer / this.attackAnimDuration) * 4
-        )));
-      } else if (!isDead && !this.isJumping && this.isMoving) {
-        row = 0;
-        frame = Math.floor(this.walkAnimTimer) % 4;
-      }
-      const frameWidth = animationSheet.naturalWidth / 4;
-      const frameHeight = animationSheet.naturalHeight / 4;
-      // Atlas cells include transparent padding around the visible body.
-      const drawHeight = 60;
-      const drawWidth = drawHeight * frameWidth / frameHeight;
-      ctx.save();
-      if ((attacking ? this.attackFacingX : this.facingX) < 0) ctx.scale(-1, 1);
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(animationSheet, frame * frameWidth, row * frameHeight,
-        frameWidth, frameHeight, -drawWidth / 2, 14 - drawHeight * 0.96,
-        drawWidth, drawHeight);
-      ctx.restore();
+      this.renderAnimationAtlas(ctx, animationSheet);
+    } else if (this.character.id === 'lula' && hasWalkSheet && walkSheet) {
+      this.renderLulaPose(ctx, walkSheet, hasAttackSheet ? attackSheet : null, isDead);
     } else if (isUsingSheet && walkSheet) {
       // Sheet-based animation: 8 walk frames per row, attack frames on a single row.
       const walkFrames = Math.max(1, this.character.walkFrames ?? 8);

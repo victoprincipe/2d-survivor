@@ -569,8 +569,10 @@ export const LULA_SKILL = {
   name: 'Poder do L',
   damage: 35,
   radius: 150,
-  cooldown: 5000,
+  cooldown: 3150,
   animationDuration: 800,
+  // Frame 4 of the eight-frame gesture is the first fully formed L.
+  releaseDelay: 400,
   color: '#ff1744',
   knockback: 80,
 };
@@ -913,5 +915,5 @@ export const AMAZON_STARTING_WEAPON_BY_CHARACTER: Record<string, WeaponId> = {
   kayrurururu: 'bow',
   bianca: 'rugido_mapinguari',
   dr_janelinha: 'ferrao_formiga',
-  lula: 'rugido_mapinguari',
+  lula: 'lula_power',
 };

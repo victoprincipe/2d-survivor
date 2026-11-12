@@ -1624,7 +1624,7 @@ export class GameEngine {
 
     // Credit kills immediately, then open at most one upgrade selection per frame.
     // Remaining levels are handled sequentially by applyUpgrade's overflow logic.
-    if (!this.isPaused && !this.isGameOver && this.player.checkLevelUp()) {
+    if (!this.isPaused && !this.isGameOver && this.checkPlayerLevelUp()) {
       const options = this.weaponSystem.generateUpgradeOptions();
       if (options.length > 0) {
         this.sound.playLevelUp();
@@ -2565,6 +2565,7 @@ export class GameEngine {
     }
     if (drop.type === 'gem_blue' || drop.type === 'gem_green' || drop.type === 'gem_red') {
       const leveledUp = this.player.addXp(drop.value);
+      if (leveledUp) this.weaponSystem.recalculatePlayerStats(this.player);
 
       if (leveledUp) {
         const options = this.weaponSystem.generateUpgradeOptions();
@@ -2738,6 +2739,12 @@ export class GameEngine {
     return { options, remaining: this.levelUpRerollsRemaining };
   }
 
+  private checkPlayerLevelUp(): boolean {
+    const leveledUp = this.player.checkLevelUp();
+    if (leveledUp) this.weaponSystem.recalculatePlayerStats(this.player);
+    return leveledUp;
+  }
+
   public applyUpgrade(option: UpgradeOption): void {
     if (option.type === 'fusion') {
       this.weaponSystem.applyFusion(option, this.player);
@@ -2758,7 +2765,7 @@ export class GameEngine {
     }
 
     // Handle multi-level overflow XP (e.g. Boss gem)
-    if (this.player.checkLevelUp()) {
+    if (this.checkPlayerLevelUp()) {
       const nextOptions = this.weaponSystem.generateUpgradeOptions();
       if (nextOptions.length > 0) {
         this.sound.playLevelUp();
@@ -4061,6 +4068,7 @@ export class GameEngine {
   public devForceLevelUp(): void {
     const needed = Math.max(1, this.player.xpToNextLevel - this.player.xp);
     this.player.addXp(needed);
+    this.weaponSystem.recalculatePlayerStats(this.player);
     const options = this.weaponSystem.generateUpgradeOptions();
     if (options.length > 0) {
       this.sound.playLevelUp();

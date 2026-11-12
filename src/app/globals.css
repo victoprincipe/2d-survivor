@@ -369,7 +369,34 @@ body {
   91.75% { background-position: 100% 66.666667%; }
 }
 
+.lula-portrait {
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  transform-origin: 50% 94%;
+}
+
+.lula-portrait-animated {
+  animation: kayru-selection-breathe 3.2s ease-in-out infinite,
+    lula-selection-attack 3s step-end infinite;
+}
+
+/* Rest for 2.2s, then the same 800ms gesture used in combat. */
+@keyframes lula-selection-attack {
+  0%, 100% { background-position: 0% 75%; }
+  73.333333% { background-position: 0% 50%; }
+  76.666667% { background-position: 14.285714% 50%; }
+  80% { background-position: 28.571429% 50%; }
+  83.333333% { background-position: 42.857143% 50%; }
+  86.666667% { background-position: 57.142857% 50%; }
+  90% { background-position: 71.428571% 50%; }
+  93.333333% { background-position: 85.714286% 50%; }
+  96.666667% { background-position: 100% 50%; }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .lula-portrait-animated {
+    animation: none;
+  }
   .kayru-selection-idle {
     animation: none;
   }

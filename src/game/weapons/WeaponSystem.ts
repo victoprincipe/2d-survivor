@@ -445,7 +445,7 @@ export class WeaponSystem {
 
     // Reset player modifiers to character base + permanent shop bonuses
     player.might =
-      1.0 + (b.might || 0) + (perm.might || 0) * 0.05 + player.objectiveMightBonus;
+      1.0 + (b.might || 0) + (perm.might || 0) * 0.05 + player.objectiveMightBonus + player.lulaLevelDamageBonus;
     player.armor = (b.armor || 0) + (perm.armor || 0) * 1;
     player.maxHp = 100 + (b.maxHp || 0) + (perm.maxHp || 0) * 10;
     player.recoveryPerSec =
@@ -464,7 +464,7 @@ export class WeaponSystem {
     player.pickupRadius = 65 + (b.pickupRadius || 0);
     player.xpMultiplier = 1.0 + (b.xpMultiplier || 0);
     player.goldMultiplier = 1.0 + (perm.greed || 0) * 0.15;
-    player.speed = player.baseSpeed * (1 + player.objectiveSpeedBonus);
+    player.speed = player.baseSpeed * (1 + player.objectiveSpeedBonus + player.lulaLevelMovementBonus);
 
     // Apply all 12 passives
     const spinach = this.passives.get('spinach');
@@ -802,7 +802,7 @@ export class WeaponSystem {
   ): void {
     // Buriti buff: shorter cooldowns (faster attacks) for its duration.
     const attackSpeedFactor = player.attackSpeedBoostTimer > 0 ? 0.65 : 1;
-    const cdFactor = Math.max(0.45, 1 - player.cooldownReduction) * attackSpeedFactor / (1 + (player.character.statBonuses.attackSpeed || 0));
+    const cdFactor = Math.max(0.45, 1 - player.cooldownReduction) * attackSpeedFactor / (1 + (player.character.statBonuses.attackSpeed || 0) + player.lulaLevelAttackSpeedBonus);
 
     switch (w.id) {
       case 'bottle_51': {
@@ -874,9 +874,9 @@ export class WeaponSystem {
       }
       case 'lula_power': {
         const baseCd = w.evolved
-          ? 4.0
+          ? 2.52
           : w.level >= 5
-            ? 4.2
+            ? 2.646
             : LULA_SKILL.cooldown / 1000;
         w.cooldownTimer = baseCd * cdFactor;
         this.triggerPoderDoL(w, player, grid, vfx, sound, onEnemyKilled);
@@ -1748,6 +1748,24 @@ export class WeaponSystem {
     sound: SoundEngine,
     onEnemyKilled: (enemy: Enemy) => void
   ): void {
+    player.triggerAttackAnimation(LULA_SKILL.animationDuration / 1000);
+    this.pendingStrikes.push({
+      timer: LULA_SKILL.releaseDelay / 1000,
+      execute: () => {
+        if (player.hp <= 0) return;
+        this.releasePoderDoL(w, player, grid, vfx, sound, onEnemyKilled);
+      },
+    });
+  }
+
+  private releasePoderDoL(
+    w: WeaponInstance,
+    player: Player,
+    grid: SpatialGrid<Enemy>,
+    vfx: VFXManager,
+    sound: SoundEngine,
+    onEnemyKilled: (enemy: Enemy) => void
+  ): void {
     const dmgTable = [0, LULA_SKILL.damage, 45, 55, 68, 82];
     const radiusTable = [0, LULA_SKILL.radius, 165, 180, 200, 225];
     const baseDamage =
@@ -1756,7 +1774,6 @@ export class WeaponSystem {
       (w.evolved ? 280 : this.tableValue(radiusTable, w.level, LULA_SKILL.radius)) *
       player.areaMultiplier;
 
-    player.triggerAttackAnimation(LULA_SKILL.animationDuration / 1000);
     this.spawnRingPulse(player.x, player.y, radius, LULA_SKILL.color, 0.42);
     this.spawnRingPulse(player.x, player.y, radius * 0.65, '#ff5252', 0.3);
     vfx.addSparks(player.x, player.y, LULA_SKILL.color, 12);
@@ -2653,7 +2670,7 @@ export class WeaponSystem {
           this.bibleCycleMax = activeDur;
           this.bibleHitCooldowns.clear();
         } else {
-          const cdFactor = Math.max(0.45, 1 - player.cooldownReduction);
+          const cdFactor = Math.max(0.45, 1 - player.cooldownReduction) / (1 + player.lulaLevelAttackSpeedBonus);
           const gap = Math.max(0.35, (w.level >= 5 ? 0.8 : 1.55) * cdFactor);
           this.bibleCycleTimer = gap;
           this.bibleCycleMax = gap;
@@ -2723,7 +2740,7 @@ export class WeaponSystem {
     this.garlicRadius =
       (w.evolved ? 112 : this.tableValue(radiusTable, w.level, 60)) * player.areaMultiplier;
 
-    const cdFactor = Math.max(0.6, 1 - player.cooldownReduction * 0.65);
+    const cdFactor = Math.max(0.6, 1 - player.cooldownReduction * 0.65) / (1 + player.lulaLevelAttackSpeedBonus);
     const tickInterval = (w.evolved ? 0.32 : w.level >= 4 ? 0.38 : 0.45) * cdFactor;
 
     if (this.garlicTimer >= tickInterval) {

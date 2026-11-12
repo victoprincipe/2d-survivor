@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Image from 'next/image';
+import { LulaPortrait } from './LulaPortrait';
 import { CharacterConfig } from '@/game/types';
 import {
   Bike,
@@ -90,7 +91,9 @@ export const CharacterHUD: React.FC<CharacterHUDProps> = ({
           }}
           title={`XP ${currentXp} / ${maxXp}`}
         >
-          {character.sprite ? (
+          {character.id === 'lula' ? (
+            <LulaPortrait character={character} />
+          ) : character.sprite ? (
             <Image
               src={character.sprite}
               alt={character.name}

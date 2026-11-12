@@ -112,9 +112,15 @@ export interface CharacterConfig {
   color: string;
   portraitColor: string;
   sprite?: string;
-  /** Four columns: walk, jump, bow attack and idle on successive rows. */
+  /** Rows: walk, jump, attack, idle, and optional dash. Defaults to a 4x4 atlas. */
   animationSprite?: string;
+  animationColumns?: number;
+  animationRows?: number;
+  /** Source-pixel seam for independently animated upper body and legs. */
+  animationSplitY?: number;
   walkSprite?: string;
+  /** Lula: eight jump poses on row 0 and eight dash poses on row 1. */
+  movementSprite?: string;
   attackSprite?: string;
   walkFrames?: number;
   attackFrames?: number;
