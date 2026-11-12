@@ -93,6 +93,9 @@ export class Player {
   public stunTimer: number = 0;
   // Kopenawa's cave snuff: horizontal controls are inverted while it lasts.
   public transeTimer: number = 0;
+  // Movement confusion: one of the four walk commands is scrambled.
+  public confusionTimer: number = 0;
+  public confusionDirection: 'up' | 'down' | 'left' | 'right' | null = null;
   /** 0–1 fraction of stun duration removed by Amazon passives. */
   public stunResistance: number = 0;
   // External impulse (Caipora's charge) that drags the hero through the world.
@@ -264,6 +267,23 @@ export class Player {
     this.transeTimer = Math.max(this.transeTimer, duration);
   }
 
+  /**
+   * Scrambles exactly one walk command. Each of the four directions has an
+   * equal 25% chance, drawn with Math.random() on every impact.
+   */
+  public applyConfusion(duration: number): void {
+    if (duration <= 0) return;
+    const roll = Math.floor(Math.random() * 4);
+    this.confusionDirection = roll === 0
+      ? 'up'
+      : roll === 1
+        ? 'down'
+        : roll === 2
+          ? 'left'
+          : 'right';
+    this.confusionTimer = Math.max(this.confusionTimer, duration);
+  }
+
   /** Pushes the hero with an external impulse (Caipora's charge). */
   public applyKnockback(velocityX: number, velocityY: number): void {
     this.knockbackVX = velocityX;
@@ -318,6 +338,11 @@ export class Player {
 
     if (this.transeTimer > 0) {
       this.transeTimer = Math.max(0, this.transeTimer - dt);
+    }
+
+    if (this.confusionTimer > 0) {
+      this.confusionTimer = Math.max(0, this.confusionTimer - dt);
+      if (this.confusionTimer === 0) this.confusionDirection = null;
     }
 
     if (this.attackSpeedBoostTimer > 0) {
@@ -380,8 +405,17 @@ export class Player {
     const mired = this.isMired && !this.isJumping;
     if (mired) this.dashTimer = 0;
 
-    const dx = this.transeTimer > 0 ? -input.dx : input.dx;
-    const dy = input.dy;
+    let dx = input.dx;
+    let dy = input.dy;
+    // Confusion only scrambles the chosen command: pressing "up" moves down,
+    // while the remaining three directions keep their normal mapping.
+    if (this.confusionTimer > 0) {
+      if (this.confusionDirection === 'up' && dy < 0) dy = -dy;
+      else if (this.confusionDirection === 'down' && dy > 0) dy = -dy;
+      else if (this.confusionDirection === 'left' && dx < 0) dx = -dx;
+      else if (this.confusionDirection === 'right' && dx > 0) dx = -dx;
+    }
+    if (this.transeTimer > 0) dx = -dx;
     const moving = !stunned && !mired && (Math.abs(dx) > 0.05 || Math.abs(dy) > 0.05);
 
     // Dash impulse (held SHIFT). Direction follows movement, or facing when idle.
@@ -427,8 +461,12 @@ export class Player {
       this.facingX = this.dashDirX;
       this.facingY = this.dashDirY;
     } else if (moving) {
-      this.facingX = this.transeTimer > 0 ? -input.facingX : input.facingX;
-      this.facingY = input.facingY;
+      this.facingX = this.confusionTimer > 0
+        ? dx
+        : this.transeTimer > 0
+          ? -input.facingX
+          : input.facingX;
+      this.facingY = this.confusionTimer > 0 ? dy : input.facingY;
     }
 
     if (!mired && (this.knockbackVX !== 0 || this.knockbackVY !== 0)) {

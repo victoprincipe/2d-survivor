@@ -92,6 +92,11 @@ export class KopenawaBoss extends ChallengeBoss {
   public breathAngle = 0;
   public pendingBreathHit = false;
 
+  // Kopenawa's offensive magic: a homing projectile that damages the hero and
+  // scrambles one movement command on impact.
+  private spiritBoltCooldown: number = KOPENAWAS.spiritBolt.initialCooldown;
+  public pendingSpiritBolt = false;
+
   private smokeTriggered = false;
   private smokeTimer = 0;
   public pendingClones = 0;
@@ -167,6 +172,7 @@ export class KopenawaBoss extends ChallengeBoss {
     if (this.hp <= 0) {
       this.pendingArenaSlam = false;
       this.pendingBreathHit = false;
+      this.pendingSpiritBolt = false;
       this.pendingClones = 0;
       return false;
     }
@@ -190,6 +196,7 @@ export class KopenawaBoss extends ChallengeBoss {
     if (this.entrancePhase !== 'none') return this.updateEntrance(dt, player);
 
     this.breathCooldown = Math.max(0, this.breathCooldown - dt);
+    this.spiritBoltCooldown = Math.max(0, this.spiritBoltCooldown - dt);
 
     if (this.breathPhase === 'warning') {
       this.animation = 'attack';
@@ -210,6 +217,16 @@ export class KopenawaBoss extends ChallengeBoss {
         this.breathPhase = 'none';
         this.breathCooldown = KOPENAWAS.breath.cooldown;
       }
+      return true;
+    }
+
+    // Offensive magic may fire between breaths, never during the warning or
+    // active cone; this leaves the existing breath rhythm untouched.
+    if (this.spiritBoltCooldown === 0) {
+      this.spiritBoltCooldown = KOPENAWAS.spiritBolt.cooldown;
+      this.pendingSpiritBolt = true;
+      this.animation = 'attack';
+      if (Math.abs(player.x - this.x) > 1) this.facing = player.x < this.x ? -1 : 1;
       return true;
     }
 

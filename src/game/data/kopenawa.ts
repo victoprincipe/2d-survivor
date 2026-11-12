@@ -17,6 +17,15 @@ export const KOPENAWAS = {
     damageMultiplier: 0.8,
     transeDuration: 3.5,
   },
+  spiritBolt: {
+    initialCooldown: 2.4,
+    cooldown: 4.6,
+    speed: 265,
+    radius: 12,
+    life: 4.5,
+    damageMultiplier: 0.6,
+    confusionDuration: 4,
+  },
   smoke: {
     threshold: 0.5,
     invulnerable: 1,
