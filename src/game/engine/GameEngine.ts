@@ -72,7 +72,7 @@ interface BossProjectile {
   damage: number;
   life: number;
   maxLife: number;
-  kind: 'fireball' | 'soundwave' | 'water' | 'sonic' | 'spore';
+  kind: 'fireball' | 'soundwave' | 'water' | 'sonic' | 'spore' | 'spirit';
 }
 
 interface BossHazard {
@@ -1030,6 +1030,26 @@ export class GameEngine {
             );
             if (fatal) { this.handlePlayerDeath(); return; }
           }
+        }
+        if (e.pendingSpiritBolt) {
+          e.pendingSpiritBolt = false;
+          const angle = Math.atan2(
+            this.player.y - (e.y - 28),
+            this.player.x - e.x
+          );
+          this.vfx.addSparks(e.x, e.y - 42, '#a855f7', 12);
+          this.vfx.addDeathBurst(e.x, e.y - 42, '#4ade80', 6);
+          this.bossProjectiles.push({
+            x: e.x,
+            y: e.y - 28,
+            vx: Math.cos(angle) * KOPENAWAS.spiritBolt.speed,
+            vy: Math.sin(angle) * KOPENAWAS.spiritBolt.speed,
+            radius: KOPENAWAS.spiritBolt.radius,
+            damage: Math.max(1, Math.round(e.damage * KOPENAWAS.spiritBolt.damageMultiplier)),
+            life: KOPENAWAS.spiritBolt.life,
+            maxLife: KOPENAWAS.spiritBolt.life,
+            kind: 'spirit',
+          });
         }
         if (e.pendingClones > 0) {
           const count = e.pendingClones;
@@ -2321,6 +2341,12 @@ export class GameEngine {
       const dy = this.player.y - p.y;
       if (Math.sqrt(dx * dx + dy * dy) <= p.radius + this.player.radius) {
         const fatal = this.applyPlayerDamage(p.damage, false, false);
+        // Kopenawa's magic leaves a movement-confusion debuff on impact.
+        if (p.kind === 'spirit') {
+          this.player.applyConfusion(KOPENAWAS.spiritBolt.confusionDuration);
+          this.vfx.addDeathBurst(p.x, p.y, '#a855f7', 10);
+          this.vfx.addSparks(p.x, p.y, '#4ade80', 6);
+        }
         // Vitória-Régia's spores cling to the player as a mild venom slow.
         if (p.kind === 'spore') this.player.applySlow(0.25, 1.5);
         p.life = 0;
@@ -2948,6 +2974,53 @@ export class GameEngine {
       ctx.fillStyle = '#c4b5fd';
       ctx.strokeText('TRANSE', playerScreen.x, playerScreen.y - 80);
       ctx.fillText('TRANSE', playerScreen.x, playerScreen.y - 80);
+      ctx.restore();
+    }
+    if (this.player.confusionTimer > 0 && this.player.confusionDirection) {
+      const playerScreen = camera.worldToScreen(this.player.x, this.player.y);
+      const iconY = playerScreen.y - 98;
+      const spin = this.waveDirector.survivalTime * 3.2;
+      const direction = this.player.confusionDirection;
+      const arrowAngle = direction === 'up'
+        ? 0
+        : direction === 'down'
+          ? Math.PI
+          : direction === 'left'
+            ? -Math.PI / 2
+            : Math.PI / 2;
+      ctx.save();
+      ctx.translate(playerScreen.x, iconY);
+      // Soft spiritual aura behind the confusion icon.
+      ctx.fillStyle = 'rgba(168, 85, 247, 0.18)';
+      ctx.beginPath();
+      ctx.arc(0, 0, 17, 0, Math.PI * 2);
+      ctx.fill();
+      // Orbiting purple/green stars.
+      for (let star = 0; star < 3; star++) {
+        const angle = spin + (star * Math.PI * 2) / 3;
+        ctx.fillStyle = star % 2 === 0 ? '#c4b5fd' : '#4ade80';
+        ctx.beginPath();
+        ctx.arc(Math.cos(angle) * 13, Math.sin(angle) * 7, 2.6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // Arrow shows which walk command is currently scrambled.
+      ctx.save();
+      ctx.rotate(arrowAngle);
+      ctx.fillStyle = '#f0fdf4';
+      ctx.strokeStyle = '#3b0764';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(0, -9);
+      ctx.lineTo(5, -1);
+      ctx.lineTo(1.8, -1);
+      ctx.lineTo(1.8, 7);
+      ctx.lineTo(-1.8, 7);
+      ctx.lineTo(-1.8, -1);
+      ctx.lineTo(-5, -1);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
       ctx.restore();
     }
     if (this.gorillaAvailable && this.gorillaNpc && this.player.y < this.gorillaNpc.y) {
@@ -3675,6 +3748,37 @@ export class GameEngine {
         ctx.beginPath();
         ctx.arc(screen.x + Math.sin(p.life * 7) * 2, screen.y, p.radius * 0.25, 0, Math.PI * 2);
         ctx.fill();
+      } else if (p.kind === 'spirit') {
+        const pulse = 1 + Math.sin(p.life * 9) * 0.08;
+        const glow = ctx.createRadialGradient(screen.x, screen.y, 1, screen.x, screen.y, p.radius * 2.8 * pulse);
+        glow.addColorStop(0, `rgba(240, 253, 244, ${alpha})`);
+        glow.addColorStop(0.32, `rgba(168, 85, 247, ${0.92 * alpha})`);
+        glow.addColorStop(0.68, `rgba(74, 222, 128, ${0.55 * alpha})`);
+        glow.addColorStop(1, 'rgba(88, 28, 135, 0)');
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(screen.x, screen.y, p.radius * 2.8 * pulse, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = `rgba(233, 213, 255, ${alpha})`;
+        ctx.beginPath();
+        ctx.arc(screen.x, screen.y, p.radius * 0.55, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Two green spiritual motes orbit the purple core.
+        for (let mote = 0; mote < 2; mote++) {
+          const orbit = p.life * 6 + mote * Math.PI;
+          ctx.fillStyle = `rgba(74, 222, 128, ${0.9 * alpha})`;
+          ctx.beginPath();
+          ctx.arc(
+            screen.x + Math.cos(orbit) * p.radius * 1.5,
+            screen.y + Math.sin(orbit) * p.radius * 0.8,
+            p.radius * 0.3,
+            0,
+            Math.PI * 2
+          );
+          ctx.fill();
+        }
       } else {
         const angle = Math.atan2(p.vy, p.vx);
         ctx.translate(screen.x, screen.y);
