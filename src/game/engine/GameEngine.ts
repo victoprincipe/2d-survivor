@@ -1010,12 +1010,7 @@ export class GameEngine {
         }
       }
 
-      if (e instanceof KopenawaBoss) {
-        if (e.pendingArenaSlam) {
-          e.pendingArenaSlam = false;
-          this.activateArena(e, 'roots');
-          this.vfx.addDeathBurst(e.x, e.y, '#7c3aed', 22);
-        }
+      if (e instanceof KopenawaBoss || e instanceof KopenawaClone) {
         if (e.pendingBreathHit) {
           e.pendingBreathHit = false;
           this.camera.shake(0.14, 4);
@@ -1051,6 +1046,14 @@ export class GameEngine {
             kind: 'spirit',
           });
         }
+      }
+
+      if (e instanceof KopenawaBoss) {
+        if (e.pendingArenaSlam) {
+          e.pendingArenaSlam = false;
+          this.activateArena(e, 'roots');
+          this.vfx.addDeathBurst(e.x, e.y, '#7c3aed', 22);
+        }
         if (e.pendingClones > 0) {
           const count = e.pendingClones;
           e.pendingClones = 0;
@@ -1061,7 +1064,7 @@ export class GameEngine {
             const distance = 110 + Math.random() * Math.max(40, radius - 110);
             const cx = e.x + Math.cos(angle) * distance;
             const cy = e.y + Math.sin(angle) * distance;
-            this.enemies.push(new KopenawaClone(this.challengeBossSerial--, cx, cy));
+            this.enemies.push(new KopenawaClone(this.challengeBossSerial--, cx, cy, e));
             this.vfx.addDeathBurst(cx, cy, '#a78bfa', 16);
           }
           this.camera.shake(0.2, 6);
@@ -1548,7 +1551,6 @@ export class GameEngine {
         : dist < this.player.radius + e.radius;
       if (!e.isSubmerged && !e.jaguarBusy && !(e instanceof GorillaBoss && (e.isLeaping || e.isRoaring || e.isInEntrance)) &&
         !(e instanceof KopenawaBoss && (e.isInEntrance || e.isInSmoke)) &&
-        !(e instanceof KopenawaClone) &&
         !(e instanceof AnacondaBoss && !e.contactEnabled) && !this.player.isJumping && bodyHit) {
         // Fire combo: Caipora's mounted charge knocks the hero away, ideally
         // into the flame ring left by Boitatá and Curupira.

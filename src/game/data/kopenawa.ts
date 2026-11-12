@@ -8,6 +8,10 @@ export const KOPENAWAS = {
   damage: 34,
   radius: 24,
   xpValue: 600,
+  // The old sage attacks three times faster than his original rhythm.
+  attackSpeedMultiplier: 3,
+  // His smoke illusions inherit 70% of every combat stat and ability.
+  cloneStatMultiplier: 0.7,
   breath: {
     cooldown: 5.2,
     warning: 0.7,

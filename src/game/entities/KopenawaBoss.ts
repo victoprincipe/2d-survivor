@@ -76,6 +76,68 @@ function drawKopenawaFigure(
   ctx.restore();
 }
 
+function kopenawaBreathHits(
+  x: number,
+  y: number,
+  breathAngle: number,
+  player: { x: number; y: number; radius: number }
+): boolean {
+  const dx = player.x - x;
+  const dy = player.y - y;
+  if (Math.hypot(dx, dy) > KOPENAWAS.breath.range + player.radius) return false;
+  const angle = Math.atan2(dy, dx);
+  const difference = Math.abs(Math.atan2(
+    Math.sin(angle - breathAngle),
+    Math.cos(angle - breathAngle)
+  ));
+  return difference <= KOPENAWAS.breath.halfAngle;
+}
+
+function drawKopenawaBreathCone(
+  ctx: CanvasRenderingContext2D,
+  camera: Camera,
+  x: number,
+  y: number,
+  breathAngle: number,
+  phase: 'none' | 'warning' | 'active',
+  timer: number,
+  attackSpeed: number
+): void {
+  if (phase === 'none') return;
+  const origin = camera.worldToScreen(x, y - 48);
+  const active = phase === 'active';
+  const duration = KOPENAWAS.breath.duration / attackSpeed;
+  const progress = active ? 1 - timer / duration : 0;
+  const reach = active
+    ? KOPENAWAS.breath.range * (0.35 + 0.65 * progress)
+    : KOPENAWAS.breath.range * 0.35;
+  const start = breathAngle - KOPENAWAS.breath.halfAngle;
+  const end = breathAngle + KOPENAWAS.breath.halfAngle;
+  ctx.save();
+  ctx.fillStyle = active ? 'rgba(168, 85, 247, 0.18)' : 'rgba(148, 163, 184, 0.10)';
+  ctx.strokeStyle = active ? 'rgba(196, 181, 253, 0.75)' : 'rgba(203, 213, 225, 0.45)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(origin.x, origin.y);
+  ctx.arc(origin.x, origin.y, reach, start, end);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  if (active) {
+    for (let i = 0; i < 10; i++) {
+      const angle = start + ((i + 0.5) / 10) * (end - start);
+      const distance = reach * (0.25 + (i % 5) * 0.14);
+      const px = origin.x + Math.cos(angle) * distance;
+      const py = origin.y + Math.sin(angle) * distance;
+      ctx.fillStyle = i % 2 === 0 ? 'rgba(167, 139, 250, 0.42)' : 'rgba(214, 211, 209, 0.36)';
+      ctx.beginPath();
+      ctx.arc(px, py, 5 + (i % 3) * 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
 export class KopenawaBoss extends ChallengeBoss {
   private readonly sprite: HTMLImageElement;
   private time = 0;
@@ -86,15 +148,17 @@ export class KopenawaBoss extends ChallengeBoss {
   private entranceSlammed = false;
   public pendingArenaSlam = false;
 
+  private readonly attackSpeed = KOPENAWAS.attackSpeedMultiplier;
   private breathPhase: 'none' | 'warning' | 'active' = 'none';
   private breathTimer = 0;
-  private breathCooldown = 2.2;
+  private breathCooldown = 2.2 / KOPENAWAS.attackSpeedMultiplier;
   public breathAngle = 0;
   public pendingBreathHit = false;
 
   // Kopenawa's offensive magic: a homing projectile that damages the hero and
   // scrambles one movement command on impact.
-  private spiritBoltCooldown: number = KOPENAWAS.spiritBolt.initialCooldown;
+  private spiritBoltCooldown: number =
+    KOPENAWAS.spiritBolt.initialCooldown / KOPENAWAS.attackSpeedMultiplier;
   public pendingSpiritBolt = false;
 
   private smokeTriggered = false;
@@ -137,16 +201,7 @@ export class KopenawaBoss extends ChallengeBoss {
   }
 
   public breathHits(player: { x: number; y: number; radius: number }): boolean {
-    const dx = player.x - this.x;
-    const dy = player.y - this.y;
-    const distance = Math.hypot(dx, dy);
-    if (distance > KOPENAWAS.breath.range + player.radius) return false;
-    const angle = Math.atan2(dy, dx);
-    const difference = Math.abs(Math.atan2(
-      Math.sin(angle - this.breathAngle),
-      Math.cos(angle - this.breathAngle)
-    ));
-    return difference <= KOPENAWAS.breath.halfAngle;
+    return kopenawaBreathHits(this.x, this.y, this.breathAngle, player);
   }
 
   private updateEntrance(dt: number, player: Player): boolean {
@@ -162,7 +217,7 @@ export class KopenawaBoss extends ChallengeBoss {
     if (this.entranceTimer === 0) {
       this.entrancePhase = 'none';
       this.animation = 'idle';
-      this.breathCooldown = 1.2;
+      this.breathCooldown = 1.2 / this.attackSpeed;
     }
     return true;
   }
@@ -204,7 +259,7 @@ export class KopenawaBoss extends ChallengeBoss {
       if (Math.abs(player.x - this.x) > 1) this.facing = player.x < this.x ? -1 : 1;
       if (this.breathTimer === 0) {
         this.breathPhase = 'active';
-        this.breathTimer = KOPENAWAS.breath.duration;
+        this.breathTimer = KOPENAWAS.breath.duration / this.attackSpeed;
         this.pendingBreathHit = true;
       }
       return true;
@@ -215,7 +270,7 @@ export class KopenawaBoss extends ChallengeBoss {
       this.breathTimer = Math.max(0, this.breathTimer - dt);
       if (this.breathTimer === 0) {
         this.breathPhase = 'none';
-        this.breathCooldown = KOPENAWAS.breath.cooldown;
+        this.breathCooldown = KOPENAWAS.breath.cooldown / this.attackSpeed;
       }
       return true;
     }
@@ -223,7 +278,7 @@ export class KopenawaBoss extends ChallengeBoss {
     // Offensive magic may fire between breaths, never during the warning or
     // active cone; this leaves the existing breath rhythm untouched.
     if (this.spiritBoltCooldown === 0) {
-      this.spiritBoltCooldown = KOPENAWAS.spiritBolt.cooldown;
+      this.spiritBoltCooldown = KOPENAWAS.spiritBolt.cooldown / this.attackSpeed;
       this.pendingSpiritBolt = true;
       this.animation = 'attack';
       if (Math.abs(player.x - this.x) > 1) this.facing = player.x < this.x ? -1 : 1;
@@ -232,7 +287,7 @@ export class KopenawaBoss extends ChallengeBoss {
 
     if (this.breathCooldown === 0) {
       this.breathPhase = 'warning';
-      this.breathTimer = KOPENAWAS.breath.warning;
+      this.breathTimer = KOPENAWAS.breath.warning / this.attackSpeed;
       this.breathAngle = Math.atan2(player.y - this.y, player.x - this.x);
       this.animation = 'attack';
       return true;
@@ -249,38 +304,16 @@ export class KopenawaBoss extends ChallengeBoss {
   }
 
   private renderBreath(ctx: CanvasRenderingContext2D, camera: Camera): void {
-    if (this.breathPhase === 'none') return;
-    const origin = camera.worldToScreen(this.x, this.y - 48);
-    const active = this.breathPhase === 'active';
-    const progress = active ? 1 - this.breathTimer / KOPENAWAS.breath.duration : 0;
-    const reach = active
-      ? KOPENAWAS.breath.range * (0.35 + 0.65 * progress)
-      : KOPENAWAS.breath.range * 0.35;
-    const start = this.breathAngle - KOPENAWAS.breath.halfAngle;
-    const end = this.breathAngle + KOPENAWAS.breath.halfAngle;
-    ctx.save();
-    ctx.fillStyle = active ? 'rgba(168, 85, 247, 0.18)' : 'rgba(148, 163, 184, 0.10)';
-    ctx.strokeStyle = active ? 'rgba(196, 181, 253, 0.75)' : 'rgba(203, 213, 225, 0.45)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(origin.x, origin.y);
-    ctx.arc(origin.x, origin.y, reach, start, end);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-    if (active) {
-      for (let i = 0; i < 10; i++) {
-        const angle = start + ((i + 0.5) / 10) * (end - start);
-        const distance = reach * (0.25 + (i % 5) * 0.14);
-        const px = origin.x + Math.cos(angle) * distance;
-        const py = origin.y + Math.sin(angle) * distance;
-        ctx.fillStyle = i % 2 === 0 ? 'rgba(167, 139, 250, 0.42)' : 'rgba(214, 211, 209, 0.36)';
-        ctx.beginPath();
-        ctx.arc(px, py, 5 + (i % 3) * 2, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-    ctx.restore();
+    drawKopenawaBreathCone(
+      ctx,
+      camera,
+      this.x,
+      this.y,
+      this.breathAngle,
+      this.breathPhase,
+      this.breathTimer,
+      this.attackSpeed
+    );
   }
 
   private renderSmoke(ctx: CanvasRenderingContext2D, camera: Camera): void {
@@ -313,55 +346,128 @@ export class KopenawaBoss extends ChallengeBoss {
   }
 }
 
-/** A one-hit illusion: it mimics the sage but deals no real damage. */
+/**
+ * A smoke illusion that inherits 70% of Kopenawa's combat stats and attacks.
+ * It shares his breath cone and spirit bolt, but never summons further clones.
+ */
 export class KopenawaClone extends Enemy {
   private readonly sprite: HTMLImageElement;
+  private readonly attackSpeed: number;
   private time = Math.random() * 5;
   private facing = 1;
   private attackTimer = 1.5 + Math.random() * 2;
   private attackFlash = 0;
 
-  constructor(id: number, x: number, y: number) {
+  private breathPhase: 'none' | 'warning' | 'active' = 'none';
+  private breathTimer = 0;
+  private breathCooldown: number;
+  public breathAngle = 0;
+  public pendingBreathHit = false;
+
+  private spiritBoltCooldown: number;
+  public pendingSpiritBolt = false;
+
+  constructor(id: number, x: number, y: number, source: KopenawaBoss) {
     super(id, 'boss_kopenawa', x, y, 1);
+    const inheritance = KOPENAWAS.cloneStatMultiplier;
     this.name = 'Ilusão de Kopenawa';
-    this.maxHp = 1;
-    this.hp = 1;
-    this.speed = 96;
-    this.damage = 0;
-    this.radius = KOPENAWAS.smoke.cloneRadius;
+    this.maxHp = Math.max(1, Math.round(source.maxHp * inheritance));
+    this.hp = this.maxHp;
+    this.speed = source.speed * inheritance;
+    this.damage = Math.max(1, Math.round(source.damage * inheritance));
+    this.radius = Math.max(1, Math.round(source.radius * inheritance));
     this.xpValue = 0;
     this.isBoss = false;
     this.isElite = false;
-    this.knockbackResistance = 1;
+    this.knockbackResistance = source.knockbackResistance * inheritance;
     this.skillCooldown = Number.MAX_SAFE_INTEGER;
+    // Clones inherit 70% of the boss's 3x attack cadence (2.1x base speed).
+    this.attackSpeed = KOPENAWAS.attackSpeedMultiplier * inheritance;
+    this.breathCooldown = 2.2 / this.attackSpeed;
+    this.spiritBoltCooldown = KOPENAWAS.spiritBolt.initialCooldown / this.attackSpeed;
     this.sprite = new Image();
     this.sprite.src = '/sprites/quiz-keeper/idle.png';
   }
 
-  override takeDamage(amount: number, knockX: number = 0, knockY: number = 0, knockForce: number = 200): boolean {
-    // Any hit dispels the illusion, even if the source would deal zero damage.
-    return super.takeDamage(Math.max(1, amount), knockX, knockY, knockForce);
+  public breathHits(player: { x: number; y: number; radius: number }): boolean {
+    return kopenawaBreathHits(this.x, this.y, this.breathAngle, player);
   }
 
   override update(dt: number, player: Player, separation: { vx: number; vy: number }): boolean {
     this.time += dt;
+    if (this.hp <= 0) {
+      this.pendingBreathHit = false;
+      this.pendingSpiritBolt = false;
+      return false;
+    }
+
     this.attackFlash = Math.max(0, this.attackFlash - dt);
     this.attackTimer -= dt;
     if (this.attackTimer <= 0) {
       this.attackTimer = 2.1 + Math.random() * 2.4;
       this.attackFlash = 0.45;
     }
+
+    this.breathCooldown = Math.max(0, this.breathCooldown - dt);
+    this.spiritBoltCooldown = Math.max(0, this.spiritBoltCooldown - dt);
+
+    if (this.breathPhase === 'warning') {
+      this.breathTimer = Math.max(0, this.breathTimer - dt);
+      if (Math.abs(player.x - this.x) > 1) this.facing = player.x < this.x ? -1 : 1;
+      if (this.breathTimer === 0) {
+        this.breathPhase = 'active';
+        this.breathTimer = KOPENAWAS.breath.duration / this.attackSpeed;
+        this.pendingBreathHit = true;
+      }
+      return true;
+    }
+
+    if (this.breathPhase === 'active') {
+      this.breathTimer = Math.max(0, this.breathTimer - dt);
+      if (this.breathTimer === 0) {
+        this.breathPhase = 'none';
+        this.breathCooldown = KOPENAWAS.breath.cooldown / this.attackSpeed;
+      }
+      return true;
+    }
+
+    if (this.spiritBoltCooldown === 0) {
+      this.spiritBoltCooldown = KOPENAWAS.spiritBolt.cooldown / this.attackSpeed;
+      this.pendingSpiritBolt = true;
+      this.attackFlash = 0.45;
+      if (Math.abs(player.x - this.x) > 1) this.facing = player.x < this.x ? -1 : 1;
+      return true;
+    }
+
+    if (this.breathCooldown === 0) {
+      this.breathPhase = 'warning';
+      this.breathTimer = KOPENAWAS.breath.warning / this.attackSpeed;
+      this.breathAngle = Math.atan2(player.y - this.y, player.x - this.x);
+      this.attackFlash = 0.45;
+      return true;
+    }
+
     const alive = super.update(dt, player, separation);
     if (Math.abs(player.x - this.x) > 12) this.facing = player.x < this.x ? -1 : 1;
     return alive;
   }
 
   override render(ctx: CanvasRenderingContext2D, camera: Camera): void {
+    drawKopenawaBreathCone(
+      ctx,
+      camera,
+      this.x,
+      this.y,
+      this.breathAngle,
+      this.breathPhase,
+      this.breathTimer,
+      this.attackSpeed
+    );
     const hop = Math.max(0, Math.sin(this.time * 3.4)) * 7;
     drawKopenawaFigure(ctx, camera, this.x, this.y, this.sprite, this.time, {
-      alpha: 0.62,
+      alpha: 0.72,
       facing: this.facing,
-      attack: this.attackFlash > 0,
+      attack: this.attackFlash > 0 || this.breathPhase !== 'none',
       jumpOffset: -hop,
     });
   }
