@@ -1274,7 +1274,6 @@ export class Enemy {
     }
 
     this.hp -= amount;
-    this.hitFlashTimer = 0.12;
 
     this.knockbackX += knockX * knockForce * this.knockbackResistance;
     this.knockbackY += knockY * knockForce * this.knockbackResistance;
