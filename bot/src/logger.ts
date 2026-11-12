@@ -49,10 +49,17 @@ export function planLogPath(planId: number, suffix = ''): string {
 export function appendBotError(context: string, error: unknown): void {
   try {
     ensureLogDir();
+    const file = path.join(paths.logs, 'bot-errors.log');
+    // rotaciona antes de crescer demais (o health.ts lê esse arquivo a cada 30 s)
+    try {
+      if (fs.statSync(file).size > 1_000_000) fs.renameSync(file, `${file}.1`);
+    } catch {
+      // ainda não existe
+    }
     const detail =
       error instanceof Error ? (error.stack ?? error.message) : String(error);
     fs.appendFileSync(
-      path.join(paths.logs, 'bot-errors.log'),
+      file,
       `${new Date().toISOString()} ${context}\n${detail}\n\n`,
     );
   } catch {

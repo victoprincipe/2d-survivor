@@ -106,19 +106,47 @@ cleanupStaleWorktrees();
 cleanupOldAssets();
 
 let stopping = false;
+let claimFailures = 0;
+
+function writeWorkerHeartbeat(state: string): void {
+  try {
+    fs.writeFileSync(
+      path.join(paths.data, 'worker-heartbeat.json'),
+      JSON.stringify({ pid: process.pid, state, at: new Date().toISOString() }),
+      'utf8',
+    );
+  } catch {
+    // disco cheio não deve derrubar o worker
+  }
+}
 
 async function main(): Promise<void> {
   log.info('Worker iniciado. Aguardando jobs...');
 
   while (!stopping) {
     if (isQueuePaused()) {
+      writeWorkerHeartbeat('paused');
       await sleep(queueConfig.pollMs);
       continue;
     }
 
-    const job = claimNextJob();
+    let job;
+    try {
+      job = claimNextJob();
+      claimFailures = 0;
+    } catch (error) {
+      claimFailures += 1;
+      log.error(`Falha ao buscar job (${claimFailures}/5): ${String(error)}`);
+      if (claimFailures >= 5) {
+        log.error('Busca de jobs falhando repetidamente; encerrando para reinício automático.');
+        process.exit(1);
+      }
+      await sleep(queueConfig.pollMs);
+      continue;
+    }
     if (job) {
       log.info(`Processando job #${job.id} (${job.kind}, tentativa ${job.attempts})...`);
+      writeWorkerHeartbeat(`job:${job.id}`);
       try {
         await processJob(job);
       } catch (error) {
@@ -130,6 +158,7 @@ async function main(): Promise<void> {
     const plan = claimNextPlan();
     if (plan) {
       log.info(`Processando plano #${plan.id}...`);
+      writeWorkerHeartbeat(`plan:${plan.id}`);
       try {
         await processPlan(plan);
       } catch (error) {
@@ -138,6 +167,7 @@ async function main(): Promise<void> {
       continue;
     }
 
+    writeWorkerHeartbeat('idle');
     await sleep(queueConfig.pollMs);
   }
 
@@ -160,6 +190,11 @@ process.on('SIGTERM', () => {
 
 process.on('unhandledRejection', (error) => {
   log.error(`Unhandled rejection: ${String(error)}`);
+});
+
+process.on('uncaughtException', (error) => {
+  log.error(`Exceção não capturada: ${error.stack ?? String(error)}`);
+  process.exit(1);
 });
 
 main().catch((error) => {
