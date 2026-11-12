@@ -7,10 +7,12 @@ import { Crown, Sparkles } from 'lucide-react';
 
 interface LevelUpModalProps {
   options: UpgradeOption[];
+  onReroll: () => void;
+  rerollsRemaining: number;
   onSelect: (option: UpgradeOption) => void;
 }
 
-export const LevelUpModal: React.FC<LevelUpModalProps> = ({ options, onSelect }) => {
+export const LevelUpModal: React.FC<LevelUpModalProps> = ({ options, onSelect, onReroll, rerollsRemaining }) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === '1' && options[0]) onSelect(options[0]);
@@ -124,6 +126,14 @@ export const LevelUpModal: React.FC<LevelUpModalProps> = ({ options, onSelect })
           })}
         </div>
 
+        <button
+          type="button"
+          onClick={onReroll}
+          disabled={rerollsRemaining === 0}
+          className="mt-4 rounded-lg border border-amber-500 px-5 py-2 text-sm font-bold text-amber-300 hover:bg-amber-900/40 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          Rerrolar ({rerollsRemaining}/2)
+        </button>
         <div className="mt-4 text-slate-500 text-[11px] text-center">
           Pressione <span className="text-amber-400 font-mono">[1]</span>,{' '}
           <span className="text-amber-400 font-mono">[2]</span> ou{' '}

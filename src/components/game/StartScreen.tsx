@@ -210,7 +210,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
           </div>
           <h1 className="gothic-title text-3xl sm:text-5xl">Teste</h1>
           <p className="mx-auto mt-2 max-w-lg text-xs leading-relaxed text-[#9ca3af] sm:text-sm">
-            Sobreviva às hordas noturnas, colete gemas arcanas e desbloqueie armas supremas!
+            Sobreviva às hordas noturnas, ganhe experiência ao derrotar monstros e desbloqueie armas supremas!
           </p>
         </header>
 

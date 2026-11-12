@@ -3,11 +3,14 @@ import { ChallengeBoss } from './ChallengeBoss';
 import { Enemy } from './Enemy';
 import { Player } from './Player';
 import { KOPENAWAS } from '../data/kopenawa';
+import { KopenawaAnimation, KopenawaPose, KOPENAWA_CHANNEL_CYCLE } from './KopenawaAnimation';
 
 interface FigureOptions {
   alpha?: number;
   facing?: number;
-  attack?: boolean;
+  animator?: KopenawaAnimation;
+  pose?: KopenawaPose;
+  progress?: number;
   jumpOffset?: number;
 }
 
@@ -40,7 +43,10 @@ function drawKopenawaFigure(
 
   ctx.translate(screen.x, screen.y + jump);
   ctx.scale(facing, 1);
-  if (options.attack) ctx.rotate(Math.sin(time * 18) * 0.06);
+  if (options.animator?.draw(ctx, options.pose ?? 'idle', options.progress)) {
+    ctx.restore();
+    return;
+  }
 
   if (sprite.complete && sprite.naturalWidth > 0) {
     const height = 108 * (1 + Math.sin(time * 2) * 0.006);
@@ -142,7 +148,7 @@ export class KopenawaBoss extends ChallengeBoss {
   private readonly sprite: HTMLImageElement;
   private time = 0;
   private facing = 1;
-  private animation: 'idle' | 'walk' | 'slam' | 'attack' | 'smoke' = 'idle';
+  private readonly animator = new KopenawaAnimation();
   private entrancePhase: 'slam' | 'none' = 'slam';
   private entranceTimer = KOPENAWAS.entrance.slamWindup + KOPENAWAS.entrance.slamRecovery;
   private entranceSlammed = false;
@@ -205,19 +211,17 @@ export class KopenawaBoss extends ChallengeBoss {
   }
 
   private updateEntrance(dt: number, player: Player): boolean {
-    this.animation = 'slam';
     this.entranceTimer = Math.max(0, this.entranceTimer - dt);
     if (Math.abs(player.x - this.x) > 1) this.facing = player.x < this.x ? -1 : 1;
-    // The root wall rises on the very first combat frame while the staff hits
-    // the ground, sealing the arena immediately.
-    if (!this.entranceSlammed) {
+    // Emit once when the staff reaches the impact pose, after its windup.
+    if (!this.entranceSlammed && this.entranceTimer <= KOPENAWAS.entrance.slamRecovery + 1e-9) {
       this.entranceSlammed = true;
       this.pendingArenaSlam = true;
     }
     if (this.entranceTimer === 0) {
       this.entrancePhase = 'none';
-      this.animation = 'idle';
       this.breathCooldown = 1.2 / this.attackSpeed;
+
     }
     return true;
   }
@@ -233,7 +237,6 @@ export class KopenawaBoss extends ChallengeBoss {
     }
 
     if (this.smokeTimer > 0) {
-      this.animation = 'smoke';
       this.smokeTimer = Math.max(0, this.smokeTimer - dt);
       return true;
     }
@@ -244,7 +247,6 @@ export class KopenawaBoss extends ChallengeBoss {
       this.smokeTimer = KOPENAWAS.smoke.invulnerable;
       this.pendingClones = KOPENAWAS.smoke.cloneCount;
       this.breathPhase = 'none';
-      this.animation = 'smoke';
       return true;
     }
 
@@ -254,7 +256,6 @@ export class KopenawaBoss extends ChallengeBoss {
     this.spiritBoltCooldown = Math.max(0, this.spiritBoltCooldown - dt);
 
     if (this.breathPhase === 'warning') {
-      this.animation = 'attack';
       this.breathTimer = Math.max(0, this.breathTimer - dt);
       if (Math.abs(player.x - this.x) > 1) this.facing = player.x < this.x ? -1 : 1;
       if (this.breathTimer === 0) {
@@ -266,7 +267,6 @@ export class KopenawaBoss extends ChallengeBoss {
     }
 
     if (this.breathPhase === 'active') {
-      this.animation = 'attack';
       this.breathTimer = Math.max(0, this.breathTimer - dt);
       if (this.breathTimer === 0) {
         this.breathPhase = 'none';
@@ -280,7 +280,6 @@ export class KopenawaBoss extends ChallengeBoss {
     if (this.spiritBoltCooldown === 0) {
       this.spiritBoltCooldown = KOPENAWAS.spiritBolt.cooldown / this.attackSpeed;
       this.pendingSpiritBolt = true;
-      this.animation = 'attack';
       if (Math.abs(player.x - this.x) > 1) this.facing = player.x < this.x ? -1 : 1;
       return true;
     }
@@ -289,18 +288,37 @@ export class KopenawaBoss extends ChallengeBoss {
       this.breathPhase = 'warning';
       this.breathTimer = KOPENAWAS.breath.warning / this.attackSpeed;
       this.breathAngle = Math.atan2(player.y - this.y, player.x - this.x);
-      this.animation = 'attack';
       return true;
     }
 
-    const previousX = this.x;
-    const previousY = this.y;
     const alive = super.update(dt, player, separation);
     if (!alive) return false;
-    const distance = Math.hypot(this.x - previousX, this.y - previousY);
-    this.animation = distance > 0.05 ? 'walk' : 'idle';
     if (Math.abs(player.x - this.x) > 12) this.facing = player.x < this.x ? -1 : 1;
     return true;
+  }
+
+  /** Called after terrain/arena collision resolution, never from rendering. */
+  public updateMovementAnimation(distance: number): void {
+    this.animator.updateMovement(this.isInEntrance || this.isInSmoke || this.breathPhase !== 'none' ? 0 : distance);
+  }
+
+  private get visualPose(): { pose: KopenawaPose; progress: number } {
+    if (this.isInEntrance) {
+      const { slamWindup, slamRecovery } = KOPENAWAS.entrance;
+      const elapsed = slamWindup + slamRecovery - this.entranceTimer;
+      // Four preparation poses followed by impact and recovery.
+      const progress = elapsed < slamWindup
+        ? elapsed / slamWindup * (4 / 6)
+        : 4 / 6 + (elapsed - slamWindup) / slamRecovery * (2 / 6);
+      return { pose: 'slam', progress: progress + 1e-9 };
+    }
+    if (this.breathPhase === 'warning') {
+      return { pose: 'cast', progress: 1 - this.breathTimer / KOPENAWAS.breath.warning };
+    }
+    if (this.breathPhase === 'active') {
+      return { pose: 'channel', progress: ((KOPENAWAS.breath.duration - this.breathTimer) / KOPENAWA_CHANNEL_CYCLE) % 1 };
+    }
+    return { pose: this.animator.movementPose, progress: 0 };
   }
 
   private renderBreath(ctx: CanvasRenderingContext2D, camera: Camera): void {
@@ -334,6 +352,7 @@ export class KopenawaBoss extends ChallengeBoss {
   }
 
   override render(ctx: CanvasRenderingContext2D, camera: Camera): void {
+    if (this.hp <= 0) return;
     this.renderBreath(ctx, camera);
     if (this.isInSmoke) {
       this.renderSmoke(ctx, camera);
@@ -341,7 +360,8 @@ export class KopenawaBoss extends ChallengeBoss {
     }
     drawKopenawaFigure(ctx, camera, this.x, this.y, this.sprite, this.time, {
       facing: this.facing,
-      attack: this.animation === 'attack' || this.animation === 'slam',
+      animator: this.animator,
+      ...this.visualPose,
     });
   }
 }
@@ -351,6 +371,7 @@ export class KopenawaBoss extends ChallengeBoss {
  * It shares his breath cone and spirit bolt, but never summons further clones.
  */
 export class KopenawaClone extends Enemy {
+  private readonly animator = new KopenawaAnimation();
   private readonly sprite: HTMLImageElement;
   private readonly attackSpeed: number;
   private time = Math.random() * 5;
@@ -394,6 +415,7 @@ export class KopenawaClone extends Enemy {
   }
 
   override update(dt: number, player: Player, separation: { vx: number; vy: number }): boolean {
+    if (this.hp <= 0) return false;
     this.time += dt;
     if (this.hp <= 0) {
       this.pendingBreathHit = false;
@@ -452,7 +474,12 @@ export class KopenawaClone extends Enemy {
     return alive;
   }
 
+  public updateMovementAnimation(distance: number): void {
+    this.animator.updateMovement(this.attackFlash > 0 ? 0 : distance);
+  }
+
   override render(ctx: CanvasRenderingContext2D, camera: Camera): void {
+    if (this.hp <= 0) return;
     drawKopenawaBreathCone(
       ctx,
       camera,
@@ -463,11 +490,15 @@ export class KopenawaClone extends Enemy {
       this.breathTimer,
       this.attackSpeed
     );
+
     const hop = Math.max(0, Math.sin(this.time * 3.4)) * 7;
     drawKopenawaFigure(ctx, camera, this.x, this.y, this.sprite, this.time, {
       alpha: 0.72,
       facing: this.facing,
-      attack: this.attackFlash > 0 || this.breathPhase !== 'none',
+      animator: this.animator,
+      pose: this.attackFlash > 0 ? 'cast' : this.animator.movementPose,
+      progress: this.attackFlash > 0 ? 1 - this.attackFlash / 0.45 : 0,
+
       jumpOffset: -hop,
     });
   }

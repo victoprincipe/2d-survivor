@@ -46,6 +46,7 @@ export const GameContainer: React.FC = () => {
   );
   const [selectedMap, setSelectedMap] = useState<MapId>(DEFAULT_MAP_ID);
   const [hud, setHud] = useState<HUDState>(DEFAULT_HUD);
+  const [rerollsRemaining, setRerollsRemaining] = useState(2);
   const [levelUpOptions, setLevelUpOptions] = useState<UpgradeOption[]>([]);
   const [chestReward, setChestReward] = useState<{ gold: number; upgrade?: UpgradeOption } | null>(null);
   const [endSummary, setEndSummary] = useState<GameEndSummary | null>(null);
@@ -111,6 +112,7 @@ export const GameContainer: React.FC = () => {
         },
         onLevelUp: (options) => {
           setLevelUpOptions(options);
+          setRerollsRemaining(2);
           gameStateRef.current = 'level_up';
           setGameState('level_up');
         },
@@ -148,6 +150,14 @@ export const GameContainer: React.FC = () => {
       engineRef.current = engine;
       engine.start();
     }, 50);
+  };
+
+  const handleReroll = () => {
+    if (gameStateRef.current !== 'level_up') return;
+    const result = engineRef.current?.rerollLevelUp(levelUpOptions);
+    if (!result) return;
+    setLevelUpOptions(result.options);
+    setRerollsRemaining(result.remaining);
   };
 
   const handleSelectUpgrade = (option: UpgradeOption) => {
@@ -341,7 +351,7 @@ export const GameContainer: React.FC = () => {
       )}
 
       {gameState === 'level_up' && (
-        <LevelUpModal options={levelUpOptions} onSelect={handleSelectUpgrade} />
+        <LevelUpModal options={levelUpOptions} onSelect={handleSelectUpgrade} onReroll={handleReroll} rerollsRemaining={rerollsRemaining} />
       )}
 
       {gameState === 'chest' && chestReward && (

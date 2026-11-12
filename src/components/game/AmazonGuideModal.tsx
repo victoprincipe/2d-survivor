@@ -563,8 +563,8 @@ const FRUIT_TREES: {
   {
     name: 'Açaizeiro',
     color: '#a855f7',
-    effect: 'Ímã de XP',
-    description: 'Atrai todo o XP do mapa para o herói.',
+    effect: 'Ímã de moedas',
+    description: 'Atrai todas as moedas do mapa para o herói.',
     icon: <Sparkles className="h-4 w-4" />,
   },
   {

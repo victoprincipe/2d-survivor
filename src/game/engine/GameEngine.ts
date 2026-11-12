@@ -1127,6 +1127,9 @@ export class GameEngine {
       // the hero. Submerged ambushers stay hidden and therefore leave no wake.
       const movedX = e.x - previousX;
       const movedY = e.y - previousY;
+      if (e instanceof KopenawaBoss || e instanceof KopenawaClone) {
+        e.updateMovementAnimation(Math.hypot(movedX, movedY));
+      }
       if (
         !e.isSubmerged &&
         movedX * movedX + movedY * movedY > 4 &&
@@ -1617,6 +1620,20 @@ export class GameEngine {
     if (this.itemSpawnTimer >= 75) {
       this.itemSpawnTimer -= 75;
       this.spawnRandomItem();
+    }
+
+    // Credit kills immediately, then open at most one upgrade selection per frame.
+    // Remaining levels are handled sequentially by applyUpgrade's overflow logic.
+    if (!this.isPaused && !this.isGameOver && this.player.checkLevelUp()) {
+      const options = this.weaponSystem.generateUpgradeOptions();
+      if (options.length > 0) {
+        this.sound.playLevelUp();
+        this.pause();
+        this.syncHUD();
+        this.levelUpRerollsRemaining = 2;
+        this.callbacks.onLevelUp(options);
+        return;
+      }
     }
 
     // 7. Update Drops & Pickups
@@ -2462,7 +2479,11 @@ export class GameEngine {
 
     if (enemy.isBoss) {
       this.bossesDefeated += 1;
-      if (enemy.type === 'boss_anaconda') { this.persistRunStats(false); return; }
+      if (enemy.type === 'boss_anaconda') {
+        this.player.xp += enemy.xpValue * this.player.xpMultiplier;
+        this.persistRunStats(false);
+        return;
+      }
       // Kopenawa leaves no physical loot outside the cave; his bow waits inside.
       if (enemy instanceof KopenawaBoss) {
         if (!this.waveDirector.isEndless && !this.waveDirector.isAmazonForest) this.handleVictory();
@@ -2471,8 +2492,7 @@ export class GameEngine {
       }
       const bossXp = Math.round(250 * this.difficulty.xpMultiplier);
       this.drops.push(new Drop(Date.now() + Math.random(), 'chest', enemy.x, enemy.y));
-      this.drops.push(new Drop(Date.now() + 1 + Math.random(), 'gem_red', enemy.x + 22, enemy.y, bossXp));
-      this.drops.push(new Drop(Date.now() + 2 + Math.random(), 'gem_red', enemy.x - 22, enemy.y, bossXp));
+      this.player.xp += bossXp * 2 * this.player.xpMultiplier;
 
       if (!this.waveDirector.isEndless && !this.waveDirector.isAmazonForest) {
         this.handleVictory();
@@ -2490,21 +2510,16 @@ export class GameEngine {
         enemy.type === 'elite_goliath_spider' ||
         enemy.type === 'elite_black_caiman';
       this.drops.push(new Drop(Date.now() + Math.random(), 'chest', enemy.x, enemy.y));
-      this.drops.push(new Drop(Date.now() + 1 + Math.random(), 'gem_green', enemy.x + 14, enemy.y, enemy.xpValue));
+      this.player.xp += enemy.xpValue * (isAmazonElite ? 2 : 1) * this.player.xpMultiplier;
       if (isAmazonElite) {
         // Rare forest elites are walking treasure piñatas: bonus XP and gold.
-        this.drops.push(new Drop(Date.now() + 2 + Math.random(), 'gem_red', enemy.x - 16, enemy.y, enemy.xpValue));
         this.drops.push(new Drop(Date.now() + 3 + Math.random(), 'coin', enemy.x + 30, enemy.y, 90));
         this.drops.push(new Drop(Date.now() + 4 + Math.random(), 'coin', enemy.x - 30, enemy.y, 90));
       }
       return;
     }
 
-    let dropType: Drop['type'] = 'gem_blue';
-    if (enemy.xpValue >= 20) {
-      dropType = 'gem_green';
-    }
-    this.drops.push(new Drop(Date.now() + Math.random(), dropType, enemy.x, enemy.y, enemy.xpValue));
+    this.player.xp += enemy.xpValue * this.player.xpMultiplier;
   }
 
   private spawnRandomItem(): void {
@@ -2556,6 +2571,7 @@ export class GameEngine {
         if (options.length > 0) {
           this.sound.playLevelUp();
           this.pause();
+          this.levelUpRerollsRemaining = 2;
           this.callbacks.onLevelUp(options);
         }
       }
@@ -2631,16 +2647,14 @@ export class GameEngine {
     }
 
     if (fruit.kind === 'acai') {
-      // Açaí: magnet every XP gem on the map toward the hero.
+      // Açaí: attract coins now that kills grant XP directly.
       this.sound.playLevelUp();
       this.vfx.triggerFlash('#38bdf8', 0.35);
       this.vfx.addSparks(fruit.x, fruit.y, '#c084fc', 12);
       for (let i = 0; i < this.drops.length; i++) {
         const drop = this.drops[i];
         if (
-          drop.type === 'gem_blue' ||
-          drop.type === 'gem_green' ||
-          drop.type === 'gem_red'
+          drop.type === 'coin'
         ) {
           drop.isBeingMagnetPulled = true;
         }
@@ -2710,6 +2724,20 @@ export class GameEngine {
     }
   }
 
+  private levelUpRerollsRemaining = 2;
+
+  public rerollLevelUp(current: UpgradeOption[]): { options: UpgradeOption[]; remaining: number } | null {
+    if (!this.isPaused || this.isGameOver || this.levelUpRerollsRemaining <= 0) return null;
+    const key = (options: UpgradeOption[]) => options.map(option => option.type + ':' + option.id).sort().join('|');
+    let options = this.weaponSystem.generateUpgradeOptions();
+    for (let attempt = 0; attempt < 8 && key(options) === key(current); attempt++) {
+      options = this.weaponSystem.generateUpgradeOptions();
+    }
+    if (options.length === 0) return null;
+    this.levelUpRerollsRemaining--;
+    return { options, remaining: this.levelUpRerollsRemaining };
+  }
+
   public applyUpgrade(option: UpgradeOption): void {
     if (option.type === 'fusion') {
       this.weaponSystem.applyFusion(option, this.player);
@@ -2735,6 +2763,7 @@ export class GameEngine {
       if (nextOptions.length > 0) {
         this.sound.playLevelUp();
         this.pause();
+        this.levelUpRerollsRemaining = 2;
         this.callbacks.onLevelUp(nextOptions);
         return;
       }
@@ -4036,6 +4065,7 @@ export class GameEngine {
     if (options.length > 0) {
       this.sound.playLevelUp();
       this.pause();
+      this.levelUpRerollsRemaining = 2;
       this.callbacks.onLevelUp(options);
     }
   }

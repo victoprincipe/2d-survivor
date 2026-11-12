@@ -639,7 +639,7 @@ export const PASSIVE_REGISTRY: Record<PassiveId, PassiveMeta> = {
   magnet: {
     id: 'magnet',
     name: 'Ímã de Almas',
-    description: 'Amplia o campo magnético de coleta de gemas, moedas e itens.',
+    description: 'Amplia o campo magnético de coleta de moedas e itens.',
     maxLevel: 5,
     iconName: 'Magnet',
     synergyWeapon: 'flying_tray',
