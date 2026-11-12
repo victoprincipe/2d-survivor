@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { EquipmentItem, CharacterConfig, DifficultyId, GameEndSummary, HUDState, MapId, SavedGameData, UpgradeOption } from '@/game/types';
 import { CHARACTERS } from '@/game/data/characters';
 import { loadSavedData } from '@/game/data/persistence';
@@ -56,6 +56,7 @@ export const GameContainer: React.FC = () => {
   const [bgmVolume, setBgmVolume] = useState<number>(0.3);
 
   const engineRef = useRef<GameEngine | null>(null);
+  const getEngine = useCallback(() => engineRef.current, []);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const gameStateRef = useRef<GameState>('menu');
 
@@ -385,9 +386,9 @@ export const GameContainer: React.FC = () => {
 
       {/* Developer Tools Floating Trigger & Drawer */}
       <DevTools
-        getEngine={() => engineRef.current}
+        getEngine={getEngine}
         savedData={savedData}
-        onUpdateSave={(newData) => setSavedData(newData)}
+        onUpdateSave={setSavedData}
         gameState={gameState}
       />
     </div>

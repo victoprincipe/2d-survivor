@@ -652,6 +652,8 @@ export class GameEngine {
     this.input.handlePointerDown(screenX, screenY);
   }
 
+  private lastRenderedAt = -Infinity;
+
   private loop(currentTime: number): void {
     if (!this.isRunning) return;
 
@@ -676,7 +678,12 @@ export class GameEngine {
       this.update(dt);
     }
 
-    this.render();
+    // Frozen scenes need occasional redraws for resize/developer changes, not
+    // a full forest repaint on every high-refresh RAF behind a React modal.
+    if ((!this.isPaused && !this.isGameOver) || currentTime - this.lastRenderedAt >= 1000 / 15) {
+      this.render();
+      this.lastRenderedAt = currentTime;
+    }
 
     this.animFrameId = requestAnimationFrame((time) => this.loop(time));
   }
@@ -1118,9 +1125,11 @@ export class GameEngine {
 
       // Land creatures standing on the river/lake/flood surface are drawn
       // waist-deep while the active flood is rising or at its peak.
+      const finalInWater = e.x === previousX && e.y === previousY
+        ? enemyInWater : this.worldProps.isWaterSurface(e.x, e.y);
       e.isWadingInWater =
         !e.isWaterDweller &&
-        (this.worldProps.isWaterSurface(e.x, e.y) ||
+        (finalInWater ||
           (this.floodPhysicsActive && this.worldProps.isFloodWater(e.x, e.y)));
 
       // Animals wading through the river leave the same ring/splash trail as
@@ -1133,7 +1142,7 @@ export class GameEngine {
       if (
         !e.isSubmerged &&
         movedX * movedX + movedY * movedY > 4 &&
-        this.worldProps.isWaterSurface(e.x, e.y) &&
+        finalInWater &&
         e.waterRippleTimer <= 0
       ) {
         e.waterRippleTimer = 0.2 + Math.random() * 0.16;
@@ -3067,7 +3076,7 @@ export class GameEngine {
     this.renderGorillaArena();
 
     // Decorative canopies become translucent over anyone walking behind them.
-    this.worldProps.renderDecorCanopyOverlay(ctx, camera, this.player, this.enemies);
+    this.worldProps.renderDecorCanopyOverlay(ctx, camera);
 
     this.renderBossProjectiles();
 
@@ -3500,14 +3509,36 @@ export class GameEngine {
     }
   }
 
+  private minimapCache: HTMLCanvasElement | null = null;
+  private minimapUpdatedAt = -Infinity;
+  private minimapPlayerX = Infinity;
+  private minimapPlayerY = Infinity;
+
   private renderMinimap(): void {
     const { ctx, camera } = this;
-    const viewport = Math.min(camera.viewportWidth, camera.viewportHeight);
-    const size = viewport < 640 ? 224 : 304;
-    const margin = 12;
-    const x = margin;
-    // Leave room for the bottom HUD hint without leaving the corner.
-    const y = camera.viewportHeight - size - margin - 18;
+    const size = Math.min(camera.viewportWidth, camera.viewportHeight) < 640 ? 224 : 304;
+    const x = 12, y = camera.viewportHeight - size - 30;
+    const scale = Math.max(1, Math.abs(ctx.getTransform().a));
+    const pixels = Math.ceil((size + 4) * scale);
+    const now = performance.now();
+    if (!this.minimapCache) this.minimapCache = document.createElement('canvas');
+    const image = this.minimapCache;
+    const resized = image.width !== pixels || image.height !== pixels;
+    if (resized) { image.width = pixels; image.height = pixels; }
+    if (resized || now - this.minimapUpdatedAt >= 1000 / 12 ||
+        Math.hypot(this.player.x - this.minimapPlayerX, this.player.y - this.minimapPlayerY) > 400) {
+      const buffer = image.getContext('2d');
+      if (!buffer) { this.drawMinimap(ctx, size, x, y); return; }
+      buffer.setTransform(scale, 0, 0, scale, 0, 0);
+      buffer.clearRect(0, 0, pixels / scale, pixels / scale);
+      this.drawMinimap(buffer, size, 2, 2);
+      this.minimapUpdatedAt = now;
+      this.minimapPlayerX = this.player.x; this.minimapPlayerY = this.player.y;
+    }
+    ctx.drawImage(image, x - 2, y - 2, pixels / scale, pixels / scale);
+  }
+
+  private drawMinimap(ctx: CanvasRenderingContext2D, size: number, x: number, y: number): void {
     const half = size / 2;
 
     const viewSpan = this.worldProps.getMinimapViewSpan();

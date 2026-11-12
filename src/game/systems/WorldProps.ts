@@ -3,6 +3,7 @@ import { Player } from '../entities/Player';
 import { Drop } from '../entities/Drops';
 import { ForestCave } from '../entities/ForestCave';
 import { DropType, MapId } from '../types';
+import { StaticSpatialIndex } from '../engine/StaticSpatialIndex';
 
 // The night plain is effectively open, so this is only a large safety limit
 // that prevents the player from wandering out of the coordinate space.
@@ -393,6 +394,11 @@ export class WorldSystem {
   private beachBranches: BeachBranchProp[] = [];
   private plateaus: PlateauProp[] = [];
   private decorTrees: DecorTreeProp[] = [];
+  private treeIndex: StaticSpatialIndex<TreeProp> | null = null;
+  private decorTreeIndex: StaticSpatialIndex<DecorTreeProp> | null = null;
+  private readonly decorMetrics = new WeakMap<DecorTreeProp, DecorTreeMetrics>();
+  private readonly foregroundCanopies: DecorTreeProp[] = [];
+  private readonly riverPaths = new Map<string, Path2D>();
 
   private floorImage: HTMLImageElement | null = null;
   private floorPattern: CanvasPattern | null = null;
@@ -431,6 +437,9 @@ export class WorldSystem {
       this.spawnFieldPlants();
     }
     this.loadFloorTexture();
+    // Generation deliberately uses the original scans while the scenery is growing.
+    this.treeIndex = new StaticSpatialIndex(this.trees, tree => ({ x: tree.x, y: tree.y, radius: tree.size * 0.32 }));
+    this.decorTreeIndex = new StaticSpatialIndex(this.decorTrees, tree => ({ x: tree.x, y: tree.y, radius: this.getDecorTreeCollisionRadius(tree) }));
   }
 
   /**
@@ -1379,6 +1388,15 @@ export class WorldSystem {
   }
 
   private getDecorTreeMetrics(tree: DecorTreeProp): DecorTreeMetrics {
+    let metrics = this.decorMetrics.get(tree);
+    if (!metrics) {
+      metrics = this.computeDecorTreeMetrics(tree);
+      this.decorMetrics.set(tree, metrics);
+    }
+    return metrics;
+  }
+
+  private computeDecorTreeMetrics(tree: DecorTreeProp): DecorTreeMetrics {
     switch (tree.kind) {
       case 'samauma':
         return {
@@ -1554,6 +1572,8 @@ export class WorldSystem {
     const mouths = this.getRiverMouthGeometries();
     for (let i = 0; i < mouths.length; i++) {
       const mouth = mouths[i];
+      // Bounds of the two sine offsets (145 + 52) and width harmonics (.33).
+      if (Math.abs(x - mouth.anchorX) > 197 + mouth.baseHalfWidth * 1.33 - inset) continue;
       if (y < Math.min(mouth.startY, mouth.endY) || y > Math.max(mouth.startY, mouth.endY)) {
         continue;
       }
@@ -1568,15 +1588,16 @@ export class WorldSystem {
 
   /** Muddy rim hugging the open river mouths. */
   private isRiverMouthMud(x: number, y: number): boolean {
-    if (this.isNavigableWater(x, y, 0)) return false;
-
     const mouths = this.getRiverMouthGeometries();
     for (let i = 0; i < mouths.length; i++) {
       const mouth = mouths[i];
+      if (Math.abs(x - mouth.anchorX) > 197 + mouth.baseHalfWidth * 1.33 + MUD_BAND) continue;
       if (y < Math.min(mouth.startY, mouth.endY) || y > Math.max(mouth.startY, mouth.endY)) {
         continue;
       }
 
+      // Only points near an actual mouth need the full navigability test.
+      if (this.isNavigableWater(x, y, 0)) return false;
       const span = mouth.endY - mouth.startY;
       const t = (y - mouth.startY) / (Math.abs(span) < 1 ? 1 : span);
       const profile = this.getRiverMouthProfile(t, mouth);
@@ -1822,6 +1843,8 @@ export class WorldSystem {
       const lake = this.lakes[i];
       const dx = x - lake.x;
       const dy = y - lake.y;
+      const bound = (Math.max(lake.rx, lake.ry) + 0) * 1.17;
+      if (Math.abs(dx) > bound || Math.abs(dy) > bound) continue;
       const cos = Math.cos(-lake.rotation);
       const sin = Math.sin(-lake.rotation);
       const lx = dx * cos - dy * sin;
@@ -1975,6 +1998,8 @@ export class WorldSystem {
       const lake = this.lakes[i];
       const dx = x - lake.x;
       const dy = y - lake.y;
+      const bound = (Math.max(lake.rx, lake.ry) + MUD_BAND) * 1.17;
+      if (Math.abs(dx) > bound || Math.abs(dy) > bound) continue;
       const cos = Math.cos(-lake.rotation);
       const sin = Math.sin(-lake.rotation);
       const lx = dx * cos - dy * sin;
@@ -4895,6 +4920,12 @@ export class WorldSystem {
 
   private collidesWithTree(x: number, y: number, radius: number): boolean {
     if (this.forestCave?.collides(x, y, radius)) return true;
+    if (this.treeIndex) {
+      return this.treeIndex.some(x, y, radius, tree => {
+        const distance = radius + tree.size * 0.32;
+        return (x - tree.x) ** 2 + (y - tree.y) ** 2 < distance * distance;
+      }) || this.collidesWithDecorTree(x, y, radius);
+    }
     for (let i = 0; i < this.trees.length; i++) {
       const tree = this.trees[i];
       const treeRadius = tree.size * 0.32;
@@ -4907,6 +4938,12 @@ export class WorldSystem {
   }
 
   private collidesWithDecorTree(x: number, y: number, radius: number): boolean {
+    if (this.decorTreeIndex) {
+      return this.decorTreeIndex.some(x, y, radius, tree => {
+        const distance = radius + this.getDecorTreeCollisionRadius(tree);
+        return (x - tree.x) ** 2 + (y - tree.y) ** 2 < distance * distance;
+      });
+    }
     for (let i = 0; i < this.decorTrees.length; i++) {
       const tree = this.decorTrees[i];
       const minDist = radius + this.getDecorTreeCollisionRadius(tree);
@@ -5683,11 +5720,59 @@ export class WorldSystem {
     }
   }
 
-  private renderAmazonWater(ctx: CanvasRenderingContext2D, camera: Camera): void {
-    const start = -FOREST_HALF_SIZE - 1200;
-    const end = FOREST_HALF_SIZE + 1200;
-    const step = 220;
+  private traceRiverBand(halfWidth: number): Path2D {
+    const key = 'water:' + halfWidth;
+    const cached = this.riverPaths.get(key);
+    if (cached) return cached;
+    const riverXs: number[] = [];
+    for (let x = -FOREST_HALF_SIZE - 1200; x <= FOREST_HALF_SIZE + 1200; x += 220) riverXs.push(x);
+    const path = new Path2D();
+    for (let i = 0; i < riverXs.length; i++) {
+      const x = riverXs[i];
+      const y = this.riverCenterY(x);
+      const half = this.getRiverHalfWidth(x, halfWidth);
+      if (i === 0) path.moveTo(x, y - half);
+      else path.lineTo(x, y - half);
+    }
+    for (let i = riverXs.length - 1; i >= 0; i--) {
+      const x = riverXs[i];
+      const y = this.riverCenterY(x);
+      const half = this.getRiverHalfWidth(x, halfWidth);
+      path.lineTo(x, y + half);
+    }
+    path.closePath();
+    this.riverPaths.set(key, path);
+    return path;
+  }
 
+  private traceRiverMudBand(thicknessScale: number): Path2D {
+    const key = 'mud:' + thicknessScale;
+    const cached = this.riverPaths.get(key);
+    if (cached) return cached;
+    const riverXs: number[] = [];
+    for (let x = -FOREST_HALF_SIZE - 1200; x <= FOREST_HALF_SIZE + 1200; x += 220) riverXs.push(x);
+    const path = new Path2D();
+    for (let i = 0; i < riverXs.length; i++) {
+      const x = riverXs[i];
+      const y = this.riverCenterY(x);
+      const half = this.getRiverHalfWidth(x, RIVER_HALF_WIDTH);
+      const mud = this.getMudBandThickness(x) * thicknessScale;
+      if (i === 0) path.moveTo(x, y - half - mud);
+      else path.lineTo(x, y - half - mud);
+    }
+    for (let i = riverXs.length - 1; i >= 0; i--) {
+      const x = riverXs[i];
+      const y = this.riverCenterY(x);
+      const half = this.getRiverHalfWidth(x, RIVER_HALF_WIDTH);
+      const mud = this.getMudBandThickness(x) * thicknessScale;
+      path.lineTo(x, y + half + mud);
+    }
+    path.closePath();
+    this.riverPaths.set(key, path);
+    return path;
+  }
+
+  private renderAmazonWater(ctx: CanvasRenderingContext2D, camera: Camera): void {
     ctx.save();
     ctx.translate(
       camera.viewportWidth / 2 - camera.x + camera.shakeOffsetX,
@@ -5699,89 +5784,26 @@ export class WorldSystem {
     ctx.rect(-FOREST_HALF_SIZE, -FOREST_HALF_SIZE, FOREST_SIZE, FOREST_SIZE);
     ctx.clip();
 
-    const riverXs: number[] = [];
-    for (let x = start; x <= end; x += step) riverXs.push(x);
-
-    /**
-     * Filled river band with an independently wobbling shoreline on each
-     * cross-section. Unlike a constant-width stroke, this carves small bays,
-     * narrowing channels and irregular sand margins along the course.
-     */
-    const traceRiverBand = (halfWidth: number) => {
-      ctx.beginPath();
-      for (let i = 0; i < riverXs.length; i++) {
-        const x = riverXs[i];
-        const y = this.riverCenterY(x);
-        const half = this.getRiverHalfWidth(x, halfWidth);
-        if (i === 0) ctx.moveTo(x, y - half);
-        else ctx.lineTo(x, y - half);
-      }
-      for (let i = riverXs.length - 1; i >= 0; i--) {
-        const x = riverXs[i];
-        const y = this.riverCenterY(x);
-        const half = this.getRiverHalfWidth(x, halfWidth);
-        ctx.lineTo(x, y + half);
-      }
-      ctx.closePath();
-    };
-
-    /**
-     * Dark clay margin that follows both riverbanks. It starts at the painted
-     * water edge and oozes a short, irregular distance onto the sand, matching
-     * the isMud() terrain check used by the movement code.
-     */
-    const traceRiverMudBand = (thicknessScale: number) => {
-      ctx.beginPath();
-      for (let i = 0; i < riverXs.length; i++) {
-        const x = riverXs[i];
-        const y = this.riverCenterY(x);
-        const half = this.getRiverHalfWidth(x, RIVER_HALF_WIDTH);
-        const mud = this.getMudBandThickness(x) * thicknessScale;
-        if (i === 0) ctx.moveTo(x, y - half - mud);
-        else ctx.lineTo(x, y - half - mud);
-      }
-      for (let i = riverXs.length - 1; i >= 0; i--) {
-        const x = riverXs[i];
-        const y = this.riverCenterY(x);
-        const half = this.getRiverHalfWidth(x, RIVER_HALF_WIDTH);
-        const mud = this.getMudBandThickness(x) * thicknessScale;
-        ctx.lineTo(x, y + half + mud);
-      }
-      ctx.closePath();
-    };
-
     // Sandy banks with a soft, mossy transition into the forest.
-    traceRiverBand((RIVER_WIDTH + RIVER_BANK * 2 + 96) / 2);
     ctx.fillStyle = '#2b4524';
-    ctx.fill();
-
-    traceRiverBand((RIVER_WIDTH + RIVER_BANK * 2 + 40) / 2);
+    ctx.fill(this.traceRiverBand((RIVER_WIDTH + RIVER_BANK * 2 + 96) / 2));
     ctx.fillStyle = '#6f5a34';
-    ctx.fill();
-
-    traceRiverBand((RIVER_WIDTH + RIVER_BANK * 2 + 12) / 2);
+    ctx.fill(this.traceRiverBand((RIVER_WIDTH + RIVER_BANK * 2 + 40) / 2));
     ctx.fillStyle = '#a17f4a';
-    ctx.fill();
-
-    traceRiverBand((RIVER_WIDTH + RIVER_BANK * 2) / 2);
+    ctx.fill(this.traceRiverBand((RIVER_WIDTH + RIVER_BANK * 2 + 12) / 2));
     ctx.fillStyle = '#b89355';
-    ctx.fill();
-
-    traceRiverBand((RIVER_WIDTH + RIVER_BANK * 1.35) / 2);
+    ctx.fill(this.traceRiverBand((RIVER_WIDTH + RIVER_BANK * 2) / 2));
     ctx.fillStyle = '#cdb079';
-    ctx.fill();
-
-    traceRiverBand((RIVER_WIDTH + RIVER_BANK * 0.78) / 2);
+    ctx.fill(this.traceRiverBand((RIVER_WIDTH + RIVER_BANK * 1.35) / 2));
     ctx.fillStyle = '#dcc28b';
-    ctx.fill();
+    ctx.fill(this.traceRiverBand((RIVER_WIDTH + RIVER_BANK * 0.78) / 2));
 
     // Granulated sand over the whole beach band.
     const sandGrain = this.getSandGrainPattern(ctx);
     if (sandGrain) {
-      traceRiverBand((RIVER_WIDTH + RIVER_BANK * 1.85) / 2);
       ctx.fillStyle = sandGrain;
       ctx.globalAlpha = 0.7;
-      ctx.fill();
+      ctx.fill(this.traceRiverBand((RIVER_WIDTH + RIVER_BANK * 1.85) / 2));
       ctx.globalAlpha = 1;
     }
 
@@ -5791,13 +5813,10 @@ export class WorldSystem {
     this.renderRiverMouthBanks(ctx);
 
     // Muddy margins oozing from the water onto the beach and forest floor.
-    traceRiverMudBand(1);
     ctx.fillStyle = '#4a3322';
-    ctx.fill();
-
-    traceRiverMudBand(0.62);
+    ctx.fill(this.traceRiverMudBand(1));
     ctx.fillStyle = '#3a2718';
-    ctx.fill();
+    ctx.fill(this.traceRiverMudBand(0.62));
 
     const waterShimmer = this.getWaterShimmerPattern(ctx);
 
@@ -5924,23 +5943,17 @@ export class WorldSystem {
     this.renderFloodWater(ctx, camera);
 
     // Water surface: dark edge, base water, lighter current and shimmer.
-    traceRiverBand(RIVER_WIDTH / 2);
     ctx.fillStyle = '#145466';
-    ctx.fill();
-
-    traceRiverBand((RIVER_WIDTH - 24) / 2);
+    ctx.fill(this.traceRiverBand(RIVER_WIDTH / 2));
     ctx.fillStyle = '#1b6b82';
-    ctx.fill();
-
-    traceRiverBand((RIVER_WIDTH - 170) / 2);
+    ctx.fill(this.traceRiverBand((RIVER_WIDTH - 24) / 2));
     ctx.fillStyle = '#2b8ba1';
-    ctx.fill();
+    ctx.fill(this.traceRiverBand((RIVER_WIDTH - 170) / 2));
 
     if (waterShimmer) {
-      traceRiverBand((RIVER_WIDTH - 30) / 2);
       ctx.fillStyle = waterShimmer;
       ctx.globalAlpha = 0.55;
-      ctx.fill();
+      ctx.fill(this.traceRiverBand((RIVER_WIDTH - 30) / 2));
       ctx.globalAlpha = 1;
     }
 
@@ -6641,6 +6654,7 @@ export class WorldSystem {
     enemies: ReadonlyArray<CanopyEntity>
   ): void {
     if (this.mapId !== 'amazon_forest') return;
+    this.foregroundCanopies.length = 0;
 
     for (let i = 0; i < this.decorTrees.length; i++) {
       const tree = this.decorTrees[i];
@@ -6649,6 +6663,7 @@ export class WorldSystem {
 
       const screen = camera.worldToScreen(tree.x, tree.y);
       const behind = this.isAnyEntityBehindDecorCanopy(tree, metrics, player, enemies);
+      if (behind) this.foregroundCanopies.push(tree);
       ctx.save();
       ctx.translate(screen.x, screen.y);
       this.drawDecorTreeShadow(ctx, tree, metrics);
@@ -6665,17 +6680,13 @@ export class WorldSystem {
    */
   public renderDecorCanopyOverlay(
     ctx: CanvasRenderingContext2D,
-    camera: Camera,
-    player: CanopyEntity,
-    enemies: ReadonlyArray<CanopyEntity>
+    camera: Camera
   ): void {
     if (this.mapId !== 'amazon_forest') return;
 
-    for (let i = 0; i < this.decorTrees.length; i++) {
-      const tree = this.decorTrees[i];
+    for (let i = 0; i < this.foregroundCanopies.length; i++) {
+      const tree = this.foregroundCanopies[i];
       const metrics = this.getDecorTreeMetrics(tree);
-      if (!camera.isInView(tree.x, tree.y, metrics.margin)) continue;
-      if (!this.isAnyEntityBehindDecorCanopy(tree, metrics, player, enemies)) continue;
 
       const screen = camera.worldToScreen(tree.x, tree.y);
       ctx.save();

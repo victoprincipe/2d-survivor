@@ -1,6 +1,7 @@
 import { Camera } from '../engine/Camera';
 
 export interface DamageNumber {
+  value: number;
   x: number;
   y: number;
   text: string;
@@ -23,6 +24,12 @@ export interface Particle {
 }
 
 export class VFXManager {
+  private readonly maxParticles = 512;
+  private readonly maxDamageNumbers = 160;
+  private readonly numberBuckets = new Map<string, DamageNumber>();
+  private mergeTime = 0;
+  private readonly textSprites = new Map<string, HTMLCanvasElement>();
+  private textSpriteBytes = 0;
   private damageNumbers: DamageNumber[] = [];
   private particles: Particle[] = [];
   public screenFlashColor: string = '#ffffff';
@@ -33,21 +40,33 @@ export class VFXManager {
   }
 
   addDamageNumber(x: number, y: number, damage: number, isCrit: boolean = false, isHeal: boolean = false): void {
-    const text = isHeal ? `+${damage}` : `${Math.round(damage)}`;
+    const value = isHeal ? damage : Math.round(damage);
     const color = isHeal ? '#22c55e' : isCrit ? '#f97316' : '#ffffff';
-    this.damageNumbers.push({
+    const key = `${Math.floor(x / 32)}:${Math.floor(y / 32)}:${color}:${Number(isCrit)}`;
+    const existing = this.numberBuckets.get(key);
+    if (existing) {
+      existing.value += value;
+      existing.text = `${isHeal ? '+' : ''}${existing.value}`;
+      return;
+    }
+    if (this.damageNumbers.length >= this.maxDamageNumbers) return;
+    const number: DamageNumber = {
+      value,
       x: x + (Math.random() - 0.5) * 16,
       y: y - 10,
-      text,
+      text: `${isHeal ? '+' : ''}${value}`,
       color,
       isCrit,
       vy: isCrit ? -80 : -50,
       life: 0.65,
       maxLife: 0.65,
-    });
+    };
+    this.damageNumbers.push(number);
+    this.numberBuckets.set(key, number);
   }
 
   addDeathBurst(x: number, y: number, color: string = '#ef4444', count: number = 10): void {
+    count = Math.min(count, this.maxParticles - this.particles.length);
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
       const speed = 40 + Math.random() * 120;
@@ -65,6 +84,7 @@ export class VFXManager {
   }
 
   addSparks(x: number, y: number, color: string = '#facc15', count: number = 6): void {
+    count = Math.min(count, this.maxParticles - this.particles.length);
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
       const speed = 60 + Math.random() * 160;
@@ -87,6 +107,11 @@ export class VFXManager {
   }
 
   update(dt: number): void {
+    this.mergeTime += dt;
+    if (this.mergeTime >= 0.1) {
+      this.mergeTime %= 0.1;
+      this.numberBuckets.clear();
+    }
     // Screen flash decay
     if (this.screenFlashAlpha > 0) {
       this.screenFlashAlpha = Math.max(0, this.screenFlashAlpha - dt * 2.5);
@@ -133,6 +158,7 @@ export class VFXManager {
     }
 
     // Render damage numbers
+    const textScale = typeof document === 'undefined' ? 1 : Math.max(1, Math.abs(ctx.getTransform().a));
     ctx.font = 'bold 13px sans-serif';
     ctx.textAlign = 'center';
     for (let i = 0; i < this.damageNumbers.length; i++) {
@@ -148,6 +174,11 @@ export class VFXManager {
         ctx.font = 'bold 13px sans-serif';
       }
 
+      const sprite = this.getTextSprite(dn, textScale);
+      if (sprite) {
+        ctx.drawImage(sprite, screen.x - sprite.width / textScale / 2, screen.y - 23, sprite.width / textScale, sprite.height / textScale);
+        continue;
+      }
       ctx.strokeStyle = '#000000';
       ctx.lineWidth = 3;
       ctx.strokeText(dn.text, screen.x, screen.y);
@@ -170,5 +201,39 @@ export class VFXManager {
     this.damageNumbers = [];
     this.particles = [];
     this.screenFlashAlpha = 0;
+    this.numberBuckets.clear();
+    this.mergeTime = 0;
+  }
+
+  private getTextSprite(number: DamageNumber, scale: number): HTMLCanvasElement | null {
+    if (typeof document === 'undefined') return null;
+    const key = `${scale}:${number.color}:${number.isCrit}:${number.text}`;
+    const cached = this.textSprites.get(key);
+    if (cached) {
+      this.textSprites.delete(key); this.textSprites.set(key, cached);
+      return cached;
+    }
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    const font = number.isCrit ? '900 17px sans-serif' : 'bold 13px sans-serif';
+    ctx.font = font;
+    const width = Math.ceil(ctx.measureText(number.text).width + 8);
+    canvas.width = Math.ceil(width * scale); canvas.height = Math.ceil(30 * scale);
+    ctx.scale(scale, scale); ctx.font = font; ctx.textAlign = 'center';
+    ctx.strokeStyle = '#000000'; ctx.lineWidth = 3; ctx.fillStyle = number.color;
+    ctx.strokeText(number.text, canvas.width / scale / 2, 23);
+    ctx.fillText(number.text, canvas.width / scale / 2, 23);
+    const bytes = canvas.width * canvas.height * 4;
+    // Bounded LRU: changing totals cannot retain an unlimited set of canvases.
+    while (this.textSprites.size && (this.textSprites.size >= 256 || this.textSpriteBytes + bytes > 2 * 1024 * 1024)) {
+      const oldest = this.textSprites.keys().next().value!;
+      const old = this.textSprites.get(oldest)!;
+      this.textSpriteBytes -= old.width * old.height * 4;
+      this.textSprites.delete(oldest); old.width = old.height = 0;
+    }
+    if (bytes > 2 * 1024 * 1024) return null;
+    this.textSprites.set(key, canvas); this.textSpriteBytes += bytes;
+    return canvas;
   }
 }

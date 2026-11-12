@@ -1,0 +1,3871 @@
+{
+  "startedAt": "2026-11-12T17:57:26.271Z",
+  "baseURL": "http://localhost:3010",
+  "host": {
+    "platform": "win32",
+    "cpus": "AMD Ryzen 5 5600 6-Core Processor              ",
+    "logicalCPUs": 12,
+    "totalMemoryGB": 23.9
+  },
+  "cases": [
+    {
+      "id": "forest-420-cpu1",
+      "map": "forest",
+      "cpu": 1,
+      "count": 420,
+      "seconds": 15,
+      "seed": 123456789,
+      "dpr": 1,
+      "width": 1280,
+      "height": 720,
+      "samplesReleasedBeforeFinalGC": true,
+      "result": {
+        "frames": {
+          "samples": 955,
+          "mean": 15.721570680628263,
+          "p50": 13.900000000001455,
+          "p95": 20.900000000000546,
+          "p99": 27.80000000000109,
+          "max": 34.80000000000018,
+          "fps": 63.60687620303585,
+          "over16_67": 299,
+          "over33_33": 4,
+          "over50": 0
+        },
+        "methods": {
+          "weaponsUpdate": {
+            "samples": 956,
+            "mean": 0.03493723834408876,
+            "p50": 0,
+            "p95": 0.10000002384185791,
+            "p99": 0.19999998807907104,
+            "max": 0.2999999523162842
+          },
+          "vfxUpdate": {
+            "samples": 956,
+            "mean": 0.010355648385929762,
+            "p50": 0,
+            "p95": 0.10000002384185791,
+            "p99": 0.10000002384185791,
+            "max": 0.19999998807907104
+          },
+          "update": {
+            "samples": 956,
+            "mean": 2.1620292890520774,
+            "p50": 2.099999964237213,
+            "p95": 2.899999976158142,
+            "p99": 3.199999988079071,
+            "max": 6.199999988079071
+          },
+          "renderFloor": {
+            "samples": 956,
+            "mean": 0.655020921050754,
+            "p50": 0.6000000238418579,
+            "p95": 0.9000000357627869,
+            "p99": 1.100000023841858,
+            "max": 1.699999988079071
+          },
+          "renderTrees": {
+            "samples": 956,
+            "mean": 0.2746861911219034,
+            "p50": 0.30000001192092896,
+            "p95": 0.40000003576278687,
+            "p99": 0.40000003576278687,
+            "max": 0.8999999761581421
+          },
+          "renderDecorTrees": {
+            "samples": 956,
+            "mean": 0.42468619327914264,
+            "p50": 0.40000003576278687,
+            "p95": 0.6000000238418579,
+            "p99": 0.699999988079071,
+            "max": 0.8999999761581421
+          },
+          "renderDecorCanopyOverlay": {
+            "samples": 956,
+            "mean": 0.14225941354011393,
+            "p50": 0.10000002384185791,
+            "p95": 0.2999999523162842,
+            "p99": 0.30000001192092896,
+            "max": 0.699999988079071
+          },
+          "weaponsRender": {
+            "samples": 956,
+            "mean": 0.021129706477021573,
+            "p50": 0,
+            "p95": 0.10000002384185791,
+            "p99": 0.10000002384185791,
+            "max": 0.10000002384185791
+          },
+          "vfxRender": {
+            "samples": 956,
+            "mean": 0.13221757344620996,
+            "p50": 0.10000002384185791,
+            "p95": 0.30000001192092896,
+            "p99": 0.5,
+            "max": 0.9000000357627869
+          },
+          "renderMinimap": {
+            "samples": 956,
+            "mean": 0.0947698746889705,
+            "p50": 0,
+            "p95": 0.6000000238418579,
+            "p99": 0.7000000476837158,
+            "max": 1.199999988079071
+          },
+          "render": {
+            "samples": 956,
+            "mean": 6.515062761481337,
+            "p50": 6.199999988079071,
+            "p95": 9.199999988079071,
+            "p99": 9.700000047683716,
+            "max": 10.5
+          },
+          "renderMinimapScenery": {
+            "samples": 164,
+            "mean": 0.23109756264744735,
+            "p50": 0.19999998807907104,
+            "p95": 0.3999999761581421,
+            "p99": 0.5,
+            "max": 0.5999999642372131
+          }
+        },
+        "windows": [
+          {
+            "end": 312,
+            "renderCount": 313,
+            "renderedFrames": 313,
+            "elapsedMs": 5010.100000023842,
+            "frames": 312,
+            "fps": 62.48623099877831,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 420,
+            "vfx": 129,
+            "heapUsed": 16833767
+          },
+          {
+            "end": 603,
+            "renderCount": 604,
+            "renderedFrames": 291,
+            "elapsedMs": 10022.900000035763,
+            "frames": 291,
+            "fps": 57.95773666075804,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 378,
+            "vfx": 90,
+            "heapUsed": 14853327
+          },
+          {
+            "end": 955,
+            "renderCount": 956,
+            "renderedFrames": 352,
+            "elapsedMs": 15027,
+            "frames": 352,
+            "fps": 70.39859202815943,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 336,
+            "vfx": 258,
+            "heapUsed": 23739562
+          }
+        ],
+        "longTasks": {
+          "samples": 0,
+          "mean": null
+        },
+        "peak": {
+          "enemies": 420,
+          "projectiles": 2,
+          "zones": 0,
+          "drops": 0,
+          "vfx": 544,
+          "particles": 509,
+          "damageNumbers": 61,
+          "bossProjectiles": 0,
+          "hazards": 0
+        },
+        "states": {},
+        "weaponsSeen": [
+          "bandeja_inox:1:false"
+        ],
+        "updates": 956,
+        "wallMs": 15057.5,
+        "waveClockDeltaSeconds": 15.034900000000146,
+        "finite": true,
+        "paused": false,
+        "gameOver": false,
+        "finalPosition": {
+          "x": 1516.6613855764265,
+          "y": 4924.236230130107
+        },
+        "fixtureOrigin": {
+          "x": 1279.32035070844,
+          "y": 4733.417488634586
+        },
+        "canvas": {
+          "width": 1280,
+          "height": 720
+        },
+        "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 Ti (0x00002782) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "visibility": "visible",
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0"
+      },
+      "heapBefore": {
+        "usedSize": 9752224,
+        "totalSize": 10739712,
+        "embedderHeapUsedSize": 3360696,
+        "backingStorageSize": 2114424
+      },
+      "heapAfter": {
+        "usedSize": 9596300,
+        "totalSize": 10739712,
+        "embedderHeapUsedSize": 5027944,
+        "backingStorageSize": 2115829
+      },
+      "errors": [],
+      "resources": [],
+      "elapsedMs": 20898
+    },
+    {
+      "id": "plain-420-cpu1",
+      "map": "plain",
+      "cpu": 1,
+      "count": 420,
+      "seconds": 15,
+      "seed": 123456789,
+      "dpr": 1,
+      "width": 1280,
+      "height": 720,
+      "samplesReleasedBeforeFinalGC": true,
+      "result": {
+        "frames": {
+          "samples": 1182,
+          "mean": 12.725803722504256,
+          "p50": 13.899999999999636,
+          "p95": 20.799999999999272,
+          "p99": 20.900000000001455,
+          "max": 48.599999999998545,
+          "fps": 78.58049847426173,
+          "over16_67": 92,
+          "over33_33": 1,
+          "over50": 0
+        },
+        "methods": {
+          "weaponsUpdate": {
+            "samples": 1183,
+            "mean": 0.019864750936287295,
+            "p50": 0,
+            "p95": 0.10000002384185791,
+            "p99": 0.19999998807907104,
+            "max": 0.800000011920929
+          },
+          "vfxUpdate": {
+            "samples": 1183,
+            "mean": 0.0030431106044192086,
+            "p50": 0,
+            "p95": 0,
+            "p99": 0.10000002384185791,
+            "max": 0.10000002384185791
+          },
+          "update": {
+            "samples": 1183,
+            "mean": 0.8321217237038826,
+            "p50": 0.800000011920929,
+            "p95": 1.199999988079071,
+            "p99": 1.5,
+            "max": 13.899999976158142
+          },
+          "renderFloor": {
+            "samples": 1183,
+            "mean": 0.013693998551227637,
+            "p50": 0,
+            "p95": 0.10000002384185791,
+            "p99": 0.10000002384185791,
+            "max": 0.5999999642372131
+          },
+          "renderTrees": {
+            "samples": 1183,
+            "mean": 0.0006762468401698469,
+            "p50": 0,
+            "p95": 0,
+            "p99": 0,
+            "max": 0.10000002384185791
+          },
+          "renderDecorTrees": {
+            "samples": 1183,
+            "mean": 0.0008453086383848602,
+            "p50": 0,
+            "p95": 0,
+            "p99": 0,
+            "max": 0.10000002384185791
+          },
+          "renderDecorCanopyOverlay": {
+            "samples": 1183,
+            "mean": 0.0010989011089779619,
+            "p50": 0,
+            "p95": 0,
+            "p99": 0.09999996423721313,
+            "max": 0.10000002384185791
+          },
+          "weaponsRender": {
+            "samples": 1183,
+            "mean": 0.0034657649739959534,
+            "p50": 0,
+            "p95": 0,
+            "p99": 0.10000002384185791,
+            "max": 0.10000002384185791
+          },
+          "vfxRender": {
+            "samples": 1183,
+            "mean": 0.02375316937294232,
+            "p50": 0,
+            "p95": 0.10000002384185791,
+            "p99": 0.19999998807907104,
+            "max": 2.399999976158142
+          },
+          "renderMinimap": {
+            "samples": 1183,
+            "mean": 0.024091293523599813,
+            "p50": 0,
+            "p95": 0.19999998807907104,
+            "p99": 0.20000004768371582,
+            "max": 0.5
+          },
+          "render": {
+            "samples": 1183,
+            "mean": 1.703550297278826,
+            "p50": 1.600000023841858,
+            "p95": 2.200000047683716,
+            "p99": 2.699999988079071,
+            "max": 9.900000035762787
+          },
+          "renderMinimapScenery": {
+            "samples": 166,
+            "mean": 0,
+            "p50": 0,
+            "p95": 0,
+            "p99": 0,
+            "max": 0
+          }
+        },
+        "windows": [
+          {
+            "end": 393,
+            "renderCount": 394,
+            "renderedFrames": 394,
+            "elapsedMs": 5018.5,
+            "frames": 393,
+            "fps": 78.49011384062312,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 420,
+            "vfx": 0,
+            "heapUsed": 9892672
+          },
+          {
+            "end": 790,
+            "renderCount": 791,
+            "renderedFrames": 397,
+            "elapsedMs": 10036,
+            "frames": 397,
+            "fps": 79.06948953374894,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 420,
+            "vfx": 0,
+            "heapUsed": 9527614
+          },
+          {
+            "end": 1181,
+            "renderCount": 1182,
+            "renderedFrames": 391,
+            "elapsedMs": 15040.200000047684,
+            "frames": 391,
+            "fps": 78.19843603127937,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 420,
+            "vfx": 29,
+            "heapUsed": 13095991
+          }
+        ],
+        "longTasks": {
+          "samples": 0,
+          "mean": null
+        },
+        "peak": {
+          "enemies": 420,
+          "projectiles": 3,
+          "zones": 0,
+          "drops": 1,
+          "vfx": 34,
+          "particles": 27,
+          "damageNumbers": 7,
+          "bossProjectiles": 0,
+          "hazards": 0
+        },
+        "states": {},
+        "weaponsSeen": [
+          "derson_combo:1:false"
+        ],
+        "updates": 1183,
+        "wallMs": 15059.800000011921,
+        "waveClockDeltaSeconds": 15.04880000000021,
+        "finite": true,
+        "paused": false,
+        "gameOver": false,
+        "finalPosition": {
+          "x": -219.59596922708752,
+          "y": 335.4828143788949
+        },
+        "fixtureOrigin": {
+          "x": 0,
+          "y": 0
+        },
+        "canvas": {
+          "width": 1280,
+          "height": 720
+        },
+        "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 Ti (0x00002782) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "visibility": "visible",
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0"
+      },
+      "heapBefore": {
+        "usedSize": 6514656,
+        "totalSize": 7331840,
+        "embedderHeapUsedSize": 2577112,
+        "backingStorageSize": 1758108
+      },
+      "heapAfter": {
+        "usedSize": 6670956,
+        "totalSize": 7593984,
+        "embedderHeapUsedSize": 3454080,
+        "backingStorageSize": 1758254
+      },
+      "errors": [],
+      "resources": [],
+      "elapsedMs": 20538
+    },
+    {
+      "id": "plain-420-cpu4",
+      "map": "plain",
+      "cpu": 4,
+      "count": 420,
+      "seconds": 15,
+      "seed": 123456789,
+      "dpr": 1,
+      "width": 1280,
+      "height": 720,
+      "samplesReleasedBeforeFinalGC": true,
+      "result": {
+        "frames": {
+          "samples": 217,
+          "mean": 69.86175115207374,
+          "p50": 69.40000000000146,
+          "p95": 83.30000000000018,
+          "p99": 104.10000000000036,
+          "max": 138.89999999999964,
+          "fps": 14.313984168865435,
+          "over16_67": 217,
+          "over33_33": 217,
+          "over50": 216
+        },
+        "methods": {
+          "weaponsUpdate": {
+            "samples": 218,
+            "mean": 0.16605504280930267,
+            "p50": 0.10000002384185791,
+            "p95": 0.6000000238418579,
+            "p99": 1.199999988079071,
+            "max": 2.200000047683716
+          },
+          "vfxUpdate": {
+            "samples": 218,
+            "mean": 0.011467889908256881,
+            "p50": 0,
+            "p95": 0.10000002384185791,
+            "p99": 0.19999998807907104,
+            "max": 0.20000004768371582
+          },
+          "update": {
+            "samples": 218,
+            "mean": 4.624770640233241,
+            "p50": 4,
+            "p95": 7.299999952316284,
+            "p99": 16.599999964237213,
+            "max": 49
+          },
+          "renderFloor": {
+            "samples": 218,
+            "mean": 0.7600917430645829,
+            "p50": 0.10000002384185791,
+            "p95": 0.5,
+            "p99": 17.899999976158142,
+            "max": 22.30000001192093
+          },
+          "renderTrees": {
+            "samples": 218,
+            "mean": 0.0032110091196287664,
+            "p50": 0,
+            "p95": 0,
+            "p99": 0.19999998807907104,
+            "max": 0.20000004768371582
+          },
+          "renderDecorTrees": {
+            "samples": 218,
+            "mean": 0.0036697245519095607,
+            "p50": 0,
+            "p95": 0,
+            "p99": 0.10000002384185791,
+            "max": 0.19999998807907104
+          },
+          "renderDecorCanopyOverlay": {
+            "samples": 218,
+            "mean": 0.006422018239257533,
+            "p50": 0,
+            "p95": 0,
+            "p99": 0.19999998807907104,
+            "max": 0.20000004768371582
+          },
+          "weaponsRender": {
+            "samples": 218,
+            "mean": 0.05412843987482403,
+            "p50": 0,
+            "p95": 0.19999998807907104,
+            "p99": 0.20000004768371582,
+            "max": 0.30000001192092896
+          },
+          "vfxRender": {
+            "samples": 218,
+            "mean": 0.8922018337687221,
+            "p50": 0.09999996423721313,
+            "p95": 1.199999988079071,
+            "p99": 39,
+            "max": 39.60000002384186
+          },
+          "renderMinimapScenery": {
+            "samples": 112,
+            "mean": 0.004464285714285714,
+            "p50": 0,
+            "p95": 0,
+            "p99": 0.19999998807907104,
+            "max": 0.20000004768371582
+          },
+          "renderMinimap": {
+            "samples": 218,
+            "mean": 0.8807339455009601,
+            "p50": 0.5,
+            "p95": 0.800000011920929,
+            "p99": 36.89999997615814,
+            "max": 39.39999997615814
+          },
+          "render": {
+            "samples": 218,
+            "mean": 11.544036697357074,
+            "p50": 9.5,
+            "p95": 16.599999964237213,
+            "p99": 65.79999995231628,
+            "max": 68.30000001192093
+          }
+        },
+        "windows": [
+          {
+            "end": 73,
+            "renderCount": 74,
+            "renderedFrames": 74,
+            "elapsedMs": 5049.100000023842,
+            "frames": 73,
+            "fps": 14.660695278452794,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 420,
+            "vfx": 27,
+            "heapUsed": 9153721
+          },
+          {
+            "end": 143,
+            "renderCount": 144,
+            "renderedFrames": 70,
+            "elapsedMs": 10077.699999988079,
+            "frames": 70,
+            "fps": 13.922590397390511,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 420,
+            "vfx": 29,
+            "heapUsed": 10558097
+          },
+          {
+            "end": 216,
+            "renderCount": 217,
+            "renderedFrames": 73,
+            "elapsedMs": 15156.100000023842,
+            "frames": 73,
+            "fps": 14.340719786264343,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 420,
+            "vfx": 0,
+            "heapUsed": 11033659
+          }
+        ],
+        "longTasks": {
+          "samples": 218,
+          "mean": 66.73394495412845,
+          "p50": 66,
+          "p95": 74,
+          "p99": 89,
+          "max": 140
+        },
+        "peak": {
+          "enemies": 420,
+          "projectiles": 5,
+          "zones": 0,
+          "drops": 1,
+          "vfx": 29,
+          "particles": 24,
+          "damageNumbers": 7,
+          "bossProjectiles": 0,
+          "hazards": 0
+        },
+        "states": {},
+        "weaponsSeen": [
+          "derson_combo:1:false"
+        ],
+        "updates": 218,
+        "wallMs": 15239.199999988079,
+        "waveClockDeltaSeconds": 15.189100000000018,
+        "finite": true,
+        "paused": false,
+        "gameOver": false,
+        "finalPosition": {
+          "x": -240.5375872171985,
+          "y": 285.917411505735
+        },
+        "fixtureOrigin": {
+          "x": 0,
+          "y": 0
+        },
+        "canvas": {
+          "width": 1280,
+          "height": 720
+        },
+        "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 Ti (0x00002782) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "visibility": "visible",
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0"
+      },
+      "heapBefore": {
+        "usedSize": 6561524,
+        "totalSize": 7331840,
+        "embedderHeapUsedSize": 2620792,
+        "backingStorageSize": 1758060
+      },
+      "heapAfter": {
+        "usedSize": 6620960,
+        "totalSize": 7856128,
+        "embedderHeapUsedSize": 3170832,
+        "backingStorageSize": 1758210
+      },
+      "errors": [],
+      "resources": [],
+      "elapsedMs": 21969
+    },
+    {
+      "id": "forest-420-cpu6",
+      "map": "forest",
+      "cpu": 6,
+      "count": 420,
+      "seconds": 20,
+      "seed": 123456789,
+      "dpr": 1,
+      "width": 1280,
+      "height": 720,
+      "samplesReleasedBeforeFinalGC": true,
+      "result": {
+        "frames": {
+          "samples": 251,
+          "mean": 80.42948207171318,
+          "p50": 76.40000000000146,
+          "p95": 104.09999999999945,
+          "p99": 125.10000000000036,
+          "max": 132,
+          "fps": 12.433251765918024,
+          "over16_67": 251,
+          "over33_33": 251,
+          "over50": 251
+        },
+        "methods": {
+          "weaponsUpdate": {
+            "samples": 252,
+            "mean": 0.4607142858088963,
+            "p50": 0.3999999761581421,
+            "p95": 1,
+            "p99": 1.5999999642372131,
+            "max": 2
+          },
+          "vfxUpdate": {
+            "samples": 252,
+            "mean": 0.05793650708501301,
+            "p50": 0,
+            "p95": 0.20000004768371582,
+            "p99": 0.30000001192092896,
+            "max": 0.3999999761581421
+          },
+          "update": {
+            "samples": 252,
+            "mean": 17.068253969862347,
+            "p50": 16.30000001192093,
+            "p95": 22.19999998807907,
+            "p99": 47.5,
+            "max": 50.40000003576279
+          },
+          "renderFloor": {
+            "samples": 252,
+            "mean": 4.746031742720377,
+            "p50": 4.699999988079071,
+            "p95": 6,
+            "p99": 7.899999976158142,
+            "max": 8.600000023841858
+          },
+          "renderTrees": {
+            "samples": 252,
+            "mean": 2.4119047628981725,
+            "p50": 2.199999988079071,
+            "p95": 2.900000035762787,
+            "p99": 4.700000047683716,
+            "max": 33.60000002384186
+          },
+          "renderDecorTrees": {
+            "samples": 252,
+            "mean": 3.2432539683012735,
+            "p50": 3,
+            "p95": 4.800000011920929,
+            "p99": 5.700000047683716,
+            "max": 7.199999988079071
+          },
+          "renderDecorCanopyOverlay": {
+            "samples": 252,
+            "mean": 0.9837301562702845,
+            "p50": 0.9000000357627869,
+            "p95": 1.5999999642372131,
+            "p99": 2.099999964237213,
+            "max": 3.199999988079071
+          },
+          "weaponsRender": {
+            "samples": 252,
+            "mean": 0.27341269997377243,
+            "p50": 0.19999998807907104,
+            "p95": 0.40000003576278687,
+            "p99": 0.5,
+            "max": 13
+          },
+          "vfxRender": {
+            "samples": 252,
+            "mean": 1.2789682521233483,
+            "p50": 1,
+            "p95": 3.099999964237213,
+            "p99": 5.5,
+            "max": 7.399999976158142
+          },
+          "renderMinimapScenery": {
+            "samples": 162,
+            "mean": 1.5191358026163078,
+            "p50": 1.5,
+            "p95": 1.800000011920929,
+            "p99": 2,
+            "max": 2
+          },
+          "renderMinimap": {
+            "samples": 252,
+            "mean": 2.87658730480406,
+            "p50": 3.600000023841858,
+            "p95": 4.899999976158142,
+            "p99": 6.699999988079071,
+            "max": 50.60000002384186
+          },
+          "render": {
+            "samples": 252,
+            "mean": 49.284126984694645,
+            "p50": 47.80000001192093,
+            "p95": 64.20000004768372,
+            "p99": 76.5,
+            "max": 106.80000001192093
+          }
+        },
+        "windows": [
+          {
+            "end": 55,
+            "renderCount": 56,
+            "renderedFrames": 56,
+            "elapsedMs": 5068.300000011921,
+            "frames": 55,
+            "fps": 11.045729319382241,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 420,
+            "vfx": 72,
+            "heapUsed": 16493481
+          },
+          {
+            "end": 115,
+            "renderCount": 116,
+            "renderedFrames": 60,
+            "elapsedMs": 10098.199999988079,
+            "frames": 60,
+            "fps": 11.900983814662016,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 378,
+            "vfx": 127,
+            "heapUsed": 13064231
+          },
+          {
+            "end": 180,
+            "renderCount": 181,
+            "renderedFrames": 65,
+            "elapsedMs": 15147.600000023842,
+            "frames": 65,
+            "fps": 12.874601382534117,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 336,
+            "vfx": 119,
+            "heapUsed": 12743439
+          },
+          {
+            "end": 250,
+            "renderCount": 251,
+            "renderedFrames": 70,
+            "elapsedMs": 20188.80000001192,
+            "frames": 70,
+            "fps": 13.846032122794519,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 302,
+            "vfx": 378,
+            "heapUsed": 16785554
+          }
+        ],
+        "longTasks": {
+          "samples": 253,
+          "mean": 75.91699604743083,
+          "p50": 74,
+          "p95": 97,
+          "p99": 123,
+          "max": 136
+        },
+        "peak": {
+          "enemies": 420,
+          "projectiles": 2,
+          "zones": 0,
+          "drops": 0,
+          "vfx": 538,
+          "particles": 483,
+          "damageNumbers": 72,
+          "bossProjectiles": 0,
+          "hazards": 0
+        },
+        "states": {},
+        "weaponsSeen": [
+          "bandeja_inox:1:false"
+        ],
+        "updates": 252,
+        "wallMs": 20376.100000023842,
+        "waveClockDeltaSeconds": 20.079800000000045,
+        "finite": true,
+        "paused": false,
+        "gameOver": false,
+        "finalPosition": {
+          "x": 1195.6670738620596,
+          "y": 4552.805672665513
+        },
+        "fixtureOrigin": {
+          "x": 1279.32035070844,
+          "y": 4733.417488634586
+        },
+        "canvas": {
+          "width": 1280,
+          "height": 720
+        },
+        "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 Ti (0x00002782) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "visibility": "visible",
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0"
+      },
+      "heapBefore": {
+        "usedSize": 9557408,
+        "totalSize": 11788288,
+        "embedderHeapUsedSize": 3240288,
+        "backingStorageSize": 2114431
+      },
+      "heapAfter": {
+        "usedSize": 9744832,
+        "totalSize": 10477568,
+        "embedderHeapUsedSize": 5091960,
+        "backingStorageSize": 2114822
+      },
+      "errors": [],
+      "resources": [],
+      "elapsedMs": 28504
+    },
+    {
+      "id": "arsenal-native-forest",
+      "map": "forest",
+      "cpu": 1,
+      "count": 420,
+      "seconds": 30,
+      "seed": 123456789,
+      "dpr": 1,
+      "width": 1280,
+      "height": 720,
+      "kind": "arsenal",
+      "samplesReleasedBeforeFinalGC": true,
+      "result": {
+        "frames": {
+          "samples": 1983,
+          "mean": 15.142763489662238,
+          "p50": 13.900000000001455,
+          "p95": 20.900000000001455,
+          "p99": 27.800000000000182,
+          "max": 55.5,
+          "fps": 66.03814427153185,
+          "over16_67": 616,
+          "over33_33": 12,
+          "over50": 1
+        },
+        "methods": {
+          "weaponsUpdate": {
+            "samples": 1984,
+            "mean": 0.10186492005783704,
+            "p50": 0.10000002384185791,
+            "p95": 0.20000004768371582,
+            "p99": 0.30000001192092896,
+            "max": 0.699999988079071
+          },
+          "vfxUpdate": {
+            "samples": 1984,
+            "mean": 0.0291330648225642,
+            "p50": 0,
+            "p95": 0.10000002384185791,
+            "p99": 0.10000002384185791,
+            "max": 0.20000004768371582
+          },
+          "update": {
+            "samples": 1984,
+            "mean": 2.025655241803296,
+            "p50": 1.9000000357627869,
+            "p95": 3,
+            "p99": 3.599999964237213,
+            "max": 13.300000011920929
+          },
+          "renderFloor": {
+            "samples": 1984,
+            "mean": 0.6651713707814774,
+            "p50": 0.6000000238418579,
+            "p95": 0.9000000357627869,
+            "p99": 1,
+            "max": 6.399999976158142
+          },
+          "renderTrees": {
+            "samples": 1984,
+            "mean": 0.28850806459423994,
+            "p50": 0.30000001192092896,
+            "p95": 0.40000003576278687,
+            "p99": 0.5,
+            "max": 1.899999976158142
+          },
+          "renderDecorTrees": {
+            "samples": 1984,
+            "mean": 0.48765120931690736,
+            "p50": 0.5,
+            "p95": 0.699999988079071,
+            "p99": 0.800000011920929,
+            "max": 5.5
+          },
+          "renderDecorCanopyOverlay": {
+            "samples": 1984,
+            "mean": 0.10625000105750176,
+            "p50": 0.10000002384185791,
+            "p95": 0.20000004768371582,
+            "p99": 0.30000001192092896,
+            "max": 0.5
+          },
+          "weaponsRender": {
+            "samples": 1984,
+            "mean": 0.10267137039092279,
+            "p50": 0.10000002384185791,
+            "p95": 0.19999998807907104,
+            "p99": 0.20000004768371582,
+            "max": 0.3999999761581421
+          },
+          "vfxRender": {
+            "samples": 1984,
+            "mean": 0.5871975811859292,
+            "p50": 0.5999999642372131,
+            "p95": 1,
+            "p99": 1.4000000357627869,
+            "max": 3.800000011920929
+          },
+          "renderMinimap": {
+            "samples": 1984,
+            "mean": 0.09324596750159417,
+            "p50": 0,
+            "p95": 0.6000000238418579,
+            "p99": 0.7000000476837158,
+            "max": 1.899999976158142
+          },
+          "render": {
+            "samples": 1984,
+            "mean": 6.642540322556611,
+            "p50": 6.5,
+            "p95": 9.800000011920929,
+            "p99": 11.699999988079071,
+            "max": 27.600000023841858
+          },
+          "renderMinimapScenery": {
+            "samples": 331,
+            "mean": 0.2265861045197778,
+            "p50": 0.19999998807907104,
+            "p95": 0.30000001192092896,
+            "p99": 0.40000003576278687,
+            "max": 0.5999999642372131
+          }
+        },
+        "windows": [
+          {
+            "end": 238,
+            "renderCount": 239,
+            "renderedFrames": 239,
+            "elapsedMs": 5010.800000011921,
+            "frames": 238,
+            "fps": 47.79884318766068,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 420,
+            "vfx": 625,
+            "heapUsed": 16664386
+          },
+          {
+            "end": 512,
+            "renderCount": 513,
+            "renderedFrames": 274,
+            "elapsedMs": 10014.800000011921,
+            "frames": 274,
+            "fps": 54.798904021919554,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 378,
+            "vfx": 636,
+            "heapUsed": 13417946
+          },
+          {
+            "end": 830,
+            "renderCount": 831,
+            "renderedFrames": 318,
+            "elapsedMs": 15024.900000035763,
+            "frames": 318,
+            "fps": 63.3352586189727,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 336,
+            "vfx": 641,
+            "heapUsed": 15665435
+          },
+          {
+            "end": 1166,
+            "renderCount": 1167,
+            "renderedFrames": 336,
+            "elapsedMs": 20037.80000001192,
+            "frames": 336,
+            "fps": 67.106051527861,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 305,
+            "vfx": 630,
+            "heapUsed": 19210505
+          },
+          {
+            "end": 1576,
+            "renderCount": 1577,
+            "renderedFrames": 410,
+            "elapsedMs": 25040.100000023842,
+            "frames": 410,
+            "fps": 82,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 294,
+            "vfx": 629,
+            "heapUsed": 15215430
+          },
+          {
+            "end": 1983,
+            "renderCount": 1984,
+            "renderedFrames": 407,
+            "elapsedMs": 30053.30000001192,
+            "frames": 407,
+            "fps": 81.06116433308773,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 240,
+            "vfx": 622,
+            "heapUsed": 26302112
+          }
+        ],
+        "longTasks": {
+          "samples": 0,
+          "mean": null
+        },
+        "peak": {
+          "enemies": 420,
+          "projectiles": 24,
+          "zones": 15,
+          "drops": 0,
+          "vfx": 667,
+          "particles": 508,
+          "damageNumbers": 160,
+          "bossProjectiles": 0,
+          "hazards": 0
+        },
+        "states": {},
+        "weaponsSeen": [
+          "bandeja_inox:10:true",
+          "metralha_floresta:10:true",
+          "nuvem_biologica:10:true",
+          "tempestade_lendaria:10:true"
+        ],
+        "updates": 1984,
+        "wallMs": 30083.5,
+        "waveClockDeltaSeconds": 30.083700000000633,
+        "finite": true,
+        "paused": false,
+        "gameOver": false,
+        "finalPosition": {
+          "x": 1911.0723205481202,
+          "y": 4783.306198037232
+        },
+        "fixtureOrigin": {
+          "x": 1279.32035070844,
+          "y": 4733.417488634586
+        },
+        "canvas": {
+          "width": 1280,
+          "height": 720
+        },
+        "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 Ti (0x00002782) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "visibility": "visible",
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0"
+      },
+      "heapBefore": {
+        "usedSize": 10093148,
+        "totalSize": 11526144,
+        "embedderHeapUsedSize": 6187616,
+        "backingStorageSize": 2114708
+      },
+      "heapAfter": {
+        "usedSize": 9598612,
+        "totalSize": 11526144,
+        "embedderHeapUsedSize": 11098328,
+        "backingStorageSize": 2116096
+      },
+      "errors": [],
+      "resources": [],
+      "elapsedMs": 35688
+    },
+    {
+      "id": "arsenal-native-plain",
+      "map": "plain",
+      "cpu": 1,
+      "count": 420,
+      "seconds": 30,
+      "seed": 123456789,
+      "dpr": 1,
+      "width": 1280,
+      "height": 720,
+      "kind": "arsenal",
+      "samplesReleasedBeforeFinalGC": true,
+      "result": {
+        "frames": {
+          "samples": 1689,
+          "mean": 17.828004736530634,
+          "p50": 20.700000000000728,
+          "p95": 21,
+          "p99": 27.900000000001455,
+          "max": 48.600000000000364,
+          "fps": 56.09152649319982,
+          "over16_67": 862,
+          "over33_33": 11,
+          "over50": 0
+        },
+        "methods": {
+          "weaponsUpdate": {
+            "samples": 1690,
+            "mean": 0.11313609456169535,
+            "p50": 0.09999996423721313,
+            "p95": 0.30000001192092896,
+            "p99": 0.699999988079071,
+            "max": 1.100000023841858
+          },
+          "vfxUpdate": {
+            "samples": 1690,
+            "mean": 0.028934911299033982,
+            "p50": 0,
+            "p95": 0.10000002384185791,
+            "p99": 0.19999998807907104,
+            "max": 0.20000004768371582
+          },
+          "update": {
+            "samples": 1690,
+            "mean": 1.091952662813593,
+            "p50": 1,
+            "p95": 1.699999988079071,
+            "p99": 2.700000047683716,
+            "max": 10.5
+          },
+          "renderFloor": {
+            "samples": 1690,
+            "mean": 0.024733727570821547,
+            "p50": 0,
+            "p95": 0.10000002384185791,
+            "p99": 0.19999998807907104,
+            "max": 1.199999988079071
+          },
+          "renderTrees": {
+            "samples": 1690,
+            "mean": 0.0008875739644970414,
+            "p50": 0,
+            "p95": 0,
+            "p99": 0,
+            "max": 0.10000002384185791
+          },
+          "renderDecorTrees": {
+            "samples": 1690,
+            "mean": 0.000591715976331361,
+            "p50": 0,
+            "p95": 0,
+            "p99": 0,
+            "max": 0.10000002384185791
+          },
+          "renderDecorCanopyOverlay": {
+            "samples": 1690,
+            "mean": 0.000828402352756297,
+            "p50": 0,
+            "p95": 0,
+            "p99": 0,
+            "max": 0.10000002384185791
+          },
+          "weaponsRender": {
+            "samples": 1690,
+            "mean": 0.08585798729806257,
+            "p50": 0.09999996423721313,
+            "p95": 0.19999998807907104,
+            "p99": 0.2999999523162842,
+            "max": 0.6000000238418579
+          },
+          "vfxRender": {
+            "samples": 1690,
+            "mean": 0.42094674674716925,
+            "p50": 0.3999999761581421,
+            "p95": 0.7999999523162842,
+            "p99": 1.100000023841858,
+            "max": 4.800000011920929
+          },
+          "renderMinimap": {
+            "samples": 1690,
+            "mean": 0.0315384616513224,
+            "p50": 0,
+            "p95": 0.19999998807907104,
+            "p99": 0.20000004768371582,
+            "max": 0.7000000476837158
+          },
+          "render": {
+            "samples": 1690,
+            "mean": 2.3586390537623116,
+            "p50": 2.199999988079071,
+            "p95": 3.199999988079071,
+            "p99": 4.400000035762787,
+            "max": 13
+          },
+          "renderMinimapScenery": {
+            "samples": 328,
+            "mean": 0.00121951212243336,
+            "p50": 0,
+            "p95": 0,
+            "p99": 0.09999996423721313,
+            "max": 0.10000002384185791
+          }
+        },
+        "windows": [
+          {
+            "end": 287,
+            "renderCount": 288,
+            "renderedFrames": 288,
+            "elapsedMs": 5016.100000023842,
+            "frames": 287,
+            "fps": 57.39885202295954,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 420,
+            "vfx": 244,
+            "heapUsed": 12295996
+          },
+          {
+            "end": 562,
+            "renderCount": 563,
+            "renderedFrames": 275,
+            "elapsedMs": 10040.100000023842,
+            "frames": 275,
+            "fps": 54.695890846891295,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 420,
+            "vfx": 517,
+            "heapUsed": 10527115
+          },
+          {
+            "end": 846,
+            "renderCount": 847,
+            "renderedFrames": 284,
+            "elapsedMs": 15048.200000047684,
+            "frames": 284,
+            "fps": 56.71945836911587,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 420,
+            "vfx": 498,
+            "heapUsed": 15078895
+          },
+          {
+            "end": 1108,
+            "renderCount": 1109,
+            "renderedFrames": 262,
+            "elapsedMs": 20070.600000023842,
+            "frames": 262,
+            "fps": 52.255774063584475,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 420,
+            "vfx": 457,
+            "heapUsed": 9762667
+          },
+          {
+            "end": 1399,
+            "renderCount": 1400,
+            "renderedFrames": 291,
+            "elapsedMs": 25094.100000023842,
+            "frames": 291,
+            "fps": 57.87704608285768,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 420,
+            "vfx": 271,
+            "heapUsed": 16958690
+          },
+          {
+            "end": 1688,
+            "renderCount": 1689,
+            "renderedFrames": 289,
+            "elapsedMs": 30110.80000001192,
+            "frames": 289,
+            "fps": 57.559401700890305,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 420,
+            "vfx": 399,
+            "heapUsed": 14525286
+          }
+        ],
+        "longTasks": {
+          "samples": 0,
+          "mean": null
+        },
+        "peak": {
+          "enemies": 420,
+          "projectiles": 32,
+          "zones": 16,
+          "drops": 1,
+          "vfx": 672,
+          "particles": 512,
+          "damageNumbers": 160,
+          "bossProjectiles": 0,
+          "hazards": 0
+        },
+        "states": {},
+        "weaponsSeen": [
+          "derson_combo:5:true",
+          "lightning:5:true",
+          "garlic:5:true",
+          "fire_flask:5:true",
+          "bottle_51:8:true",
+          "executioner_axe:5:true"
+        ],
+        "updates": 1690,
+        "wallMs": 30134.900000035763,
+        "waveClockDeltaSeconds": 30.125400000000067,
+        "finite": true,
+        "paused": false,
+        "gameOver": false,
+        "finalPosition": {
+          "x": 183.6300610914085,
+          "y": 77.36625600085034
+        },
+        "fixtureOrigin": {
+          "x": 0,
+          "y": 0
+        },
+        "canvas": {
+          "width": 1280,
+          "height": 720
+        },
+        "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 Ti (0x00002782) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "visibility": "visible",
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0"
+      },
+      "heapBefore": {
+        "usedSize": 6899212,
+        "totalSize": 7856128,
+        "embedderHeapUsedSize": 6798320,
+        "backingStorageSize": 1764268
+      },
+      "heapAfter": {
+        "usedSize": 7182212,
+        "totalSize": 8642560,
+        "embedderHeapUsedSize": 10896840,
+        "backingStorageSize": 1759090
+      },
+      "errors": [],
+      "resources": [],
+      "elapsedMs": 35599
+    },
+    {
+      "id": "arsenal-diagnostic-forest",
+      "map": "forest",
+      "cpu": 4,
+      "count": 420,
+      "seconds": 20,
+      "seed": 123456789,
+      "dpr": 1,
+      "width": 1280,
+      "height": 720,
+      "kind": "arsenal",
+      "samplesReleasedBeforeFinalGC": true,
+      "result": {
+        "frames": {
+          "samples": 387,
+          "mean": 52.05710594315248,
+          "p50": 48.70000000000073,
+          "p95": 62.5,
+          "p99": 83.40000000000146,
+          "max": 104.20000000000073,
+          "fps": 19.209673336278478,
+          "over16_67": 387,
+          "over33_33": 386,
+          "over50": 180
+        },
+        "methods": {
+          "weaponsUpdate": {
+            "samples": 388,
+            "mean": 0.8317010328941739,
+            "p50": 0.7000000476837158,
+            "p95": 1.600000023841858,
+            "p99": 2.800000011920929,
+            "max": 3.300000011920929
+          },
+          "vfxUpdate": {
+            "samples": 388,
+            "mean": 0.12551546327232085,
+            "p50": 0.10000002384185791,
+            "p95": 0.30000001192092896,
+            "p99": 0.30000001192092896,
+            "max": 1.899999976158142
+          },
+          "update": {
+            "samples": 388,
+            "mean": 10.106443297463594,
+            "p50": 9.400000035762787,
+            "p95": 13.400000035762787,
+            "p99": 31.100000023841858,
+            "max": 45.80000001192093
+          },
+          "renderFloor": {
+            "samples": 388,
+            "mean": 2.8077319587014387,
+            "p50": 2.600000023841858,
+            "p95": 3.700000047683716,
+            "p99": 4.800000011920929,
+            "max": 5.5
+          },
+          "renderTrees": {
+            "samples": 388,
+            "mean": 1.327061855608655,
+            "p50": 1.300000011920929,
+            "p95": 1.699999988079071,
+            "p99": 2.199999988079071,
+            "max": 4.300000011920929
+          },
+          "renderDecorTrees": {
+            "samples": 388,
+            "mean": 2.314948453423903,
+            "p50": 2.300000011920929,
+            "p95": 2.900000035762787,
+            "p99": 3.900000035762787,
+            "max": 4.5
+          },
+          "renderDecorCanopyOverlay": {
+            "samples": 388,
+            "mean": 0.5953608252031287,
+            "p50": 0.5999999642372131,
+            "p95": 1,
+            "p99": 1.0999999642372131,
+            "max": 1.4000000357627869
+          },
+          "weaponsRender": {
+            "samples": 388,
+            "mean": 0.6365979372226086,
+            "p50": 0.5,
+            "p95": 0.7999999523162842,
+            "p99": 2.300000011920929,
+            "max": 20.799999952316284
+          },
+          "vfxRender": {
+            "samples": 388,
+            "mean": 2.994845361285603,
+            "p50": 2.5,
+            "p95": 5.5,
+            "p99": 7.5,
+            "max": 9.600000023841858
+          },
+          "renderMinimapScenery": {
+            "samples": 195,
+            "mean": 1.0041025666090158,
+            "p50": 1,
+            "p95": 1.199999988079071,
+            "p99": 4,
+            "max": 8.199999988079071
+          },
+          "renderMinimap": {
+            "samples": 388,
+            "mean": 1.2144329905817188,
+            "p50": 1.899999976158142,
+            "p95": 2.699999988079071,
+            "p99": 3.300000011920929,
+            "max": 9.800000011920929
+          },
+          "render": {
+            "samples": 388,
+            "mean": 33.02938144415924,
+            "p50": 32.69999998807907,
+            "p95": 39.5,
+            "p99": 46.30000001192093,
+            "max": 60.19999998807907
+          }
+        },
+        "windows": [
+          {
+            "end": 87,
+            "renderCount": 88,
+            "renderedFrames": 88,
+            "elapsedMs": 5017.399999976158,
+            "frames": 87,
+            "fps": 17.5215999033291,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 420,
+            "vfx": 584,
+            "heapUsed": 13882680
+          },
+          {
+            "end": 179,
+            "renderCount": 180,
+            "renderedFrames": 92,
+            "elapsedMs": 10072.300000011921,
+            "frames": 92,
+            "fps": 18.222512726048286,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 378,
+            "vfx": 593,
+            "heapUsed": 20769925
+          },
+          {
+            "end": 277,
+            "renderCount": 278,
+            "renderedFrames": 98,
+            "elapsedMs": 15102.5,
+            "frames": 98,
+            "fps": 19.437502479273277,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 336,
+            "vfx": 562,
+            "heapUsed": 18784354
+          },
+          {
+            "end": 386,
+            "renderCount": 387,
+            "renderedFrames": 109,
+            "elapsedMs": 20147.80000001192,
+            "frames": 109,
+            "fps": 21.590143802242213,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 301,
+            "vfx": 618,
+            "heapUsed": 17867473
+          }
+        ],
+        "longTasks": {
+          "samples": 171,
+          "mean": 55.14035087719298,
+          "p50": 53,
+          "p95": 70,
+          "p99": 89,
+          "max": 98
+        },
+        "peak": {
+          "enemies": 420,
+          "projectiles": 25,
+          "zones": 15,
+          "drops": 0,
+          "vfx": 638,
+          "particles": 478,
+          "damageNumbers": 160,
+          "bossProjectiles": 0,
+          "hazards": 0
+        },
+        "states": {},
+        "weaponsSeen": [
+          "bandeja_inox:10:true",
+          "metralha_floresta:10:true",
+          "nuvem_biologica:10:true",
+          "tempestade_lendaria:10:true"
+        ],
+        "updates": 388,
+        "wallMs": 20231.19999998808,
+        "waveClockDeltaSeconds": 20.19749999999994,
+        "finite": true,
+        "paused": false,
+        "gameOver": false,
+        "finalPosition": {
+          "x": 1832.744586379737,
+          "y": 4817.206937735295
+        },
+        "fixtureOrigin": {
+          "x": 1279.32035070844,
+          "y": 4733.417488634586
+        },
+        "canvas": {
+          "width": 1280,
+          "height": 720
+        },
+        "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 Ti (0x00002782) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "visibility": "visible",
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0"
+      },
+      "heapBefore": {
+        "usedSize": 10143016,
+        "totalSize": 11526144,
+        "embedderHeapUsedSize": 6662352,
+        "backingStorageSize": 2114679
+      },
+      "heapAfter": {
+        "usedSize": 9399520,
+        "totalSize": 10739712,
+        "embedderHeapUsedSize": 11202808,
+        "backingStorageSize": 2116041
+      },
+      "errors": [],
+      "resources": [],
+      "elapsedMs": 27316
+    },
+    {
+      "id": "arsenal-diagnostic-plain",
+      "map": "plain",
+      "cpu": 4,
+      "count": 420,
+      "seconds": 20,
+      "seed": 123456789,
+      "dpr": 1,
+      "width": 1280,
+      "height": 720,
+      "kind": "arsenal",
+      "samplesReleasedBeforeFinalGC": true,
+      "result": {
+        "frames": {
+          "samples": 187,
+          "mean": 109.25561497326193,
+          "p50": 111.09999999999854,
+          "p95": 125,
+          "p99": 132,
+          "max": 138.89999999999964,
+          "fps": 9.152847661374013,
+          "over16_67": 187,
+          "over33_33": 187,
+          "over50": 187
+        },
+        "methods": {
+          "weaponsUpdate": {
+            "samples": 188,
+            "mean": 1.2244680847259277,
+            "p50": 1,
+            "p95": 3,
+            "p99": 4,
+            "max": 4.900000035762787
+          },
+          "vfxUpdate": {
+            "samples": 188,
+            "mean": 0.08138297942090542,
+            "p50": 0.09999996423721313,
+            "p95": 0.20000004768371582,
+            "p99": 0.30000001192092896,
+            "max": 0.30000001192092896
+          },
+          "update": {
+            "samples": 188,
+            "mean": 5.531382978596586,
+            "p50": 5,
+            "p95": 8.300000011920929,
+            "p99": 15.599999964237213,
+            "max": 20.80000001192093
+          },
+          "renderFloor": {
+            "samples": 188,
+            "mean": 18.181382977899084,
+            "p50": 17.900000035762787,
+            "p95": 21.69999998807907,
+            "p99": 22.80000001192093,
+            "max": 23.099999964237213
+          },
+          "renderTrees": {
+            "samples": 188,
+            "mean": 0.006382978659995059,
+            "p50": 0,
+            "p95": 0,
+            "p99": 0.19999998807907104,
+            "max": 0.30000001192092896
+          },
+          "renderDecorTrees": {
+            "samples": 188,
+            "mean": 0.002127659764695675,
+            "p50": 0,
+            "p95": 0,
+            "p99": 0.10000002384185791,
+            "max": 0.20000004768371582
+          },
+          "renderDecorCanopyOverlay": {
+            "samples": 188,
+            "mean": 0.0031914898055665037,
+            "p50": 0,
+            "p95": 0,
+            "p99": 0.10000002384185791,
+            "max": 0.19999998807907104
+          },
+          "weaponsRender": {
+            "samples": 188,
+            "mean": 0.5239361724320878,
+            "p50": 0.5999999642372131,
+            "p95": 0.8999999761581421,
+            "p99": 1.699999988079071,
+            "max": 2.199999988079071
+          },
+          "vfxRender": {
+            "samples": 188,
+            "mean": 66.2106382989503,
+            "p50": 65.89999997615814,
+            "p95": 76.5,
+            "p99": 81.60000002384186,
+            "max": 83.10000002384186
+          },
+          "renderMinimapScenery": {
+            "samples": 188,
+            "mean": 0.004255319212345367,
+            "p50": 0,
+            "p95": 0,
+            "p99": 0.10000002384185791,
+            "max": 0.19999998807907104
+          },
+          "renderMinimap": {
+            "samples": 188,
+            "mean": 0.9148936195576445,
+            "p50": 0.800000011920929,
+            "p95": 1.399999976158142,
+            "p99": 2,
+            "max": 2.400000035762787
+          },
+          "render": {
+            "samples": 188,
+            "mean": 96.31702127735666,
+            "p50": 96.39999997615814,
+            "p95": 107.30000001192093,
+            "p99": 117.19999998807907,
+            "max": 117.5
+          }
+        },
+        "windows": [
+          {
+            "end": 48,
+            "renderCount": 49,
+            "renderedFrames": 49,
+            "elapsedMs": 5119.600000023842,
+            "frames": 48,
+            "fps": 9.626569331354538,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 420,
+            "vfx": 252,
+            "heapUsed": 8761830
+          },
+          {
+            "end": 93,
+            "renderCount": 94,
+            "renderedFrames": 45,
+            "elapsedMs": 10245,
+            "frames": 45,
+            "fps": 8.756737823269573,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 420,
+            "vfx": 369,
+            "heapUsed": 9312270
+          },
+          {
+            "end": 139,
+            "renderCount": 140,
+            "renderedFrames": 46,
+            "elapsedMs": 15345.300000011921,
+            "frames": 46,
+            "fps": 8.98771028311287,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 420,
+            "vfx": 420,
+            "heapUsed": 9722950
+          },
+          {
+            "end": 186,
+            "renderCount": 187,
+            "renderedFrames": 47,
+            "elapsedMs": 20425.19999998808,
+            "frames": 47,
+            "fps": 9.270948398295726,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 420,
+            "vfx": 468,
+            "heapUsed": 9396031
+          }
+        ],
+        "longTasks": {
+          "samples": 188,
+          "mean": 104.48936170212765,
+          "p50": 104,
+          "p95": 117,
+          "p99": 126,
+          "max": 130
+        },
+        "peak": {
+          "enemies": 420,
+          "projectiles": 30,
+          "zones": 16,
+          "drops": 1,
+          "vfx": 648,
+          "particles": 508,
+          "damageNumbers": 160,
+          "bossProjectiles": 0,
+          "hazards": 0
+        },
+        "states": {},
+        "weaponsSeen": [
+          "derson_combo:5:true",
+          "lightning:5:true",
+          "garlic:5:true",
+          "fire_flask:5:true",
+          "bottle_51:8:true",
+          "executioner_axe:5:true"
+        ],
+        "updates": 188,
+        "wallMs": 20552.399999976158,
+        "waveClockDeltaSeconds": 18.68620000000006,
+        "finite": true,
+        "paused": false,
+        "gameOver": false,
+        "finalPosition": {
+          "x": 52.968692813489774,
+          "y": 6.927786392094187
+        },
+        "fixtureOrigin": {
+          "x": 0,
+          "y": 0
+        },
+        "canvas": {
+          "width": 1280,
+          "height": 720
+        },
+        "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 Ti (0x00002782) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "visibility": "visible",
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0"
+      },
+      "heapBefore": {
+        "usedSize": 7127788,
+        "totalSize": 7856128,
+        "embedderHeapUsedSize": 6314216,
+        "backingStorageSize": 1758959
+      },
+      "heapAfter": {
+        "usedSize": 7083512,
+        "totalSize": 8118272,
+        "embedderHeapUsedSize": 11404744,
+        "backingStorageSize": 1759317
+      },
+      "errors": [],
+      "resources": [],
+      "elapsedMs": 27510
+    },
+    {
+      "id": "forest-mobile-cpu6",
+      "map": "forest",
+      "cpu": 6,
+      "count": 250,
+      "seconds": 20,
+      "seed": 123456789,
+      "dpr": 2,
+      "width": 390,
+      "height": 844,
+      "samplesReleasedBeforeFinalGC": true,
+      "result": {
+        "frames": {
+          "samples": 394,
+          "mean": 51.07918781725889,
+          "p50": 48.60000000000218,
+          "p95": 62.5,
+          "p99": 76.40000000000146,
+          "max": 104.19999999999891,
+          "fps": 19.577445193091247,
+          "over16_67": 394,
+          "over33_33": 394,
+          "over50": 158
+        },
+        "methods": {
+          "weaponsUpdate": {
+            "samples": 395,
+            "mean": 0.2658227845083309,
+            "p50": 0.19999998807907104,
+            "p95": 0.6000000238418579,
+            "p99": 1.2000000476837158,
+            "max": 2.5
+          },
+          "vfxUpdate": {
+            "samples": 395,
+            "mean": 0.047088609315172024,
+            "p50": 0,
+            "p95": 0.20000004768371582,
+            "p99": 0.30000001192092896,
+            "max": 0.30000001192092896
+          },
+          "update": {
+            "samples": 395,
+            "mean": 9.866582278058498,
+            "p50": 9,
+            "p95": 13.5,
+            "p99": 30.69999998807907,
+            "max": 60.30000001192093
+          },
+          "renderFloor": {
+            "samples": 395,
+            "mean": 4.465316456329973,
+            "p50": 4.300000011920929,
+            "p95": 5.599999964237213,
+            "p99": 6.899999976158142,
+            "max": 7.5
+          },
+          "renderTrees": {
+            "samples": 395,
+            "mean": 1.499746834326394,
+            "p50": 1.399999976158142,
+            "p95": 1.9000000357627869,
+            "p99": 3.300000011920929,
+            "max": 21.69999998807907
+          },
+          "renderDecorTrees": {
+            "samples": 395,
+            "mean": 2.3777215197116512,
+            "p50": 2.399999976158142,
+            "p95": 3.199999988079071,
+            "p99": 4.199999988079071,
+            "max": 5
+          },
+          "renderDecorCanopyOverlay": {
+            "samples": 395,
+            "mean": 0.5883544292631029,
+            "p50": 0.5999999642372131,
+            "p95": 1,
+            "p99": 1.4000000357627869,
+            "max": 3
+          },
+          "weaponsRender": {
+            "samples": 395,
+            "mean": 0.1683544315869295,
+            "p50": 0.19999998807907104,
+            "p95": 0.30000001192092896,
+            "p99": 0.40000003576278687,
+            "max": 0.6000000238418579
+          },
+          "vfxRender": {
+            "samples": 395,
+            "mean": 0.86481012437917,
+            "p50": 0.699999988079071,
+            "p95": 2.099999964237213,
+            "p99": 4.300000011920929,
+            "max": 13.199999988079071
+          },
+          "renderMinimapScenery": {
+            "samples": 197,
+            "mean": 1.7289340090630623,
+            "p50": 1.699999988079071,
+            "p95": 2,
+            "p99": 2.699999988079071,
+            "max": 3.299999952316284
+          },
+          "renderMinimap": {
+            "samples": 395,
+            "mean": 1.9498734173895438,
+            "p50": 0.30000001192092896,
+            "p95": 4.399999976158142,
+            "p99": 5.099999964237213,
+            "max": 5.599999964237213
+          },
+          "render": {
+            "samples": 395,
+            "mean": 32.716455695900734,
+            "p50": 32.09999996423721,
+            "p95": 39.59999996423721,
+            "p99": 45.89999997615814,
+            "max": 50.80000001192093
+          }
+        },
+        "windows": [
+          {
+            "end": 90,
+            "renderCount": 91,
+            "renderedFrames": 91,
+            "elapsedMs": 5038.400000035763,
+            "frames": 90,
+            "fps": 18.075192802056556,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 250,
+            "vfx": 129,
+            "heapUsed": 17980716
+          },
+          {
+            "end": 183,
+            "renderCount": 184,
+            "renderedFrames": 93,
+            "elapsedMs": 10051.900000035763,
+            "frames": 93,
+            "fps": 18.497155813675956,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 225,
+            "vfx": 32,
+            "heapUsed": 13685989
+          },
+          {
+            "end": 288,
+            "renderCount": 289,
+            "renderedFrames": 105,
+            "elapsedMs": 15088.199999988079,
+            "frames": 105,
+            "fps": 20.8548502423135,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 200,
+            "vfx": 26,
+            "heapUsed": 15379616
+          },
+          {
+            "end": 393,
+            "renderCount": 394,
+            "renderedFrames": 105,
+            "elapsedMs": 20123,
+            "frames": 105,
+            "fps": 20.8548502423135,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 181,
+            "vfx": 123,
+            "heapUsed": 13679469
+          }
+        ],
+        "longTasks": {
+          "samples": 106,
+          "mean": 55.905660377358494,
+          "p50": 54,
+          "p95": 69,
+          "p99": 79,
+          "max": 103
+        },
+        "peak": {
+          "enemies": 250,
+          "projectiles": 2,
+          "zones": 0,
+          "drops": 0,
+          "vfx": 339,
+          "particles": 314,
+          "damageNumbers": 45,
+          "bossProjectiles": 0,
+          "hazards": 0
+        },
+        "states": {},
+        "weaponsSeen": [
+          "bandeja_inox:1:false"
+        ],
+        "updates": 395,
+        "wallMs": 20195.900000035763,
+        "waveClockDeltaSeconds": 20.18359999999995,
+        "finite": true,
+        "paused": false,
+        "gameOver": false,
+        "finalPosition": {
+          "x": 1839.4210235610494,
+          "y": 4807.5459140361145
+        },
+        "fixtureOrigin": {
+          "x": 1279.32035070844,
+          "y": 4733.417488634586
+        },
+        "canvas": {
+          "width": 780,
+          "height": 1688
+        },
+        "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 Ti (0x00002782) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "visibility": "visible",
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0"
+      },
+      "heapBefore": {
+        "usedSize": 9472616,
+        "totalSize": 10215424,
+        "embedderHeapUsedSize": 2955936,
+        "backingStorageSize": 2114402
+      },
+      "heapAfter": {
+        "usedSize": 9095364,
+        "totalSize": 10215424,
+        "embedderHeapUsedSize": 3988304,
+        "backingStorageSize": 2114430
+      },
+      "errors": [],
+      "resources": [],
+      "elapsedMs": 27821
+    },
+    {
+      "id": "forest-software-renderer",
+      "map": "forest",
+      "cpu": 1,
+      "count": 250,
+      "seconds": 20,
+      "seed": 123456789,
+      "dpr": 1,
+      "width": 1280,
+      "height": 720,
+      "software": true,
+      "samplesReleasedBeforeFinalGC": true,
+      "result": {
+        "frames": {
+          "samples": 535,
+          "mean": 37.50074766355135,
+          "p50": 34.79999999999927,
+          "p95": 48.600000000000364,
+          "p99": 55.600000000000364,
+          "max": 55.60000000000218,
+          "fps": 26.666135005408027,
+          "over16_67": 535,
+          "over33_33": 471,
+          "over50": 13
+        },
+        "methods": {
+          "weaponsUpdate": {
+            "samples": 536,
+            "mean": 0.04235074591280809,
+            "p50": 0,
+            "p95": 0.10000002384185791,
+            "p99": 0.20000004768371582,
+            "max": 0.3999999761581421
+          },
+          "vfxUpdate": {
+            "samples": 536,
+            "mean": 0.011380597170609148,
+            "p50": 0,
+            "p95": 0.10000002384185791,
+            "p99": 0.10000002384185791,
+            "max": 0.19999998807907104
+          },
+          "update": {
+            "samples": 536,
+            "mean": 1.8666044776119404,
+            "p50": 1.699999988079071,
+            "p95": 2.899999976158142,
+            "p99": 4.600000023841858,
+            "max": 10.699999988079071
+          },
+          "renderFloor": {
+            "samples": 536,
+            "mean": 0.8511194012947937,
+            "p50": 0.800000011920929,
+            "p95": 1.2999999523162842,
+            "p99": 1.800000011920929,
+            "max": 3.800000011920929
+          },
+          "renderTrees": {
+            "samples": 536,
+            "mean": 0.3335820903528982,
+            "p50": 0.30000001192092896,
+            "p95": 0.5,
+            "p99": 0.699999988079071,
+            "max": 1.300000011920929
+          },
+          "renderDecorTrees": {
+            "samples": 536,
+            "mean": 0.6190298499900904,
+            "p50": 0.5999999642372131,
+            "p95": 0.8999999761581421,
+            "p99": 1.5,
+            "max": 8
+          },
+          "renderDecorCanopyOverlay": {
+            "samples": 536,
+            "mean": 0.14701492595138835,
+            "p50": 0.10000002384185791,
+            "p95": 0.30000001192092896,
+            "p99": 0.8999999761581421,
+            "max": 5
+          },
+          "weaponsRender": {
+            "samples": 536,
+            "mean": 0.026119403763493493,
+            "p50": 0,
+            "p95": 0.10000002384185791,
+            "p99": 0.10000002384185791,
+            "max": 1.100000023841858
+          },
+          "vfxRender": {
+            "samples": 536,
+            "mean": 0.14123134303893617,
+            "p50": 0.10000002384185791,
+            "p95": 0.3999999761581421,
+            "p99": 0.800000011920929,
+            "max": 1.7999999523162842
+          },
+          "renderMinimap": {
+            "samples": 536,
+            "mean": 1.0277985071958,
+            "p50": 0,
+            "p95": 3.299999952316284,
+            "p99": 4.599999964237213,
+            "max": 6.899999976158142
+          },
+          "render": {
+            "samples": 536,
+            "mean": 6.356343282581265,
+            "p50": 5.800000011920929,
+            "p95": 10,
+            "p99": 12.900000035762787,
+            "max": 17.100000023841858
+          },
+          "renderMinimapScenery": {
+            "samples": 191,
+            "mean": 0.29319372008608274,
+            "p50": 0.30000001192092896,
+            "p95": 0.40000003576278687,
+            "p99": 0.800000011920929,
+            "max": 1.300000011920929
+          }
+        },
+        "windows": [
+          {
+            "end": 129,
+            "renderCount": 130,
+            "renderedFrames": 130,
+            "elapsedMs": 5035.099999964237,
+            "frames": 129,
+            "fps": 25.83565320141796,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 250,
+            "vfx": 98,
+            "heapUsed": 13066783
+          },
+          {
+            "end": 253,
+            "renderCount": 254,
+            "renderedFrames": 124,
+            "elapsedMs": 10052.099999964237,
+            "frames": 124,
+            "fps": 24.66189339697692,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 225,
+            "vfx": 107,
+            "heapUsed": 12652403
+          },
+          {
+            "end": 391,
+            "renderCount": 392,
+            "renderedFrames": 138,
+            "elapsedMs": 15067.799999952316,
+            "frames": 138,
+            "fps": 27.486754571166802,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 200,
+            "vfx": 167,
+            "heapUsed": 15438450
+          },
+          {
+            "end": 535,
+            "renderCount": 536,
+            "renderedFrames": 144,
+            "elapsedMs": 20091.399999976158,
+            "frames": 144,
+            "fps": 28.678403568867996,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 182,
+            "vfx": 212,
+            "heapUsed": 14315534
+          }
+        ],
+        "longTasks": {
+          "samples": 5,
+          "mean": 51.8,
+          "p50": 51,
+          "p95": 55,
+          "p99": 55,
+          "max": 55
+        },
+        "peak": {
+          "enemies": 250,
+          "projectiles": 2,
+          "zones": 0,
+          "drops": 0,
+          "vfx": 503,
+          "particles": 467,
+          "damageNumbers": 44,
+          "bossProjectiles": 0,
+          "hazards": 0
+        },
+        "states": {},
+        "weaponsSeen": [
+          "bandeja_inox:1:false"
+        ],
+        "updates": 536,
+        "wallMs": 20121.099999964237,
+        "waveClockDeltaSeconds": 20.09750000000006,
+        "finite": true,
+        "paused": false,
+        "gameOver": false,
+        "finalPosition": {
+          "x": 1962.4778513378953,
+          "y": 4860.661700964844
+        },
+        "fixtureOrigin": {
+          "x": 1279.32035070844,
+          "y": 4733.417488634586
+        },
+        "canvas": {
+          "width": 1280,
+          "height": 720
+        },
+        "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+        "visibility": "visible",
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0"
+      },
+      "heapBefore": {
+        "usedSize": 9629288,
+        "totalSize": 11001856,
+        "embedderHeapUsedSize": 2958440,
+        "backingStorageSize": 2114403
+      },
+      "heapAfter": {
+        "usedSize": 9290808,
+        "totalSize": 10215424,
+        "embedderHeapUsedSize": 3963496,
+        "backingStorageSize": 2115773
+      },
+      "errors": [],
+      "resources": [],
+      "elapsedMs": 27698
+    },
+    {
+      "id": "weapon-catalog",
+      "map": "forest",
+      "cpu": 4,
+      "count": 250,
+      "seconds": 72,
+      "seed": 123456789,
+      "dpr": 1,
+      "width": 1280,
+      "height": 720,
+      "kind": "catalog",
+      "weaponIds": [
+        "bottle_51",
+        "whip",
+        "wand",
+        "knife",
+        "bow",
+        "bible",
+        "garlic",
+        "lightning",
+        "derson_combo",
+        "flying_tray",
+        "syringe",
+        "fire_flask",
+        "executioner_axe",
+        "lula_power",
+        "garras_onca",
+        "espinhos_pupunha",
+        "ferrao_formiga",
+        "bandeja_inox",
+        "ciclone_saci",
+        "lanca_caipora",
+        "esporos_vitoria",
+        "mordida_piranha",
+        "rugido_mapinguari",
+        "chicotada_cipo",
+        "enxame_mutuca",
+        "gota_resina",
+        "voo_tucano",
+        "teia_aranha",
+        "arrancada_sucuri",
+        "furia_onca_acu",
+        "metralha_floresta",
+        "nuvem_biologica",
+        "tempestade_lendaria",
+        "injecao_letal"
+      ],
+      "samplesReleasedBeforeFinalGC": true,
+      "result": {
+        "frames": {
+          "samples": 2698,
+          "mean": 26.802594514455237,
+          "p50": 20.90000000000873,
+          "p95": 41.70000000000073,
+          "p99": 55.600000000000364,
+          "max": 132,
+          "fps": 37.30982086307643,
+          "over16_67": 2507,
+          "over33_33": 678,
+          "over50": 48
+        },
+        "methods": {
+          "weaponsUpdate": {
+            "samples": 2699,
+            "mean": 0.46721007804951875,
+            "p50": 0.19999998807907104,
+            "p95": 1.399999976158142,
+            "p99": 6.200000047683716,
+            "max": 35.89999997615814
+          },
+          "vfxUpdate": {
+            "samples": 2699,
+            "mean": 0.0663208594451175,
+            "p50": 0,
+            "p95": 0.20000004768371582,
+            "p99": 0.30000001192092896,
+            "max": 0.3999999761581421
+          },
+          "update": {
+            "samples": 2699,
+            "mean": 3.5599481287643884,
+            "p50": 2.5,
+            "p95": 7.299999952316284,
+            "p99": 15.800000011920929,
+            "max": 48.10000002384186
+          },
+          "renderFloor": {
+            "samples": 2699,
+            "mean": 3.2820674325413686,
+            "p50": 3.200000047683716,
+            "p95": 3.699999988079071,
+            "p99": 4.600000023841858,
+            "max": 11.899999976158142
+          },
+          "renderTrees": {
+            "samples": 2699,
+            "mean": 1.2507595407295864,
+            "p50": 1.199999988079071,
+            "p95": 1.5999999642372131,
+            "p99": 1.899999976158142,
+            "max": 5.800000011920929
+          },
+          "renderDecorTrees": {
+            "samples": 2699,
+            "mean": 2.0057058166954067,
+            "p50": 2,
+            "p95": 2.400000035762787,
+            "p99": 2.800000011920929,
+            "max": 36
+          },
+          "renderDecorCanopyOverlay": {
+            "samples": 2699,
+            "mean": 0.3050759543794842,
+            "p50": 0.30000001192092896,
+            "p95": 0.5999999642372131,
+            "p99": 0.800000011920929,
+            "max": 2.5
+          },
+          "weaponsRender": {
+            "samples": 2699,
+            "mean": 0.24201556140292613,
+            "p50": 0.19999998807907104,
+            "p95": 0.800000011920929,
+            "p99": 1,
+            "max": 18.69999998807907
+          },
+          "vfxRender": {
+            "samples": 2699,
+            "mean": 2.14208966301476,
+            "p50": 1.399999976158142,
+            "p95": 6.800000011920929,
+            "p99": 12.300000011920929,
+            "max": 31.799999952316284
+          },
+          "renderMinimapScenery": {
+            "samples": 734,
+            "mean": 0.917983650186731,
+            "p50": 0.8999999761581421,
+            "p95": 1.100000023841858,
+            "p99": 1.399999976158142,
+            "max": 2.199999988079071
+          },
+          "renderMinimap": {
+            "samples": 2699,
+            "mean": 0.5832160056277795,
+            "p50": 0,
+            "p95": 2.199999988079071,
+            "p99": 2.600000023841858,
+            "max": 19.100000023841858
+          },
+          "render": {
+            "samples": 2699,
+            "mean": 17.751500556074987,
+            "p50": 15.800000011920929,
+            "p95": 27.600000023841858,
+            "p99": 35.80000001192093,
+            "max": 58.60000002384186
+          }
+        },
+        "windows": [
+          {
+            "end": 122,
+            "renderCount": 123,
+            "renderedFrames": 123,
+            "elapsedMs": 5036.800000011921,
+            "frames": 122,
+            "fps": 24.400488009760192,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 250,
+            "vfx": 171,
+            "heapUsed": 15026430
+          },
+          {
+            "end": 238,
+            "renderCount": 239,
+            "renderedFrames": 116,
+            "elapsedMs": 10058.900000035763,
+            "frames": 116,
+            "fps": 23.16710271414592,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 225,
+            "vfx": 402,
+            "heapUsed": 16117430
+          },
+          {
+            "end": 368,
+            "renderCount": 369,
+            "renderedFrames": 130,
+            "elapsedMs": 15089.199999988079,
+            "frames": 130,
+            "fps": 25.749202765068233,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 200,
+            "vfx": 136,
+            "heapUsed": 18807490
+          },
+          {
+            "end": 509,
+            "renderCount": 510,
+            "renderedFrames": 141,
+            "elapsedMs": 20132.100000023842,
+            "frames": 141,
+            "fps": 28.005084611106703,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 180,
+            "vfx": 620,
+            "heapUsed": 13993336
+          },
+          {
+            "end": 668,
+            "renderCount": 669,
+            "renderedFrames": 159,
+            "elapsedMs": 25149.30000001192,
+            "frames": 159,
+            "fps": 31.580829046417854,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 175,
+            "vfx": 132,
+            "heapUsed": 17036646
+          },
+          {
+            "end": 829,
+            "renderCount": 830,
+            "renderedFrames": 161,
+            "elapsedMs": 30162.69999998808,
+            "frames": 161,
+            "fps": 32.1094513472009,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 137,
+            "vfx": 332,
+            "heapUsed": 16898316
+          },
+          {
+            "end": 1018,
+            "renderCount": 1019,
+            "renderedFrames": 189,
+            "elapsedMs": 35184,
+            "frames": 189,
+            "fps": 37.69520732364027,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 125,
+            "vfx": 634,
+            "heapUsed": 20032370
+          },
+          {
+            "end": 1202,
+            "renderCount": 1203,
+            "renderedFrames": 184,
+            "elapsedMs": 40192.69999998808,
+            "frames": 184,
+            "fps": 36.64754620777563,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 119,
+            "vfx": 194,
+            "heapUsed": 15146348
+          },
+          {
+            "end": 1430,
+            "renderCount": 1431,
+            "renderedFrames": 228,
+            "elapsedMs": 45208.60000002384,
+            "frames": 228,
+            "fps": 45.4726765057838,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 96,
+            "vfx": 160,
+            "heapUsed": 17981700
+          },
+          {
+            "end": 1672,
+            "renderCount": 1673,
+            "renderedFrames": 242,
+            "elapsedMs": 50216.19999998808,
+            "frames": 242,
+            "fps": 48.26485839648983,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 96,
+            "vfx": 118,
+            "heapUsed": 26255670
+          },
+          {
+            "end": 1911,
+            "renderCount": 1912,
+            "renderedFrames": 239,
+            "elapsedMs": 55232.40000003576,
+            "frames": 239,
+            "fps": 47.66748439338644,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 96,
+            "vfx": 153,
+            "heapUsed": 21756299
+          },
+          {
+            "end": 2141,
+            "renderCount": 2142,
+            "renderedFrames": 230,
+            "elapsedMs": 60253.10000002384,
+            "frames": 230,
+            "fps": 45.87155963302752,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 96,
+            "vfx": 450,
+            "heapUsed": 14069844
+          },
+          {
+            "end": 2372,
+            "renderCount": 2373,
+            "renderedFrames": 231,
+            "elapsedMs": 65267.10000002384,
+            "frames": 231,
+            "fps": 46.00768786472537,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 96,
+            "vfx": 85,
+            "heapUsed": 13036733
+          },
+          {
+            "end": 2599,
+            "renderCount": 2600,
+            "renderedFrames": 227,
+            "elapsedMs": 70283.19999998808,
+            "frames": 227,
+            "fps": 45.21101794499,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 96,
+            "vfx": 76,
+            "heapUsed": 16122657
+          },
+          {
+            "end": 2697,
+            "renderCount": 2698,
+            "renderedFrames": 98,
+            "elapsedMs": 72310.90000003576,
+            "frames": 98,
+            "fps": 48.328237498767066,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 96,
+            "vfx": 106,
+            "heapUsed": 20002674
+          }
+        ],
+        "longTasks": {
+          "samples": 47,
+          "mean": 60.638297872340424,
+          "p50": 56,
+          "p95": 89,
+          "p99": 112,
+          "max": 112
+        },
+        "peak": {
+          "enemies": 250,
+          "projectiles": 29,
+          "zones": 28,
+          "drops": 1,
+          "vfx": 672,
+          "particles": 512,
+          "damageNumbers": 160,
+          "bossProjectiles": 0,
+          "hazards": 0
+        },
+        "states": {},
+        "weaponsSeen": [
+          "bottle_51:10:false",
+          "whip:10:false",
+          "wand:10:false",
+          "knife:10:false",
+          "bottle_51:10:true",
+          "whip:10:true",
+          "wand:10:true",
+          "knife:10:true",
+          "bow:10:false",
+          "bible:10:false",
+          "garlic:10:false",
+          "lightning:10:false",
+          "bow:10:true",
+          "bible:10:true",
+          "garlic:10:true",
+          "lightning:10:true",
+          "derson_combo:10:false",
+          "flying_tray:10:false",
+          "syringe:10:false",
+          "fire_flask:10:false",
+          "derson_combo:10:true",
+          "flying_tray:10:true",
+          "syringe:10:true",
+          "fire_flask:10:true",
+          "executioner_axe:10:false",
+          "lula_power:10:false",
+          "garras_onca:10:false",
+          "espinhos_pupunha:10:false",
+          "executioner_axe:10:true",
+          "lula_power:10:true",
+          "garras_onca:10:true",
+          "espinhos_pupunha:10:true",
+          "ferrao_formiga:10:false",
+          "bandeja_inox:10:false",
+          "ciclone_saci:10:false",
+          "lanca_caipora:10:false",
+          "ferrao_formiga:10:true",
+          "bandeja_inox:10:true",
+          "ciclone_saci:10:true",
+          "lanca_caipora:10:true",
+          "esporos_vitoria:10:false",
+          "mordida_piranha:10:false",
+          "rugido_mapinguari:10:false",
+          "chicotada_cipo:10:false",
+          "esporos_vitoria:10:true",
+          "mordida_piranha:10:true",
+          "rugido_mapinguari:10:true",
+          "chicotada_cipo:10:true",
+          "enxame_mutuca:10:false",
+          "gota_resina:10:false",
+          "voo_tucano:10:false",
+          "teia_aranha:10:false",
+          "enxame_mutuca:10:true",
+          "gota_resina:10:true",
+          "voo_tucano:10:true",
+          "teia_aranha:10:true",
+          "arrancada_sucuri:10:false",
+          "furia_onca_acu:10:false",
+          "metralha_floresta:10:false",
+          "nuvem_biologica:10:false",
+          "arrancada_sucuri:10:true",
+          "furia_onca_acu:10:true",
+          "metralha_floresta:10:true",
+          "nuvem_biologica:10:true",
+          "tempestade_lendaria:10:false",
+          "injecao_letal:10:false",
+          "tempestade_lendaria:10:true",
+          "injecao_letal:10:true"
+        ],
+        "updates": 2699,
+        "wallMs": 72369.10000002384,
+        "waveClockDeltaSeconds": 72.28010000000188,
+        "finite": true,
+        "paused": false,
+        "gameOver": false,
+        "finalPosition": {
+          "x": 1279.32035070844,
+          "y": 4733.417488634586
+        },
+        "fixtureOrigin": {
+          "x": 1279.32035070844,
+          "y": 4733.417488634586
+        },
+        "canvas": {
+          "width": 1280,
+          "height": 720
+        },
+        "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 Ti (0x00002782) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "visibility": "visible",
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0"
+      },
+      "heapBefore": {
+        "usedSize": 9537612,
+        "totalSize": 10739712,
+        "embedderHeapUsedSize": 5033592,
+        "backingStorageSize": 2114823
+      },
+      "heapAfter": {
+        "usedSize": 9926224,
+        "totalSize": 11526144,
+        "embedderHeapUsedSize": 11374336,
+        "backingStorageSize": 2117721
+      },
+      "errors": [],
+      "resources": [],
+      "elapsedMs": 79385
+    },
+    {
+      "id": "soak-forest",
+      "map": "forest",
+      "cpu": 4,
+      "count": 0,
+      "seconds": 120,
+      "seed": 123456789,
+      "dpr": 1,
+      "width": 1280,
+      "height": 720,
+      "kind": "soak",
+      "samplesReleasedBeforeFinalGC": true,
+      "result": {
+        "frames": {
+          "samples": 6010,
+          "mean": 20.04094841930076,
+          "p50": 20.80000000000291,
+          "p95": 27.80000000000291,
+          "p99": 34.79999999998836,
+          "max": 104.20000000000073,
+          "fps": 49.897838120122785,
+          "over16_67": 4369,
+          "over33_33": 94,
+          "over50": 4
+        },
+        "methods": {
+          "weaponsUpdate": {
+            "samples": 6011,
+            "mean": 0.28371319280371177,
+            "p50": 0.2999999523162842,
+            "p95": 0.5,
+            "p99": 0.699999988079071,
+            "max": 3.100000023841858
+          },
+          "vfxUpdate": {
+            "samples": 6011,
+            "mean": 0.04940941605070549,
+            "p50": 0,
+            "p95": 0.19999998807907104,
+            "p99": 0.30000001192092896,
+            "max": 0.40000003576278687
+          },
+          "update": {
+            "samples": 6011,
+            "mean": 3.983064381795841,
+            "p50": 4,
+            "p95": 5.800000011920929,
+            "p99": 6.899999976158142,
+            "max": 66
+          },
+          "renderFloor": {
+            "samples": 6011,
+            "mean": 2.85717850622094,
+            "p50": 2.799999952316284,
+            "p95": 3.600000023841858,
+            "p99": 4.199999988079071,
+            "max": 17.5
+          },
+          "renderTrees": {
+            "samples": 6011,
+            "mean": 1.086508068709579,
+            "p50": 1.0999999642372131,
+            "p95": 1.4000000357627869,
+            "p99": 1.699999988079071,
+            "max": 4.699999988079071
+          },
+          "renderDecorTrees": {
+            "samples": 6011,
+            "mean": 1.6519381134110627,
+            "p50": 1.600000023841858,
+            "p95": 2.199999988079071,
+            "p99": 2.5,
+            "max": 5.900000035762787
+          },
+          "renderDecorCanopyOverlay": {
+            "samples": 6011,
+            "mean": 0.6234569957700155,
+            "p50": 0.6000000238418579,
+            "p95": 0.9000000357627869,
+            "p99": 1.100000023841858,
+            "max": 37
+          },
+          "weaponsRender": {
+            "samples": 6011,
+            "mean": 0.6217601061204451,
+            "p50": 0.6000000238418579,
+            "p95": 0.8999999761581421,
+            "p99": 1,
+            "max": 19.900000035762787
+          },
+          "vfxRender": {
+            "samples": 6011,
+            "mean": 0.6802029618207874,
+            "p50": 0.6000000238418579,
+            "p95": 1.100000023841858,
+            "p99": 1.5999999642372131,
+            "max": 24.100000023841858
+          },
+          "renderMinimap": {
+            "samples": 6011,
+            "mean": 0.43936117120599055,
+            "p50": 0,
+            "p95": 2,
+            "p99": 2.200000047683716,
+            "max": 3.5
+          },
+          "render": {
+            "samples": 6011,
+            "mean": 11.845217102429887,
+            "p50": 11.599999964237213,
+            "p95": 14.600000023841858,
+            "p99": 17.100000023841858,
+            "max": 56.30000001192093
+          },
+          "renderMinimapScenery": {
+            "samples": 1292,
+            "mean": 0.9245356039458384,
+            "p50": 0.9000000357627869,
+            "p95": 1.100000023841858,
+            "p99": 1.300000011920929,
+            "max": 2.400000035762787
+          }
+        },
+        "windows": [
+          {
+            "end": 278,
+            "renderCount": 279,
+            "renderedFrames": 279,
+            "elapsedMs": 5013.199999988079,
+            "frames": 278,
+            "fps": 55.67571897780982,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 59,
+            "vfx": 61,
+            "heapUsed": 15230600
+          },
+          {
+            "end": 542,
+            "renderCount": 543,
+            "renderedFrames": 264,
+            "elapsedMs": 10023.5,
+            "frames": 264,
+            "fps": 52.726183343319335,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 64,
+            "vfx": 136,
+            "heapUsed": 18356047
+          },
+          {
+            "end": 820,
+            "renderCount": 821,
+            "renderedFrames": 278,
+            "elapsedMs": 15034.699999988079,
+            "frames": 278,
+            "fps": 55.44475468687674,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 69,
+            "vfx": 228,
+            "heapUsed": 15725992
+          },
+          {
+            "end": 1090,
+            "renderCount": 1091,
+            "renderedFrames": 270,
+            "elapsedMs": 20048.19999998808,
+            "frames": 270,
+            "fps": 53.850296176628994,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 70,
+            "vfx": 160,
+            "heapUsed": 16435413
+          },
+          {
+            "end": 1344,
+            "renderCount": 1345,
+            "renderedFrames": 254,
+            "elapsedMs": 25076,
+            "frames": 254,
+            "fps": 50.58853990320459,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 75,
+            "vfx": 76,
+            "heapUsed": 14182574
+          },
+          {
+            "end": 1632,
+            "renderCount": 1633,
+            "renderedFrames": 288,
+            "elapsedMs": 30085.599999964237,
+            "frames": 288,
+            "fps": 57.36023422095643,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 85,
+            "vfx": 148,
+            "heapUsed": 21557545
+          },
+          {
+            "end": 1943,
+            "renderCount": 1944,
+            "renderedFrames": 311,
+            "elapsedMs": 35106.59999996424,
+            "frames": 311,
+            "fps": 62.02632628639809,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 102,
+            "vfx": 154,
+            "heapUsed": 16113454
+          },
+          {
+            "end": 2230,
+            "renderCount": 2231,
+            "renderedFrames": 287,
+            "elapsedMs": 40132.09999996424,
+            "frames": 287,
+            "fps": 57.08148531195925,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 120,
+            "vfx": 200,
+            "heapUsed": 15680084
+          },
+          {
+            "end": 2499,
+            "renderCount": 2500,
+            "renderedFrames": 269,
+            "elapsedMs": 45154.59999996424,
+            "frames": 269,
+            "fps": 53.57711918419372,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 131,
+            "vfx": 144,
+            "heapUsed": 14426816
+          },
+          {
+            "end": 2765,
+            "renderCount": 2766,
+            "renderedFrames": 266,
+            "elapsedMs": 50161.39999997616,
+            "frames": 266,
+            "fps": 53.05145592341444,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 137,
+            "vfx": 177,
+            "heapUsed": 15610860
+          },
+          {
+            "end": 3032,
+            "renderCount": 3033,
+            "renderedFrames": 267,
+            "elapsedMs": 55181.5,
+            "frames": 267,
+            "fps": 53.2508974870363,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 148,
+            "vfx": 263,
+            "heapUsed": 17217093
+          },
+          {
+            "end": 3285,
+            "renderCount": 3286,
+            "renderedFrames": 253,
+            "elapsedMs": 60186,
+            "frames": 253,
+            "fps": 50.6,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 158,
+            "vfx": 228,
+            "heapUsed": 14623667
+          },
+          {
+            "end": 3537,
+            "renderCount": 3538,
+            "renderedFrames": 252,
+            "elapsedMs": 65200.39999997616,
+            "frames": 252,
+            "fps": 50.19020494333691,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 168,
+            "vfx": 162,
+            "heapUsed": 26248899
+          },
+          {
+            "end": 3778,
+            "renderCount": 3779,
+            "renderedFrames": 241,
+            "elapsedMs": 70230.89999997616,
+            "frames": 241,
+            "fps": 47.99936266406413,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 188,
+            "vfx": 279,
+            "heapUsed": 15568477
+          },
+          {
+            "end": 4006,
+            "renderCount": 4007,
+            "renderedFrames": 228,
+            "elapsedMs": 75259.39999997616,
+            "frames": 228,
+            "fps": 45.2848176690237,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 186,
+            "vfx": 181,
+            "heapUsed": 25989370
+          },
+          {
+            "end": 4239,
+            "renderCount": 4240,
+            "renderedFrames": 233,
+            "elapsedMs": 80286,
+            "frames": 233,
+            "fps": 46.34141490483096,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 201,
+            "vfx": 261,
+            "heapUsed": 28357529
+          },
+          {
+            "end": 4450,
+            "renderCount": 4451,
+            "renderedFrames": 211,
+            "elapsedMs": 85300,
+            "frames": 211,
+            "fps": 42.083009234328614,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 205,
+            "vfx": 292,
+            "heapUsed": 24797325
+          },
+          {
+            "end": 4677,
+            "renderCount": 4678,
+            "renderedFrames": 227,
+            "elapsedMs": 90315.19999998808,
+            "frames": 227,
+            "fps": 45.27323494216195,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 203,
+            "vfx": 299,
+            "heapUsed": 24185793
+          },
+          {
+            "end": 4885,
+            "renderCount": 4886,
+            "renderedFrames": 208,
+            "elapsedMs": 95337.59999996424,
+            "frames": 208,
+            "fps": 41.484672610143726,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 200,
+            "vfx": 212,
+            "heapUsed": 19069652
+          },
+          {
+            "end": 5113,
+            "renderCount": 5114,
+            "renderedFrames": 228,
+            "elapsedMs": 100351,
+            "frames": 228,
+            "fps": 45.410185424923874,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 197,
+            "vfx": 177,
+            "heapUsed": 22029986
+          },
+          {
+            "end": 5332,
+            "renderCount": 5333,
+            "renderedFrames": 219,
+            "elapsedMs": 105385.19999998808,
+            "frames": 219,
+            "fps": 43.49725907682527,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 188,
+            "vfx": 207,
+            "heapUsed": 22069589
+          },
+          {
+            "end": 5566,
+            "renderCount": 5567,
+            "renderedFrames": 234,
+            "elapsedMs": 110417.59999996424,
+            "frames": 234,
+            "fps": 46.476523397155766,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 199,
+            "vfx": 168,
+            "heapUsed": 34830942
+          },
+          {
+            "end": 5779,
+            "renderCount": 5780,
+            "renderedFrames": 213,
+            "elapsedMs": 115440.19999998808,
+            "frames": 213,
+            "fps": 42.48190031711846,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 200,
+            "vfx": 208,
+            "heapUsed": 41596493
+          },
+          {
+            "end": 6009,
+            "renderCount": 6010,
+            "renderedFrames": 230,
+            "elapsedMs": 120449.29999995232,
+            "frames": 230,
+            "fps": 45.87155963302752,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 207,
+            "vfx": 201,
+            "heapUsed": 14806669
+          }
+        ],
+        "longTasks": {
+          "samples": 7,
+          "mean": 66,
+          "p50": 54,
+          "p95": 99,
+          "p99": 99,
+          "max": 99
+        },
+        "peak": {
+          "enemies": 208,
+          "projectiles": 52,
+          "zones": 15,
+          "drops": 7,
+          "vfx": 395,
+          "particles": 301,
+          "damageNumbers": 107,
+          "bossProjectiles": 19,
+          "hazards": 9
+        },
+        "states": {
+          "boss_curupira:idle::::::": 1185,
+          "boss_saci:idle::::::": 885,
+          "boss_boto:idle::::::": 407,
+          "boss_iara:idle::::::": 1501,
+          "boss_caipora:idle::::::": 1285,
+          "boss_caipora:telegraph_dash::::::": 89,
+          "boss_caipora:dashing::::::": 86
+        },
+        "weaponsSeen": [
+          "bandeja_inox:10:true",
+          "metralha_floresta:10:true",
+          "nuvem_biologica:10:true",
+          "tempestade_lendaria:10:true"
+        ],
+        "updates": 6011,
+        "wallMs": 120535.29999995232,
+        "waveClockDeltaSeconds": 120.43249999980571,
+        "finite": true,
+        "paused": false,
+        "gameOver": false,
+        "finalPosition": {
+          "x": 1995.633908678876,
+          "y": 4797.5235603630745
+        },
+        "fixtureOrigin": {
+          "x": 1279.32035070844,
+          "y": 4733.417488634586
+        },
+        "canvas": {
+          "width": 1280,
+          "height": 720
+        },
+        "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 Ti (0x00002782) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "visibility": "visible",
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0"
+      },
+      "heapBefore": {
+        "usedSize": 9654372,
+        "totalSize": 11526144,
+        "embedderHeapUsedSize": 2998296,
+        "backingStorageSize": 2116911
+      },
+      "heapAfter": {
+        "usedSize": 10477300,
+        "totalSize": 12312576,
+        "embedderHeapUsedSize": 7916232,
+        "backingStorageSize": 2117605
+      },
+      "errors": [],
+      "resources": [],
+      "elapsedMs": 127538
+    },
+    {
+      "id": "forest-420-cpu4",
+      "map": "forest",
+      "cpu": 4,
+      "count": 420,
+      "seconds": 15,
+      "seed": 123456789,
+      "dpr": 1,
+      "width": 1280,
+      "height": 720,
+      "samplesReleasedBeforeFinalGC": true,
+      "result": {
+        "frames": {
+          "samples": 302,
+          "mean": 50.129139072847686,
+          "p50": 48.600000000000364,
+          "p95": 62.5,
+          "p99": 76.5,
+          "max": 111,
+          "fps": 19.948477442367395,
+          "over16_67": 302,
+          "over33_33": 302,
+          "over50": 82
+        },
+        "methods": {
+          "weaponsUpdate": {
+            "samples": 303,
+            "mean": 0.29834983706867735,
+            "p50": 0.20000004768371582,
+            "p95": 0.699999988079071,
+            "p99": 1.4000000357627869,
+            "max": 2.199999988079071
+          },
+          "vfxUpdate": {
+            "samples": 303,
+            "mean": 0.054455444560979456,
+            "p50": 0,
+            "p95": 0.19999998807907104,
+            "p99": 0.30000001192092896,
+            "max": 0.30000001192092896
+          },
+          "update": {
+            "samples": 303,
+            "mean": 10.332343235267665,
+            "p50": 9.699999988079071,
+            "p95": 13.399999976158142,
+            "p99": 23.69999998807907,
+            "max": 53.60000002384186
+          },
+          "renderFloor": {
+            "samples": 303,
+            "mean": 2.838943894743526,
+            "p50": 2.600000023841858,
+            "p95": 3.700000047683716,
+            "p99": 4.199999988079071,
+            "max": 5.200000047683716
+          },
+          "renderTrees": {
+            "samples": 303,
+            "mean": 1.3607260720564587,
+            "p50": 1.300000011920929,
+            "p95": 1.800000011920929,
+            "p99": 2,
+            "max": 2.200000047683716
+          },
+          "renderDecorTrees": {
+            "samples": 303,
+            "mean": 2.293069306576606,
+            "p50": 2.299999952316284,
+            "p95": 3.099999964237213,
+            "p99": 3.600000023841858,
+            "max": 4.200000047683716
+          },
+          "renderDecorCanopyOverlay": {
+            "samples": 303,
+            "mean": 0.5455445552816486,
+            "p50": 0.5,
+            "p95": 1,
+            "p99": 1.300000011920929,
+            "max": 3.200000047683716
+          },
+          "weaponsRender": {
+            "samples": 303,
+            "mean": 0.1986798673573107,
+            "p50": 0.10000002384185791,
+            "p95": 0.2999999523162842,
+            "p99": 0.30000001192092896,
+            "max": 24
+          },
+          "vfxRender": {
+            "samples": 303,
+            "mean": 0.8653465344174074,
+            "p50": 0.7000000476837158,
+            "p95": 2,
+            "p99": 3.699999988079071,
+            "max": 4.700000047683716
+          },
+          "renderMinimapScenery": {
+            "samples": 151,
+            "mean": 0.9642384103591869,
+            "p50": 1,
+            "p95": 1.2000000476837158,
+            "p99": 1.4000000357627869,
+            "max": 1.4000000357627869
+          },
+          "renderMinimap": {
+            "samples": 303,
+            "mean": 1.2165016494568426,
+            "p50": 0.2999999523162842,
+            "p95": 2.800000011920929,
+            "p99": 3.399999976158142,
+            "max": 4.199999988079071
+          },
+          "render": {
+            "samples": 303,
+            "mean": 32.06204620465981,
+            "p50": 31.5,
+            "p95": 37.5,
+            "p99": 44.10000002384186,
+            "max": 71.80000001192093
+          }
+        },
+        "windows": [
+          {
+            "end": 95,
+            "renderCount": 96,
+            "renderedFrames": 96,
+            "elapsedMs": 5045.800000011921,
+            "frames": 95,
+            "fps": 19.000000000000004,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 420,
+            "vfx": 183,
+            "heapUsed": 12657851
+          },
+          {
+            "end": 194,
+            "renderCount": 195,
+            "renderedFrames": 99,
+            "elapsedMs": 10097.600000023842,
+            "frames": 99,
+            "fps": 19.581858100757557,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 378,
+            "vfx": 151,
+            "heapUsed": 15137842
+          },
+          {
+            "end": 301,
+            "renderCount": 302,
+            "renderedFrames": 107,
+            "elapsedMs": 15142,
+            "frames": 107,
+            "fps": 21.223421136147262,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 336,
+            "vfx": 48,
+            "heapUsed": 13383897
+          }
+        ],
+        "longTasks": {
+          "samples": 69,
+          "mean": 55.79710144927536,
+          "p50": 52,
+          "p95": 72,
+          "p99": 105,
+          "max": 105
+        },
+        "peak": {
+          "enemies": 420,
+          "projectiles": 2,
+          "zones": 0,
+          "drops": 0,
+          "vfx": 544,
+          "particles": 506,
+          "damageNumbers": 66,
+          "bossProjectiles": 0,
+          "hazards": 0
+        },
+        "states": {},
+        "weaponsSeen": [
+          "bandeja_inox:1:false"
+        ],
+        "updates": 303,
+        "wallMs": 15207.199999988079,
+        "waveClockDeltaSeconds": 15.18360000000002,
+        "finite": true,
+        "paused": false,
+        "gameOver": false,
+        "finalPosition": {
+          "x": 1370.571146938115,
+          "y": 4725.143429219198
+        },
+        "fixtureOrigin": {
+          "x": 1279.32035070844,
+          "y": 4733.417488634586
+        },
+        "canvas": {
+          "width": 1280,
+          "height": 720
+        },
+        "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 Ti (0x00002782) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "visibility": "visible",
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0"
+      },
+      "heapBefore": {
+        "usedSize": 9914092,
+        "totalSize": 11526144,
+        "embedderHeapUsedSize": 3355912,
+        "backingStorageSize": 2114472
+      },
+      "heapAfter": {
+        "usedSize": 9204936,
+        "totalSize": 10477568,
+        "embedderHeapUsedSize": 4516616,
+        "backingStorageSize": 2114483
+      },
+      "errors": [],
+      "resources": [],
+      "elapsedMs": 23305
+    }
+  ],
+  "finishedAt": "2026-11-12T18:08:56.140Z",
+  "verificationHistory": [
+    {
+      "id": "forest-420-cpu4",
+      "map": "forest",
+      "cpu": 4,
+      "count": 420,
+      "seconds": 15,
+      "seed": 123456789,
+      "dpr": 1,
+      "width": 1280,
+      "height": 720,
+      "samplesReleasedBeforeFinalGC": true,
+      "result": {
+        "frames": {
+          "samples": 296,
+          "mean": 50.95777027027027,
+          "p50": 48.60000000000218,
+          "p95": 62.600000000000364,
+          "p99": 76.40000000000146,
+          "max": 104.20000000000073,
+          "fps": 19.62409255146352,
+          "over16_67": 296,
+          "over33_33": 296,
+          "over50": 113
+        },
+        "methods": {
+          "weaponsUpdate": {
+            "samples": 297,
+            "mean": 0.24680134664079556,
+            "p50": 0.19999998807907104,
+            "p95": 0.6000000238418579,
+            "p99": 1.0999999642372131,
+            "max": 1.199999988079071
+          },
+          "vfxUpdate": {
+            "samples": 297,
+            "mean": 0.04444444400292856,
+            "p50": 0,
+            "p95": 0.19999998807907104,
+            "p99": 0.30000001192092896,
+            "max": 0.30000001192092896
+          },
+          "update": {
+            "samples": 297,
+            "mean": 9.972053872214424,
+            "p50": 9.5,
+            "p95": 12.599999964237213,
+            "p99": 27.80000001192093,
+            "max": 30.5
+          },
+          "renderFloor": {
+            "samples": 297,
+            "mean": 2.809090909933803,
+            "p50": 2.600000023841858,
+            "p95": 3.699999988079071,
+            "p99": 4.300000011920929,
+            "max": 4.600000023841858
+          },
+          "renderTrees": {
+            "samples": 297,
+            "mean": 1.3828282835909012,
+            "p50": 1.399999976158142,
+            "p95": 1.7000000476837158,
+            "p99": 2.099999964237213,
+            "max": 4
+          },
+          "renderDecorTrees": {
+            "samples": 297,
+            "mean": 2.3111111112315244,
+            "p50": 2.299999952316284,
+            "p95": 3.100000023841858,
+            "p99": 3.600000023841858,
+            "max": 3.699999988079071
+          },
+          "renderDecorCanopyOverlay": {
+            "samples": 297,
+            "mean": 0.6794612801034844,
+            "p50": 0.5,
+            "p95": 0.9000000357627869,
+            "p99": 1.7999999523162842,
+            "max": 36.59999996423721
+          },
+          "weaponsRender": {
+            "samples": 297,
+            "mean": 0.1239057223403494,
+            "p50": 0.10000002384185791,
+            "p95": 0.30000001192092896,
+            "p99": 0.30000001192092896,
+            "max": 2.199999988079071
+          },
+          "vfxRender": {
+            "samples": 297,
+            "mean": 0.7653198637544908,
+            "p50": 0.6000000238418579,
+            "p95": 2.199999988079071,
+            "p99": 3,
+            "max": 4.099999964237213
+          },
+          "renderMinimapScenery": {
+            "samples": 147,
+            "mean": 1.039455784015915,
+            "p50": 1,
+            "p95": 1.300000011920929,
+            "p99": 1.300000011920929,
+            "max": 2.200000047683716
+          },
+          "renderMinimap": {
+            "samples": 297,
+            "mean": 1.2501683528174454,
+            "p50": 0.30000001192092896,
+            "p95": 2.800000011920929,
+            "p99": 3.599999964237213,
+            "max": 4.800000011920929
+          },
+          "render": {
+            "samples": 297,
+            "mean": 33.49393939610684,
+            "p50": 32.69999998807907,
+            "p95": 40.200000047683716,
+            "p99": 43.700000047683716,
+            "max": 82.69999998807907
+          }
+        },
+        "windows": [
+          {
+            "end": 91,
+            "renderCount": 92,
+            "renderedFrames": 92,
+            "elapsedMs": 5016.699999988079,
+            "frames": 91,
+            "fps": 18.32719070348217,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 420,
+            "vfx": 60,
+            "heapUsed": 15781191
+          },
+          {
+            "end": 185,
+            "renderCount": 186,
+            "renderedFrames": 94,
+            "elapsedMs": 10045.199999988079,
+            "frames": 94,
+            "fps": 18.695678116112095,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 378,
+            "vfx": 66,
+            "heapUsed": 14483553
+          },
+          {
+            "end": 295,
+            "renderCount": 296,
+            "renderedFrames": 110,
+            "elapsedMs": 15080.399999976158,
+            "frames": 110,
+            "fps": 21.81803756669377,
+            "paused": false,
+            "gameOver": false,
+            "enemies": 336,
+            "vfx": 60,
+            "heapUsed": 13725567
+          }
+        ],
+        "longTasks": {
+          "samples": 115,
+          "mean": 55.356521739130436,
+          "p50": 53,
+          "p95": 72,
+          "p99": 79,
+          "max": 102
+        },
+        "peak": {
+          "enemies": 420,
+          "projectiles": 2,
+          "zones": 0,
+          "drops": 0,
+          "vfx": 531,
+          "particles": 491,
+          "damageNumbers": 67,
+          "bossProjectiles": 0,
+          "hazards": 0
+        },
+        "states": {},
+        "weaponsSeen": [
+          "bandeja_inox:1:false"
+        ],
+        "updates": 297,
+        "wallMs": 15176.599999964237,
+        "waveClockDeltaSeconds": 15.127900000000007,
+        "finite": true,
+        "paused": false,
+        "gameOver": false,
+        "finalPosition": {
+          "x": 1345.8090858696123,
+          "y": 4727.858694304202
+        },
+        "fixtureOrigin": {
+          "x": 1279.32035070844,
+          "y": 4733.417488634586
+        },
+        "canvas": {
+          "width": 1280,
+          "height": 720
+        },
+        "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 Ti (0x00002782) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "visibility": "visible",
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0"
+      },
+      "heapBefore": {
+        "usedSize": 9765488,
+        "totalSize": 11264000,
+        "embedderHeapUsedSize": 3473696,
+        "backingStorageSize": 2114372
+      },
+      "heapAfter": {
+        "usedSize": 9208364,
+        "totalSize": 10477568,
+        "embedderHeapUsedSize": 4467336,
+        "backingStorageSize": 2114425
+      },
+      "errors": [],
+      "resources": [],
+      "elapsedMs": 22225
+    }
+  ],
+  "implementation": {
+    "state": "uncommitted working tree changes over c9e78478829fd14890e743b8377c763414b4f043",
+    "finalSourceSHA256": {
+      "src/components/game/DevTools.tsx": "667eb7ea96e9dee54af51072c1bf0d392d3701888a3bfc0aebd047fca597e55c",
+      "src/components/game/GameContainer.tsx": "b6db858757aea3e7820e109128de868d4bf391ca61a31e11c4833ba35670b91f",
+      "src/game/engine/GameEngine.ts": "99d0c42fffec2b35d3ad176847dfee0f35c5ecf37ceae3290598e88c734fbeb0",
+      "src/game/engine/SpatialGrid.ts": "23c7a5021c459e95bc554dcb9b97736fb839243e1f89ab9f46ecd15124a20802",
+      "src/game/engine/StaticSpatialIndex.ts": "694305320aabb7d710dec33e810e8d969d6c7a390cbec1dda09a391a5cd208e8",
+      "src/game/entities/VFX.ts": "3bd6c929bf3d6ccae5ed43a89a32f2472bf58f253cc39521fed7a57ccf0eccff",
+      "src/game/systems/WorldProps.ts": "1876306bc7e5c37c4add347f2f3442cce71edf29b366ca22cf22247480f79e71"
+    },
+    "checks": {
+      "build": "pass",
+      "typecheckNoEmit": "pass",
+      "lint": "pass; one pre-existing unused parameter warning",
+      "collisionAndMovement": "pass",
+      "riverMouthGeometry": "pass",
+      "separation": "pass",
+      "cosmeticBounds": "pass",
+      "pixelComparisons": {
+        "cases": 74,
+        "worstMeanRGBADifference": 0.0354
+      },
+      "pauseResizeResume": "pass"
+    },
+    "note": "Final large-radius fallback and critical-heal bucket separation were checked after the main batch; the dense CPU4 case was repeated against the final build."
+  }
+}

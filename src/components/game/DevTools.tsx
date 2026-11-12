@@ -81,12 +81,12 @@ interface DevToolsProps {
 
 type TabType = 'player' | 'arsenal' | 'world' | 'debug' | 'save';
 
-export const DevTools: React.FC<DevToolsProps> = ({
+export const DevTools: React.FC<DevToolsProps> = React.memo(function DevToolsPanel({
   getEngine,
   savedData,
   onUpdateSave,
   gameState,
-}) => {
+}: DevToolsProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('player');
   const [spawnMultiplier, setSpawnMultiplier] = useState<number>(1);
@@ -97,7 +97,7 @@ export const DevTools: React.FC<DevToolsProps> = ({
   // Telemetry state synced via useEffect (avoids ref access during render)
   const [telemetry, setTelemetry] = useState<DevTelemetrySnapshot | null>(null);
 
-  // Poll telemetry when open or every 400ms when playing
+  // Stable parent props keep HUD updates from restarting this polling effect.
   useEffect(() => {
     const updateSnapshot = () => {
       const engine = getEngine();
@@ -1615,4 +1615,4 @@ export const DevTools: React.FC<DevToolsProps> = ({
       )}
     </aside>
   );
-};
+});

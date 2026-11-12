@@ -65,23 +65,29 @@ export class SpatialGrid<T extends GridEntity> {
    * Applies soft separation force between neighboring entities to prevent them from stacking.
    */
   applySeparation(entity: T, radius: number, forceMultiplier: number = 0.5): { vx: number; vy: number } {
-    const neighbors = this.queryRadius(entity.x, entity.y, radius);
     let sepX = 0;
     let sepY = 0;
-
-    for (let i = 0; i < neighbors.length; i++) {
-      const other = neighbors[i];
-      if (other.id === entity.id) continue;
-
-      const dx = entity.x - other.x;
-      const dy = entity.y - other.y;
-      const distSq = dx * dx + dy * dy;
-
-      if (distSq > 0 && distSq < radius * radius) {
-        const dist = Math.sqrt(distSq);
-        const push = (radius - dist) / radius;
-        sepX += (dx / dist) * push;
-        sepY += (dy / dist) * push;
+    const minX = Math.floor((entity.x - radius) / this.cellSize);
+    const maxX = Math.floor((entity.x + radius) / this.cellSize);
+    const minY = Math.floor((entity.y - radius) / this.cellSize);
+    const maxY = Math.floor((entity.y + radius) / this.cellSize);
+    // Same cell and entity order as queryRadius, without allocating a list per enemy.
+    for (let cx = minX; cx <= maxX; cx++) {
+      for (let cy = minY; cy <= maxY; cy++) {
+        const cell = this.cells.get(this.getKey(cx, cy));
+        if (!cell) continue;
+        for (const other of cell) {
+          if (other.id === entity.id) continue;
+          const dx = entity.x - other.x;
+          const dy = entity.y - other.y;
+          const distSq = dx * dx + dy * dy;
+          if (distSq > 0 && distSq < radius * radius) {
+            const dist = Math.sqrt(distSq);
+            const push = (radius - dist) / radius;
+            sepX += (dx / dist) * push;
+            sepY += (dy / dist) * push;
+          }
+        }
       }
     }
 
