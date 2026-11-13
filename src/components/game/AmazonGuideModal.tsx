@@ -3,19 +3,28 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { BookOpen, Clock, Crown, Droplets, Heart, Leaf, MousePointerClick, PawPrint, Shield, Skull, Sparkles, Trees, X, Zap } from 'lucide-react';
 import { Enemy } from '@/game/entities/Enemy';
+import { Player } from '@/game/entities/Player';
 import { Camera } from '@/game/engine/Camera';
-import type { EnemyType } from '@/game/types';
+import { CHARACTERS } from '@/game/data/characters';
+import { LULA_SKILL, WEAPON_REGISTRY } from '@/game/data/upgrades';
+import { GORILLA_CHARGE, GORILLA_LEAP, GORILLA_ROAR, GORILLA_SLAM_COOLDOWN } from '@/game/data/gorilla';
+import { ANACONDA } from '@/game/data/anaconda';
+import { KOPENAWAS } from '@/game/data/kopenawa';
+import { FOREST_ARMOR, GUARDIAN_BOW } from '@/game/data/inventory';
+import type { CharacterConfig, EnemyType } from '@/game/types';
 
 interface AmazonGuideModalProps {
   onClose: () => void;
 }
 
-type GuideTab = 'fruits' | 'fauna' | 'bosses';
+type GuideTab = 'fruits' | 'fauna' | 'bosses' | 'heroes' | 'guardians';
 
 const TABS: { id: GuideTab; label: string; icon: React.ReactNode }[] = [
   { id: 'fruits', label: '1. Frutas & Regras', icon: <Leaf className="h-4 w-4" /> },
   { id: 'fauna', label: '2. Fauna (21 Animais)', icon: <PawPrint className="h-4 w-4" /> },
   { id: 'bosses', label: '3. Chefes (10 Guardiões)', icon: <Crown className="h-4 w-4" /> },
+  { id: 'heroes', label: '4. Heróis & Atributos', icon: <Shield className="h-4 w-4" /> },
+  { id: 'guardians', label: '5. Guardiões de Arena', icon: <Skull className="h-4 w-4" /> },
 ];
 
 type FaunaRank = 'Básico' | 'Médio' | 'Resistente' | 'Elite';
@@ -322,6 +331,210 @@ function getEnemyStats(type: EnemyType): FaunaStats {
     defense: Math.max(0, Math.round((1 - enemy.knockbackResistance) * 100)),
   };
 }
+
+const formatGuideNumber = (value: number, digits = 1): string =>
+  value.toLocaleString('pt-BR', { maximumFractionDigits: digits });
+
+const formatSeconds = (value: number): string => `${formatGuideNumber(value, 2)} s`;
+
+// Level-1 starter-weapon values mirrored from WeaponSystem.fireWeapon and each
+// trigger. Damage is shown before the character's might bonus; cooldown is
+// multiplied by the character's cooldown reduction below.
+const HERO_WEAPON_LEVEL_ONE: Record<
+  string,
+  { damage: number[]; cooldown: number; cooldownFactor?: number; damageNote?: string }
+> = {
+  derson: { damage: [14, 18, 15], cooldown: 0.82, damageNote: 'pão / café / bolo' },
+  dukarai: { damage: [18], cooldown: 1.28 },
+  kayrurururu: { damage: [30], cooldown: 1.42, cooldownFactor: 0.7 },
+  dr_janelinha: { damage: [13], cooldown: 0.9 },
+  lula: { damage: [LULA_SKILL.damage], cooldown: LULA_SKILL.cooldown / 1000 },
+};
+
+function describeCharacterPassive(character: CharacterConfig): string {
+  const bonuses = character.statBonuses;
+  const parts: string[] = [];
+  if (bonuses.maxHp) parts.push(`+${formatGuideNumber(bonuses.maxHp)} HP máx`);
+  if (bonuses.armor) parts.push(`+${formatGuideNumber(bonuses.armor)} armadura`);
+  if (bonuses.speed) parts.push(`+${formatGuideNumber(bonuses.speed * 100)}% velocidade`);
+  if (bonuses.might) parts.push(`+${formatGuideNumber(bonuses.might * 100)}% dano`);
+  if (bonuses.cooldownReduction) {
+    parts.push(`-${formatGuideNumber(bonuses.cooldownReduction * 100)}% recarga`);
+  }
+  if (bonuses.recovery) parts.push(`+${formatGuideNumber(bonuses.recovery)} HP/s regeneração`);
+  if (bonuses.pickupRadius) parts.push(`+${formatGuideNumber(bonuses.pickupRadius)} coleta`);
+  if (bonuses.critChance) parts.push(`+${formatGuideNumber(bonuses.critChance * 100)}% crítico`);
+  if (bonuses.xpMultiplier) parts.push(`+${formatGuideNumber(bonuses.xpMultiplier * 100)}% XP`);
+  if (bonuses.attackSpeed) parts.push(`+${formatGuideNumber(bonuses.attackSpeed * 100)}% vel. ataque`);
+  if (bonuses.bonusAmount) parts.push(`+${formatGuideNumber(bonuses.bonusAmount)} projétil`);
+  if (bonuses.area) parts.push(`+${formatGuideNumber(bonuses.area * 100)}% área`);
+  if (bonuses.damageReduction) {
+    parts.push(`+${formatGuideNumber(bonuses.damageReduction * 100)}% redução de dano`);
+  }
+  if (character.id === 'lula') {
+    parts.push('a cada nível: +0,8% dano, +0,8% cadência e +0,4% velocidade');
+  }
+  return parts.length > 0 ? parts.join(' · ') : 'Sem bônus passivos adicionais.';
+}
+
+interface GuardianAbility {
+  name: string;
+  damage: string;
+  cooldown: string;
+}
+
+interface GuardianEntry {
+  type: EnemyType;
+  name: string;
+  subtitle: string;
+  hp: number;
+  contactDamage: number;
+  speed: number;
+  abilities: GuardianAbility[];
+  reward: string;
+  special?: string;
+}
+
+function getGuardianGuide(): GuardianEntry[] {
+  const gorilla = new Enemy(0, 'boss_gorilla', 0, 0, 1);
+  const anaconda = new Enemy(0, 'boss_anaconda', 0, 0, 1);
+  const kopenawa = new Enemy(0, 'boss_kopenawa', 0, 0, 1);
+  const [gorillaName, gorillaSubtitle] = gorilla.name.split(' — ');
+  const [anacondaName, anacondaSubtitle] = anaconda.name.split(' — ');
+  const [, kopenawaSubtitle] = kopenawa.name.split(' — ');
+  const armor = FOREST_ARMOR.stats;
+  const bow = GUARDIAN_BOW.stats;
+
+  return [
+    {
+      type: 'boss_gorilla',
+      name: gorillaName,
+      subtitle: gorillaSubtitle,
+      hp: gorilla.maxHp,
+      contactDamage: gorilla.damage,
+      speed: gorilla.speed,
+      abilities: [
+        {
+          name: 'Investida',
+          damage: `${formatGuideNumber(gorilla.damage)} por impacto`,
+          cooldown: formatSeconds(GORILLA_CHARGE.cooldown),
+        },
+        {
+          name: 'Salto triplo',
+          damage: `${formatGuideNumber(gorilla.damage)} por impacto`,
+          cooldown: formatSeconds(GORILLA_LEAP.cooldown),
+        },
+        {
+          name: 'Impacto no solo',
+          damage: formatGuideNumber(Math.round(gorilla.damage * 0.85)),
+          cooldown: formatSeconds(GORILLA_SLAM_COOLDOWN),
+        },
+        {
+          name: 'Grito',
+          damage: `${formatGuideNumber(
+            Math.round(gorilla.damage * GORILLA_ROAR.damageMultiplier)
+          )}/s por ${formatGuideNumber(GORILLA_ROAR.duration)} s`,
+          cooldown: formatSeconds(GORILLA_ROAR.cooldown),
+        },
+      ],
+      reward: `Armadura da Mata (+${formatGuideNumber(armor.armor ?? 0)} armadura, +${formatGuideNumber(
+        armor.maxHp ?? 0
+      )} HP, +${formatGuideNumber(armor.recovery ?? 0)} HP/s, +${formatGuideNumber(
+        (armor.damageReduction ?? 0) * 100
+      )}% redução) · Baú · 500 XP (Normal)`,
+      special: `O Grito cura ${formatGuideNumber(
+        GORILLA_ROAR.healFraction * 100
+      )}% do HP máximo do guardião.`,
+    },
+    {
+      type: 'boss_anaconda',
+      name: anacondaName,
+      subtitle: anacondaSubtitle,
+      hp: anaconda.maxHp,
+      contactDamage: anaconda.damage,
+      speed: anaconda.speed,
+      abilities: [
+        {
+          name: 'Mordida',
+          damage: formatGuideNumber(anaconda.damage),
+          cooldown: formatSeconds(ANACONDA.bite.cooldown),
+        },
+        {
+          name: 'Impacto no lago',
+          damage: formatGuideNumber(Math.round(anaconda.damage * 0.85)),
+          cooldown: formatSeconds(ANACONDA.slam.cooldown),
+        },
+        {
+          name: 'Mergulho',
+          damage: `${formatGuideNumber(ANACONDA.dive.damage)}/onda · ${formatGuideNumber(
+            ANACONDA.dive.emergeDamage
+          )} ao emergir`,
+          cooldown: formatSeconds(ANACONDA.dive.cooldown),
+        },
+        {
+          name: 'Chuva ácida',
+          damage: `${formatGuideNumber(
+            Math.round(anaconda.damage * ANACONDA.acid.damage)
+          )}/s por ${formatGuideNumber(ANACONDA.acid.duration)} s`,
+          cooldown: formatSeconds(ANACONDA.acid.cooldown),
+        },
+      ],
+      reward: `Luvas da Sucuri · ${formatGuideNumber(anaconda.xpValue)} XP`,
+      special: `A Chuva ácida cura ${formatGuideNumber(
+        ANACONDA.acid.heal * 100
+      )}% do HP máximo. Sair do lago encerra o duelo.`,
+    },
+    {
+      type: 'boss_kopenawa',
+      name: 'Ancião Kopenawa',
+      subtitle: kopenawaSubtitle,
+      hp: kopenawa.maxHp,
+      contactDamage: kopenawa.damage,
+      speed: kopenawa.speed,
+      abilities: [
+        {
+          name: 'Bafo do cachimbo',
+          damage: `${formatGuideNumber(
+            Math.round(kopenawa.damage * KOPENAWAS.breath.damageMultiplier)
+          )} + transe de ${formatGuideNumber(KOPENAWAS.breath.transeDuration)} s`,
+          cooldown: formatSeconds(KOPENAWAS.breath.cooldown / KOPENAWAS.attackSpeedMultiplier),
+        },
+        {
+          name: 'Dardo espiritual',
+          damage: `${formatGuideNumber(
+            Math.round(kopenawa.damage * KOPENAWAS.spiritBolt.damageMultiplier)
+          )} + confusão de ${formatGuideNumber(KOPENAWAS.spiritBolt.confusionDuration)} s`,
+          cooldown: formatSeconds(
+            KOPENAWAS.spiritBolt.cooldown / KOPENAWAS.attackSpeedMultiplier
+          ),
+        },
+      ],
+      reward: `Desbloqueia a Caverna · Arco do Guardião (+${formatGuideNumber(
+        (bow.attackSpeed ?? 0) * 100
+      )}% vel. ataque, +${formatGuideNumber(bow.bonusAmount ?? 0)} projétil, +${formatGuideNumber(
+        (bow.critChance ?? 0) * 100
+      )}% crítico)`,
+      special: `A ${formatGuideNumber(
+        KOPENAWAS.smoke.threshold * 100
+      )}% do HP vira fumaça por ${formatGuideNumber(
+        KOPENAWAS.smoke.invulnerable
+      )} s, fica invulnerável e invoca ${KOPENAWAS.smoke.cloneCount} ilusões com ${formatGuideNumber(
+        KOPENAWAS.cloneStatMultiplier * 100
+      )}% dos atributos.`,
+    },
+  ];
+}
+
+const GuideStatRow: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => (
+  <div className="flex items-start justify-between gap-3 border-b border-[#2a2f3a] py-1 last:border-0">
+    <span className="shrink-0 text-[9px] font-bold uppercase tracking-wide text-[#9ca3af]">
+      {label}
+    </span>
+    <span className="text-right text-[11px] font-semibold leading-relaxed text-[#f3f4f6]">
+      {value}
+    </span>
+  </div>
+);
 
 const EnemySprite: React.FC<{ type: EnemyType; label: string }> = ({ type, label }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -658,6 +871,21 @@ export const AmazonGuideModal: React.FC<AmazonGuideModalProps> = ({ onClose }) =
     [bossesWithStats]
   );
 
+  const heroesWithStats = useMemo(
+    () =>
+      CHARACTERS.map((character) => {
+        const player = new Player(character);
+        return {
+          character,
+          player,
+          weapon: WEAPON_REGISTRY[character.startingWeapon],
+        };
+      }),
+    []
+  );
+
+  const guardians = useMemo(() => getGuardianGuide(), []);
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
@@ -692,7 +920,7 @@ export const AmazonGuideModal: React.FC<AmazonGuideModalProps> = ({ onClose }) =
                 Guia do Mapa / Bestiário
               </h2>
               <p className="text-[11px] text-[#9ca3af]">
-                Floresta Amazônica · Ecossistema, frutas, fauna e chefes
+                Floresta Amazônica · Ecossistema, frutas, fauna, chefes, heróis e guardiões
               </p>
             </div>
           </div>
@@ -892,6 +1120,172 @@ export const AmazonGuideModal: React.FC<AmazonGuideModalProps> = ({ onClose }) =
                     stats={boss.stats}
                     maxStats={bossMaxStats}
                   />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'heroes' && (
+            <div className="flex flex-col gap-4">
+              <div className="rounded-lg border border-[#383e4c] bg-[#14171c] p-2.5 text-[11px] leading-relaxed text-[#9ca3af]">
+                <span className="font-bold text-[#f3f4f6]">Valores reais no nível 1:</span> sem
+                power-ups permanentes ou equipamentos. Dano e recarga mostram a arma nativa no
+                nível 1; a recarga já inclui a redução do próprio herói.
+              </div>
+
+              <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
+                {heroesWithStats.map(({ character, player, weapon }) => {
+                  const profile =
+                    HERO_WEAPON_LEVEL_ONE[character.id] ?? {
+                      damage: [0],
+                      cooldown: 0,
+                      cooldownFactor: 1,
+                      damageNote: undefined,
+                    };
+                  const might = player.might;
+                  const cooldown =
+                    profile.cooldown *
+                    Math.max(0.45, 1 - player.cooldownReduction) *
+                    (profile.cooldownFactor ?? 1);
+                  const damage = profile.damage
+                    .map((value) => formatGuideNumber(value * might))
+                    .join(' / ');
+
+                  return (
+                    <div
+                      key={character.id}
+                      className="flex h-full flex-col gap-2 rounded-lg border border-[#383e4c] bg-gradient-to-b from-[#1c2027] to-[#121419] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-sm font-black text-white shadow-inner"
+                          style={{
+                            backgroundColor: character.color,
+                            borderColor: character.portraitColor,
+                          }}
+                          aria-hidden="true"
+                        >
+                          {character.name.charAt(0)}
+                        </span>
+                        <div className="min-w-0">
+                          <div className="text-sm font-bold leading-tight text-[#f3f4f6]">
+                            {character.name}
+                          </div>
+                          <div className="text-[10px] font-semibold text-[#e69f22]">
+                            {character.title}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col">
+                        <GuideStatRow
+                          label="HP Máximo"
+                          value={formatGuideNumber(player.maxHp)}
+                        />
+                        <GuideStatRow
+                          label="Armadura"
+                          value={formatGuideNumber(player.armor)}
+                        />
+                        <GuideStatRow
+                          label="Velocidade"
+                          value={`${formatGuideNumber(player.speed)} u/s`}
+                        />
+                        <GuideStatRow
+                          label="Dano Base"
+                          value={`${damage}${
+                            profile.damageNote ? ` (${profile.damageNote})` : ''
+                          }`}
+                        />
+                        <GuideStatRow
+                          label="Cooldown/Cadência"
+                          value={`${formatSeconds(cooldown)} por ataque`}
+                        />
+                        <GuideStatRow label="Arma Nativa" value={weapon.name} />
+                        <GuideStatRow
+                          label="Habilidade Passiva"
+                          value={describeCharacterPassive(character)}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'guardians' && (
+            <div className="flex flex-col gap-4">
+              <div className="rounded-lg border border-[#383e4c] bg-[#14171c] p-2.5 text-[11px] leading-relaxed text-[#9ca3af]">
+                <span className="font-bold text-[#f3f4f6]">Valores-base na dificuldade Normal:</span>{' '}
+                vida e dano escalam com a dificuldade; a vida também escala com o tempo de
+                sobrevivência. Estes três guardiões fixos têm arena própria e não entram na
+                rotação dos chefes de 1m30s.
+              </div>
+
+              <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
+                {guardians.map((guardian) => (
+                  <div
+                    key={guardian.type}
+                    className="flex h-full flex-col gap-2 rounded-lg border border-[#3a2a2a] bg-gradient-to-b from-[#1c2027] to-[#121419] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <span className="shrink-0 rounded-xl border border-[#3a2a2a] bg-gradient-to-b from-[#362626] to-[#1d1515] p-1 shadow-inner">
+                        <EnemySprite type={guardian.type} label={guardian.name} />
+                      </span>
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold leading-tight text-[#f3f4f6]">
+                          {guardian.name}
+                        </div>
+                        <div className="mt-0.5 text-[10px] text-[#9ca3af]">
+                          {guardian.subtitle}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col">
+                      <GuideStatRow label="HP Máximo" value={formatGuideNumber(guardian.hp)} />
+                      <GuideStatRow
+                        label="Dano Físico/Contato"
+                        value={formatGuideNumber(guardian.contactDamage)}
+                      />
+                      <GuideStatRow
+                        label="Velocidade"
+                        value={`${formatGuideNumber(guardian.speed)} u/s`}
+                      />
+                    </div>
+
+                    <div className="rounded border border-[#2a2f3a] bg-[#0f1115] p-2">
+                      <div className="mb-1 text-[9px] font-bold uppercase tracking-wide text-[#9ca3af]">
+                        Dano Mágico/Habilidades
+                      </div>
+                      <ul className="flex flex-col gap-1.5">
+                        {guardian.abilities.map((ability) => (
+                          <li key={ability.name} className="flex items-start justify-between gap-2">
+                            <span className="min-w-0 text-[10.5px] leading-snug text-[#cbd5e1]">
+                              {ability.name}
+                              <span className="block text-[10px] text-[#9ca3af]">
+                                {ability.damage}
+                              </span>
+                            </span>
+                            <span className="shrink-0 text-right text-[10px] font-bold text-amber-200">
+                              Recarga: {ability.cooldown}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    <p className="text-[10.5px] leading-relaxed text-[#9ca3af]">
+                      <span className="font-bold text-[#cbd5e1]">Recompensa/Efeito ao derrotar:</span>{' '}
+                      {guardian.reward}
+                    </p>
+
+                    {guardian.special && (
+                      <p className="rounded border border-indigo-700/60 bg-indigo-950/40 px-2 py-1.5 text-[10px] leading-relaxed text-indigo-200">
+                        {guardian.special}
+                      </p>
+                    )}
+                  </div>
                 ))}
               </div>
             </div>
