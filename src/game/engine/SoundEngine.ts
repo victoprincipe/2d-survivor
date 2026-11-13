@@ -486,9 +486,9 @@ export class SoundEngine {
     osc.stop(now + 0.12);
   }
 
-  playWhip(): void {
+  playSlash(): void {
     if (this.muted || !this.initCtx() || !this.ctx || !this.sfxGain) return;
-    if (this.shouldRateLimit('whip', 100)) return;
+    if (this.shouldRateLimit('slash', 100)) return;
 
     const now = this.ctx.currentTime;
     const osc = this.ctx.createOscillator();
@@ -508,9 +508,9 @@ export class SoundEngine {
     osc.stop(now + 0.18);
   }
 
-  playKnife(): void {
+  playPierce(): void {
     if (this.muted || !this.initCtx() || !this.ctx || !this.sfxGain) return;
-    if (this.shouldRateLimit('knife', 50)) return;
+    if (this.shouldRateLimit('pierce', 50)) return;
 
     const now = this.ctx.currentTime;
     const osc = this.ctx.createOscillator();
@@ -645,28 +645,6 @@ export class SoundEngine {
 
     osc.start(now);
     osc.stop(now + 0.25);
-  }
-
-  playGarlicPulse(): void {
-    if (this.muted || !this.initCtx() || !this.ctx || !this.sfxGain) return;
-    if (this.shouldRateLimit('garlic', 250)) return;
-
-    const now = this.ctx.currentTime;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(220, now);
-    osc.frequency.linearRampToValueAtTime(110, now + 0.12);
-
-    gain.gain.setValueAtTime(0.12, now);
-    gain.gain.linearRampToValueAtTime(0.01, now + 0.12);
-
-    osc.connect(gain);
-    gain.connect(this.sfxGain);
-
-    osc.start(now);
-    osc.stop(now + 0.12);
   }
 
   playLevelUp(): void {

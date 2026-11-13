@@ -24,12 +24,8 @@ export type SupremeWeaponId =
 
 export type WeaponId =
   | 'bottle_51'
-  | 'wand'
-  | 'whip'
-  | 'knife'
   | 'bow'
   | 'bible'
-  | 'garlic'
   | 'lightning'
   | 'derson_combo'
   | 'flying_tray'
@@ -42,12 +38,8 @@ export type WeaponId =
 
 export type EvolvedWeaponId =
   | 'rain_51'
-  | 'holy_wand'
-  | 'bloody_tear'
-  | 'thousand_edge'
   | 'arrow_storm'
   | 'unholy_vespers'
-  | 'soul_eater'
   | 'thunder_loop'
   | 'derson_banquet'
   | 'infinite_rodizio'

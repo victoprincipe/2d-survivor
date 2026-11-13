@@ -1878,7 +1878,7 @@ export class GameEngine {
         THORN_BUSH_BLEED_DPS,
         THORN_BUSH_BLEED_DPS * 4,
         THORN_BUSH_BLEED_DURATION,
-        'knife'
+        'chicotada_cipo'
       );
       this.vfx.addSparks(enemy.x, enemy.y, '#dc2626', 4);
 
@@ -2968,7 +2968,7 @@ export class GameEngine {
     }
 
     // 4. Render Ground Hazards & Auras beneath Enemies/Player
-    this.weaponSystem.renderGround(ctx, camera, this.player);
+    this.weaponSystem.renderGround(ctx, camera);
     if (this.bossEncounter?.boss instanceof AnacondaBoss) {
       this.bossEncounter.boss.acid.renderGround(ctx, camera);
       this.bossEncounter.boss.dive.render(ctx, camera);
@@ -4108,7 +4108,7 @@ export class GameEngine {
       }
     }
 
-    // 2. Ranges (Pickup radius, Bible orbital, Garlic aura)
+    // 2. Ranges (Pickup radius, Bible orbital)
     if (debugConfig.showRanges) {
       const pScreen = camera.worldToScreen(player.x, player.y);
 
@@ -4120,16 +4120,6 @@ export class GameEngine {
       ctx.arc(pScreen.x, pScreen.y, player.pickupRadius, 0, Math.PI * 2);
       ctx.stroke();
       ctx.setLineDash([]);
-
-      // Garlic aura
-      if (this.weaponSystem.weapons.has('garlic')) {
-        const gRadius = this.weaponSystem.garlicRadius * player.areaMultiplier;
-        ctx.strokeStyle = 'rgba(234, 179, 8, 0.6)';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.arc(pScreen.x, pScreen.y, gRadius, 0, Math.PI * 2);
-        ctx.stroke();
-      }
 
       // Bible orbit
       if (this.weaponSystem.weapons.has('bible')) {

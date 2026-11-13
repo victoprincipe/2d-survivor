@@ -73,7 +73,6 @@ export class Enemy {
   public bleedDps: number = 0;
   public bleedSourceWeapon: WeaponId | null = null;
   public dotTickTimer: number = 0.5;
-  public soulEaterMarkTimer: number = 0;
 
   // Elite / Boss Special Skill State
   public skillCooldown: number = 4.5;
@@ -773,9 +772,6 @@ export class Enemy {
     if (this.bleedTimer > 0) {
       this.bleedTimer -= dt;
       if (this.bleedTimer <= 0) this.bleedDps = 0;
-    }
-    if (this.soulEaterMarkTimer > 0) {
-      this.soulEaterMarkTimer -= dt;
     }
 
     if (this.isJaguarPredator && this.hp <= 0) {

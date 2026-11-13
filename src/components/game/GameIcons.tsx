@@ -5,8 +5,6 @@ import Image from 'next/image';
 import { WeaponId, PassiveId } from '@/game/types';
 import {
   Flame,
-  Wand2,
-  Sword,
   Swords,
   BowArrow,
   BookOpen,
@@ -39,18 +37,10 @@ export function renderWeaponIcon(id: WeaponId, sizeClass: string = 'w-4 h-4'): R
   switch (id) {
     case 'bottle_51':
       return renderNamedIcon('Bottle51', sizeClass);
-    case 'whip':
-      return <Flame className={`${sizeClass} text-orange-400`} />;
-    case 'wand':
-      return <Wand2 className={`${sizeClass} text-sky-400`} />;
-    case 'knife':
-      return <Sword className={`${sizeClass} text-slate-200`} />;
     case 'bow':
       return <BowArrow className={`${sizeClass} text-lime-400`} />;
     case 'bible':
       return <BookOpen className={`${sizeClass} text-indigo-400`} />;
-    case 'garlic':
-      return <Shield className={`${sizeClass} text-yellow-300`} />;
     case 'lightning':
       return <Zap className={`${sizeClass} text-cyan-300`} />;
     case 'derson_combo':
@@ -167,10 +157,6 @@ export function renderNamedIcon(
       return <Image src="/bottle-51.svg" alt="Garrafa de 51" width={64} height={96} unoptimized className={`${sizeClass} object-contain`} />;
     case 'Flame':
       return <Flame className={c('text-orange-400')} />;
-    case 'Wand2':
-      return <Wand2 className={c('text-sky-400')} />;
-    case 'Sword':
-      return <Sword className={c('text-slate-200')} />;
     case 'Swords':
       return <Swords className={c('text-slate-200')} />;
     case 'BowArrow':

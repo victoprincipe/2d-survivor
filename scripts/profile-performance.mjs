@@ -99,7 +99,7 @@ function browserFixture(s) {
   const arm = () => {
     const ids = s.map === 'forest'
       ? ['metralha_floresta', 'nuvem_biologica', 'tempestade_lendaria']
-      : ['lightning', 'garlic', 'fire_flask', 'bottle_51', 'executioner_axe'];
+      : ['lightning', 'bible', 'fire_flask', 'bottle_51', 'executioner_axe'];
     for (const id of ids) e.weaponSystem.addWeapon(id);
     e.devMaximizeAllEquipped(); e.devEvolveAllEquipped();
   };

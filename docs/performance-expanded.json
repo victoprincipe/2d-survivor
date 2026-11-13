@@ -4881,7 +4881,6 @@
         "weaponsSeen": [
           "derson_combo:5:true",
           "lightning:5:true",
-          "garlic:5:true",
           "fire_flask:5:true",
           "bottle_51:8:true",
           "executioner_axe:5:true"
@@ -6390,12 +6389,8 @@
       "kind": "catalog",
       "weaponIds": [
         "bottle_51",
-        "whip",
-        "wand",
-        "knife",
         "bow",
         "bible",
-        "garlic",
         "lightning",
         "derson_combo",
         "flying_tray",
@@ -6737,20 +6732,12 @@
         "states": {},
         "weaponsSeen": [
           "bottle_51:10:false",
-          "whip:10:false",
-          "wand:10:false",
-          "knife:10:false",
           "bottle_51:10:true",
-          "whip:10:true",
-          "wand:10:true",
-          "knife:10:true",
           "bow:10:false",
           "bible:10:false",
-          "garlic:10:false",
           "lightning:10:false",
           "bow:10:true",
           "bible:10:true",
-          "garlic:10:true",
           "lightning:10:true",
           "derson_combo:10:false",
           "flying_tray:10:false",
@@ -8123,7 +8110,6 @@
         "weaponsSeen": [
           "derson_combo:5:true",
           "lightning:5:true",
-          "garlic:5:true",
           "fire_flask:5:true",
           "bottle_51:8:true",
           "executioner_axe:5:true"
@@ -8607,7 +8593,6 @@
         "weaponsSeen": [
           "derson_combo:5:true",
           "lightning:5:true",
-          "garlic:5:true",
           "fire_flask:5:true",
           "bottle_51:8:true",
           "executioner_axe:5:true"
@@ -10678,7 +10663,6 @@
         "weaponsSeen": [
           "derson_combo:5:true",
           "lightning:5:true",
-          "garlic:5:true",
           "fire_flask:5:true",
           "bottle_51:8:true",
           "executioner_axe:5:true"

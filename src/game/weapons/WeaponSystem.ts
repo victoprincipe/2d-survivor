@@ -9,8 +9,6 @@ import { VFXManager } from '../entities/VFX';
 
 export type ProjectileVisualType =
   | 'bottle_51'
-  | 'wand'
-  | 'knife'
   | 'bow'
   | 'cheese_bread'
   | 'coffee'
@@ -110,7 +108,7 @@ export interface Projectile {
   };
 }
 
-export interface WhipSlashEffect {
+export interface SlashEffect {
   x: number;
   y: number;
   width: number;
@@ -173,12 +171,8 @@ interface PendingStrike {
 
 const ALL_WEAPON_IDS: WeaponId[] = [
   'bottle_51',
-  'whip',
-  'wand',
-  'knife',
   'bow',
   'bible',
-  'garlic',
   'lightning',
   'derson_combo',
   'flying_tray',
@@ -245,7 +239,7 @@ export class WeaponSystem {
   public readonly maxItemLevel: number;
 
   public projectiles: Projectile[] = [];
-  public whipSlashes: WhipSlashEffect[] = [];
+  public slashEffects: SlashEffect[] = [];
   public lightningStrikes: LightningStrikeEffect[] = [];
   public chainArcs: ChainArcEffect[] = [];
   public ringPulses: RingPulseEffect[] = [];
@@ -260,10 +254,6 @@ export class WeaponSystem {
   private bibleCycleTimer: number = 3.2;
   private bibleCycleMax: number = 3.2;
   private bibleHitCooldowns: Map<number, number> = new Map();
-
-  // Garlic pulse state
-  public garlicTimer: number = 0;
-  public garlicRadius: number = 58;
 
   private nextProjId: number = 1;
   private nextZoneId: number = 1;
@@ -583,9 +573,9 @@ export class WeaponSystem {
     onEnemyKilled: (enemy: Enemy) => void
   ): void {
     // 1. Decay visual effects
-    for (let i = this.whipSlashes.length - 1; i >= 0; i--) {
-      this.whipSlashes[i].life -= dt;
-      if (this.whipSlashes[i].life <= 0) this.whipSlashes.splice(i, 1);
+    for (let i = this.slashEffects.length - 1; i >= 0; i--) {
+      this.slashEffects[i].life -= dt;
+      if (this.slashEffects[i].life <= 0) this.slashEffects.splice(i, 1);
     }
     for (let i = this.lightningStrikes.length - 1; i >= 0; i--) {
       this.lightningStrikes[i].life -= dt;
@@ -600,7 +590,7 @@ export class WeaponSystem {
       if (this.ringPulses[i].life <= 0) this.ringPulses.splice(i, 1);
     }
 
-    // 2. Process delayed multi-strikes (Whip Lv5 double crack, Thunder Loop echo)
+    // 2. Process delayed multi-strikes and echoes
     for (let i = this.pendingStrikes.length - 1; i >= 0; i--) {
       this.pendingStrikes[i].timer -= dt;
       if (this.pendingStrikes[i].timer <= 0) {
@@ -619,7 +609,7 @@ export class WeaponSystem {
 
     // 4. Update weapon cooldowns & trigger active firing
     this.weapons.forEach((weapon) => {
-      if (weapon.id === 'bible' || weapon.id === 'garlic') return;
+      if (weapon.id === 'bible') return;
       weapon.cooldownTimer -= dt;
       if (weapon.cooldownTimer <= 0) {
         this.fireWeapon(
@@ -637,7 +627,6 @@ export class WeaponSystem {
 
     // 5. Update continuous/cyclic weapons & ground zones
     this.updateBible(dt, player, spatialGrid, vfx, sound, onEnemyKilled);
-    this.updateGarlic(dt, player, spatialGrid, vfx, sound, onEnemyKilled);
     this.updateGroundZones(dt, player, spatialGrid, vfx, onEnemyKilled);
 
     // 6. Update all flying, homing, bouncing, parabolic & boomerang projectiles
@@ -717,28 +706,6 @@ export class WeaponSystem {
         );
       }
     }
-
-    // 2. Soul Eater (Evolved Garlic) Corpse Explosion!
-    if (deadEnemy.soulEaterMarkTimer > 0) {
-      deadEnemy.soulEaterMarkTimer = 0; // Prevent recursion loops
-      const garlicWeapon = this.weapons.get('garlic');
-      const blastRadius = 72 * player.areaMultiplier;
-      const blastDamage = 20 * player.might + deadEnemy.maxHp * 0.14;
-      this.spawnRingPulse(deadEnemy.x, deadEnemy.y, blastRadius, '#ef4444', 0.25);
-      vfx.addSparks(deadEnemy.x, deadEnemy.y, '#dc2626', 6);
-
-      const neighbors = grid.queryRadius(deadEnemy.x, deadEnemy.y, blastRadius);
-      for (let i = 0; i < neighbors.length; i++) {
-        const n = neighbors[i];
-        if (n.id === deadEnemy.id || n.hp <= 0) continue;
-        const angle = Math.atan2(n.y - deadEnemy.y, n.x - deadEnemy.x);
-        const amplified = n.computeDamageTaken(blastDamage, player.debuffDamageBonus);
-        if (garlicWeapon) garlicWeapon.totalDamageDealt += amplified;
-        const killed = n.takeDamage(amplified, Math.cos(angle), Math.sin(angle), 90);
-        vfx.addDamageNumber(n.x, n.y, amplified, false);
-        if (killed) onEnemyKilled(n);
-      }
-    }
   }
 
   private updateEnemyDoTs(
@@ -809,24 +776,6 @@ export class WeaponSystem {
         const baseCd = w.evolved ? 1.5 : w.level >= 8 ? 1.8 : w.level >= 5 ? 2.1 : 2.4;
         w.cooldownTimer = baseCd * cdFactor;
         this.triggerBottle51(w, player, enemies, camera, sound);
-        break;
-      }
-      case 'whip': {
-        const baseCd = w.evolved ? 0.92 : w.level >= 4 ? 1.02 : 1.28;
-        w.cooldownTimer = baseCd * cdFactor;
-        this.triggerWhip(w, player, grid, vfx, sound, onEnemyKilled);
-        break;
-      }
-      case 'wand': {
-        const baseCd = w.evolved ? 0.28 : w.level >= 5 ? 0.82 : 1.02;
-        w.cooldownTimer = baseCd * cdFactor;
-        this.triggerWand(w, player, grid, sound);
-        break;
-      }
-      case 'knife': {
-        const baseCd = w.evolved ? 0.18 : w.level >= 5 ? 0.6 : 0.78;
-        w.cooldownTimer = baseCd * cdFactor;
-        this.triggerKnife(w, player, sound);
         break;
       }
       case 'bow': {
@@ -963,243 +912,6 @@ export class WeaponSystem {
         break;
       }
     }
-  }
-
-  private performWhipStrike(
-    w: WeaponInstance,
-    player: Player,
-    grid: SpatialGrid<Enemy>,
-    vfx: VFXManager,
-    sound: SoundEngine,
-    onEnemyKilled: (enemy: Enemy) => void,
-    damageScale: number = 1.0,
-    widthScale: number = 1.0
-  ): void {
-    if (w.id === player.character.startingWeapon) sound.playWhip();
-    const facing = player.facingX < 0 ? -1 : 1;
-    const dmgTable = [0, 22, 29, 34, 40, 44];
-    const baseDamage = (w.evolved ? 46 : this.tableValue(dmgTable, w.level, 22)) * player.might * damageScale;
-    const slashWidth =
-      (w.evolved ? 172 : 115 + w.level * 12) * player.areaMultiplier * widthScale;
-    const slashHeight = (w.evolved ? 76 : 52 + w.level * 3) * player.areaMultiplier;
-
-    // Front slash
-    this.whipSlashes.push({
-      x: player.x + (slashWidth / 2) * facing,
-      y: player.y,
-      width: slashWidth,
-      height: slashHeight,
-      life: 0.18,
-      maxLife: 0.18,
-      isEvolved: w.evolved,
-      direction: facing,
-    });
-
-    const hitBack = w.level >= 3 || w.evolved;
-    if (hitBack) {
-      this.whipSlashes.push({
-        x: player.x - (slashWidth / 2) * facing,
-        y: player.y,
-        width: slashWidth,
-        height: slashHeight,
-        life: 0.18,
-        maxLife: 0.18,
-        isEvolved: w.evolved,
-        direction: -facing,
-      });
-    }
-
-    const targets = grid.queryRadius(player.x, player.y, slashWidth + 24);
-    let hitCount = 0;
-    let healedThisSwing = 0;
-
-    for (let i = 0; i < targets.length; i++) {
-      const e = targets[i];
-      if (e.hp <= 0) continue;
-
-      const inFront =
-        facing > 0
-          ? e.x >= player.x - 12 && e.x <= player.x + slashWidth
-          : e.x <= player.x + 12 && e.x >= player.x - slashWidth;
-      const inBack =
-        hitBack &&
-        (facing > 0
-          ? e.x <= player.x + 12 && e.x >= player.x - slashWidth
-          : e.x >= player.x - 12 && e.x <= player.x + slashWidth);
-
-      if ((inFront || inBack) && Math.abs(e.y - player.y) <= slashHeight / 2 + e.radius) {
-        const knockX = e.x >= player.x ? 1 : -1;
-        const result = this.dealHitToEnemy(
-          w,
-          e,
-          baseDamage,
-          player,
-          knockX,
-          0,
-          175,
-          grid,
-          vfx,
-          onEnemyKilled,
-          w.evolved ? 0.3 : 0.05,
-          w.evolved ? 0.35 : 0
-        );
-        hitCount++;
-
-        if (w.level >= 4 || w.evolved) {
-          e.applyBleed(
-            (w.evolved ? 14 : 8) * player.might,
-            32 * player.might,
-            3.0 * player.durationMultiplier,
-            'whip'
-          );
-        }
-
-        if (w.evolved && result.isCrit && healedThisSwing < 6) {
-          player.heal(2);
-          healedThisSwing += 2;
-          vfx.addDamageNumber(player.x, player.y - 8, 2, false, true);
-        }
-      }
-    }
-
-    if ((hitCount > 0) && w.id === player.character.startingWeapon) sound.playHit();
-  }
-
-  private triggerWhip(
-    w: WeaponInstance,
-    player: Player,
-    grid: SpatialGrid<Enemy>,
-    vfx: VFXManager,
-    sound: SoundEngine,
-    onEnemyKilled: (enemy: Enemy) => void
-  ): void {
-    this.performWhipStrike(w, player, grid, vfx, sound, onEnemyKilled, 1.0, 1.0);
-
-    // Lv5 & Evolved: Genuine delayed 2nd whip crack!
-    if (w.level >= 5 || w.evolved) {
-      this.pendingStrikes.push({
-        timer: 0.14,
-        execute: () => {
-          this.performWhipStrike(
-            w,
-            player,
-            grid,
-            vfx,
-            sound,
-            onEnemyKilled,
-            w.evolved ? 1.0 : 0.85,
-            1.1
-          );
-        },
-      });
-    }
-
-    // Duplicator adds an extra echo lash
-    if (player.bonusAmount > 0) {
-      this.pendingStrikes.push({
-        timer: 0.28,
-        execute: () => {
-          this.performWhipStrike(w, player, grid, vfx, sound, onEnemyKilled, 0.75, 1.05);
-        },
-      });
-    }
-  }
-
-  private triggerWand(
-    w: WeaponInstance,
-    player: Player,
-    grid: SpatialGrid<Enemy>,
-    sound: SoundEngine
-  ): void {
-    const nearby = grid.queryRadius(player.x, player.y, 480);
-    if (nearby.length === 0) return;
-
-    nearby.sort((a, b) => {
-      const da = (a.x - player.x) ** 2 + (a.y - player.y) ** 2;
-      const db = (b.x - player.x) ** 2 + (b.y - player.y) ** 2;
-      return da - db;
-    });
-
-    const baseCount = w.evolved ? 3 : 1 + (w.level >= 2 ? 1 : 0) + (w.level >= 4 ? 1 : 0);
-    const projectileCount = baseCount + player.bonusAmount;
-    const speed = (w.evolved ? 470 : 370) * player.projectileSpeedMultiplier;
-    const dmgTable = [0, 16, 18, 22, 26, 31];
-    const baseDamage = (w.evolved ? 24 : this.tableValue(dmgTable, w.level, 16)) * player.might;
-    const bounces =
-      (w.evolved ? 2 : w.level >= 5 ? 2 : w.level >= 3 ? 1 : 0) +
-      Math.floor(player.bonusPierce / 2);
-    const life = 1.6 * player.durationMultiplier;
-
-    for (let i = 0; i < projectileCount; i++) {
-      const target = nearby[i % nearby.length];
-      const baseAngle = Math.atan2(target.y - player.y, target.x - player.x);
-      const jitter = (i - (projectileCount - 1) / 2) * 0.14;
-      const angle = baseAngle + jitter;
-
-      this.projectiles.push({
-        id: this.nextProjId++,
-        type: 'wand',
-        x: player.x,
-        y: player.y,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        radius: (w.evolved ? 9 : 7) * player.areaMultiplier,
-        damage: baseDamage,
-        pierce: 1 + bounces,
-        bouncesLeft: bounces,
-        homingTurnRate: w.evolved ? 7.5 : 5.5,
-        explosionRadius: w.evolved ? 42 * player.areaMultiplier : 0,
-        life,
-        maxLife: life,
-        weaponId: 'wand',
-        isEvolved: w.evolved,
-        hitEnemyIds: new Set(),
-      });
-    }
-
-    if (w.id === player.character.startingWeapon) sound.playShoot();
-  }
-
-  private triggerKnife(w: WeaponInstance, player: Player, sound: SoundEngine): void {
-    const countTable = [0, 1, 2, 2, 3, 4];
-    const projectileCount = (w.evolved ? 3 : this.tableValue(countTable, w.level, 1)) + player.bonusAmount;
-    const speed = (w.evolved ? 600 : 460) * player.projectileSpeedMultiplier;
-    const dmgTable = [0, 14, 16, 19, 23, 27];
-    const baseDamage = (w.evolved ? 21 : this.tableValue(dmgTable, w.level, 14)) * player.might;
-    const baseAngle = Math.atan2(player.facingY, player.facingX);
-    const perpX = -Math.sin(baseAngle);
-    const perpY = Math.cos(baseAngle);
-    const life = 1.2 * player.durationMultiplier;
-    const applyBleed = w.level >= 3 || w.evolved;
-
-    for (let i = 0; i < projectileCount; i++) {
-      const offsetIdx = i - (projectileCount - 1) / 2;
-      const spreadAngle = baseAngle + offsetIdx * (w.evolved ? 0.06 : 0.09);
-      const laneOffset = offsetIdx * 7;
-
-      this.projectiles.push({
-        id: this.nextProjId++,
-        type: 'knife',
-        x: player.x + perpX * laneOffset,
-        y: player.y + perpY * laneOffset,
-        vx: Math.cos(spreadAngle) * speed,
-        vy: Math.sin(spreadAngle) * speed,
-        radius: 6 * player.areaMultiplier,
-        damage: baseDamage,
-        pierce: (w.evolved ? 3 : w.level >= 3 ? 2 : 1) + player.bonusPierce,
-        bonusCritChance: w.evolved ? 0.22 : 0.15,
-        bleedDps: applyBleed ? (w.evolved ? 9 : 6) * player.might : 0,
-        bleedMaxDps: (w.evolved ? 85 : 36) * player.might,
-        bleedDuration: 2.5 * player.durationMultiplier,
-        life,
-        maxLife: life,
-        weaponId: 'knife',
-        isEvolved: w.evolved,
-        hitEnemyIds: new Set(),
-      });
-    }
-
-    if (w.id === player.character.startingWeapon) sound.playKnife();
   }
 
   private triggerBow(
@@ -1464,7 +1176,7 @@ export class WeaponSystem {
           hitEnemyIds: new Set(),
         });
       }
-      if (w.id === player.character.startingWeapon) sound.playKnife();
+      if (w.id === player.character.startingWeapon) sound.playPierce();
     }
   }
 
@@ -1534,7 +1246,7 @@ export class WeaponSystem {
       });
     }
 
-    if (w.id === player.character.startingWeapon) sound.playKnife();
+    if (w.id === player.character.startingWeapon) sound.playPierce();
   }
 
   private triggerBottle51(
@@ -1689,7 +1401,7 @@ export class WeaponSystem {
           hitEnemyIds: new Set(),
         });
       }
-      if (w.id === player.character.startingWeapon) sound.playWhip();
+      if (w.id === player.character.startingWeapon) sound.playSlash();
       return;
     }
 
@@ -1737,7 +1449,7 @@ export class WeaponSystem {
       });
     }
 
-    if (w.id === player.character.startingWeapon) sound.playWhip();
+    if (w.id === player.character.startingWeapon) sound.playSlash();
   }
 
   private triggerPoderDoL(
@@ -1866,7 +1578,7 @@ export class WeaponSystem {
       });
     }
     vfx.addSparks(player.x, player.y, supreme ? '#f97316' : '#fbbf24', supreme ? 12 : 6);
-    if (w.id === player.character.startingWeapon) sound.playWhip();
+    if (w.id === player.character.startingWeapon) sound.playSlash();
   }
 
   private triggerPupunhaSpikes(w: WeaponInstance, player: Player, sound: SoundEngine): void {
@@ -1896,7 +1608,7 @@ export class WeaponSystem {
         hitEnemyIds: new Set(),
       });
     }
-    if (w.id === player.character.startingWeapon) sound.playKnife();
+    if (w.id === player.character.startingWeapon) sound.playPierce();
   }
 
   private triggerBulletSting(
@@ -1991,7 +1703,7 @@ export class WeaponSystem {
         },
       });
     }
-    if (w.id === player.character.startingWeapon) sound.playKnife();
+    if (w.id === player.character.startingWeapon) sound.playPierce();
   }
 
   private triggerSaciCyclone(w: WeaponInstance, player: Player, sound: SoundEngine): void {
@@ -2030,7 +1742,7 @@ export class WeaponSystem {
       });
     }
     this.spawnRingPulse(player.x, player.y, 46 * player.areaMultiplier, supreme ? '#38bdf8' : '#a16207', 0.3);
-    if (w.id === player.character.startingWeapon) sound.playWhip();
+    if (w.id === player.character.startingWeapon) sound.playSlash();
   }
 
   private triggerCaiporaSpear(
@@ -2151,7 +1863,7 @@ export class WeaponSystem {
         hitEnemyIds: new Set(),
       });
     }
-    if (w.id === player.character.startingWeapon) sound.playKnife();
+    if (w.id === player.character.startingWeapon) sound.playPierce();
   }
 
   private triggerMapinguariRoar(
@@ -2203,7 +1915,7 @@ export class WeaponSystem {
     const slashHeight = (58 + w.level * 4) * player.areaMultiplier;
     const baseDamage = (18 + w.level * 4) * player.might;
 
-    this.whipSlashes.push({
+    this.slashEffects.push({
       x: player.x + (slashWidth / 2) * facing,
       y: player.y,
       width: slashWidth,
@@ -2214,7 +1926,7 @@ export class WeaponSystem {
       direction: facing,
       color: '#22c55e',
     });
-    this.whipSlashes.push({
+    this.slashEffects.push({
       x: player.x,
       y: player.y,
       width: slashWidth * 0.9,
@@ -2245,7 +1957,7 @@ export class WeaponSystem {
       enemy.applySlow(0.3, 1.6 * player.durationMultiplier);
       if (result.dead) continue;
     }
-    if (w.id === player.character.startingWeapon) sound.playWhip();
+    if (w.id === player.character.startingWeapon) sound.playSlash();
   }
 
   private triggerMutucaSwarm(
@@ -2450,7 +2162,7 @@ export class WeaponSystem {
       hitEnemyIds: new Set(),
     });
     this.spawnRingPulse(player.x, player.y, 50 * player.areaMultiplier, '#166534', 0.28);
-    if (w.id === player.character.startingWeapon) sound.playWhip();
+    if (w.id === player.character.startingWeapon) sound.playSlash();
   }
 
   private performLightningBolt(
@@ -2724,69 +2436,6 @@ export class WeaponSystem {
     if ((hitAny) && w.id === player.character.startingWeapon) sound.playHit();
   }
 
-  private updateGarlic(
-    dt: number,
-    player: Player,
-    grid: SpatialGrid<Enemy>,
-    vfx: VFXManager,
-    sound: SoundEngine,
-    onEnemyKilled: (enemy: Enemy) => void
-  ): void {
-    const w = this.weapons.get('garlic');
-    if (!w) return;
-
-    this.garlicTimer += dt;
-    const radiusTable = [0, 60, 72, 74, 88, 94];
-    this.garlicRadius =
-      (w.evolved ? 112 : this.tableValue(radiusTable, w.level, 60)) * player.areaMultiplier;
-
-    const cdFactor = Math.max(0.6, 1 - player.cooldownReduction * 0.65) / (1 + player.lulaLevelAttackSpeedBonus);
-    const tickInterval = (w.evolved ? 0.32 : w.level >= 4 ? 0.38 : 0.45) * cdFactor;
-
-    if (this.garlicTimer >= tickInterval) {
-      this.garlicTimer = 0;
-      if (w.id === player.character.startingWeapon) sound.playGarlicPulse();
-
-      const dmgTable = [0, 11, 14, 18, 22, 26];
-      const baseDamage = (w.evolved ? 32 : this.tableValue(dmgTable, w.level, 11)) * player.might;
-      const knockForce = w.evolved ? 105 : w.level >= 3 ? 150 : 125;
-      const enemies = grid.queryRadius(player.x, player.y, this.garlicRadius);
-      let healedCount = 0;
-
-      for (let i = 0; i < enemies.length; i++) {
-        const e = enemies[i];
-        if (e.hp <= 0) continue;
-
-        if (w.level >= 5 || w.evolved) {
-          e.applyVulnerability(0.2, 2.5 * player.durationMultiplier);
-        }
-        if (w.evolved) {
-          e.applySlow(0.25, 1.2);
-          e.soulEaterMarkTimer = 1.2;
-        }
-
-        const angle = Math.atan2(e.y - player.y, e.x - player.x);
-        this.dealHitToEnemy(
-          w,
-          e,
-          baseDamage,
-          player,
-          Math.cos(angle),
-          Math.sin(angle),
-          knockForce,
-          grid,
-          vfx,
-          onEnemyKilled
-        );
-
-        if (w.evolved && healedCount < 3 && Math.random() < 0.2) {
-          player.heal(1);
-          healedCount += 1;
-        }
-      }
-    }
-  }
-
   private updateGroundZones(
     dt: number,
     player: Player,
@@ -3030,7 +2679,7 @@ export class WeaponSystem {
           p.y += p.vy * dt;
         }
       } else {
-        // 4. Homing steering (Wand) + Gravity (Axe) + Linear velocity
+        // 4. Homing steering + Gravity (Axe) + Linear velocity
         if (p.homingTurnRate && p.homingTurnRate > 0) {
           const candidates = grid.queryRadius(p.x, p.y, 340);
           let best: Enemy | undefined;
@@ -3192,7 +2841,7 @@ export class WeaponSystem {
           }
         }
 
-        // Ricochet bounce retargeting (Wand & Cheese Bread)
+        // Ricochet bounce retargeting (Cheese Bread)
         if (p.bouncesLeft && p.bouncesLeft > 0) {
           p.bouncesLeft -= 1;
           const neighbors = grid.queryRadius(enemy.x, enemy.y, 240);
@@ -3217,10 +2866,8 @@ export class WeaponSystem {
         }
 
         const sparkColor =
-          p.type === 'wand'
-            ? '#38bdf8'
-            : p.type === 'bow'
-              ? '#a3e635'
+          p.type === 'bow'
+            ? '#a3e635'
               : p.type === 'cheese_bread'
                 ? '#facc15'
                 : p.type === 'coffee'
@@ -3261,20 +2908,6 @@ export class WeaponSystem {
 
         p.pierce -= 1;
         if (p.pierce <= 0) {
-          if (p.type === 'wand' && p.explosionRadius && p.explosionRadius > 0) {
-            this.triggerSplashExplosion(
-              w,
-              enemy.x,
-              enemy.y,
-              p.explosionRadius,
-              p.damage * 0.5,
-              '#c084fc',
-              player,
-              grid,
-              vfx,
-              onEnemyKilled
-            );
-          }
           this.projectiles.splice(i, 1);
           break;
         }
@@ -3284,7 +2917,7 @@ export class WeaponSystem {
     }
   }
 
-  renderGround(ctx: CanvasRenderingContext2D, camera: Camera, player: Player): void {
+  renderGround(ctx: CanvasRenderingContext2D, camera: Camera): void {
     // 1. Render Persistent Ground Zones (Fire Pools, Bio Clouds, Static Fields)
     for (let i = 0; i < this.groundZones.length; i++) {
       const z = this.groundZones[i];
@@ -3343,31 +2976,12 @@ export class WeaponSystem {
 
       ctx.restore();
     }
-
-    // 2. Render Garlic Aura
-    const garlic = this.weapons.get('garlic');
-    if (garlic) {
-      const screen = camera.worldToScreen(player.x, player.y);
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(screen.x, screen.y, this.garlicRadius, 0, Math.PI * 2);
-      ctx.fillStyle = garlic.evolved
-        ? 'rgba(127, 29, 29, 0.26)'
-        : garlic.level >= 5
-          ? 'rgba(250, 204, 21, 0.2)'
-          : 'rgba(253, 224, 71, 0.14)';
-      ctx.fill();
-      ctx.strokeStyle = garlic.evolved ? '#ef4444' : '#facc15';
-      ctx.lineWidth = garlic.evolved ? 2.5 : 1.8;
-      ctx.stroke();
-      ctx.restore();
-    }
   }
 
   render(ctx: CanvasRenderingContext2D, camera: Camera, player: Player): void {
-    // 3. Render Whip Slashes
-    for (let i = 0; i < this.whipSlashes.length; i++) {
-      const s = this.whipSlashes[i];
+    // 3. Render Slash Effects
+    for (let i = 0; i < this.slashEffects.length; i++) {
+      const s = this.slashEffects[i];
       const screen = camera.worldToScreen(s.x, s.y);
       const alpha = s.life / s.maxLife;
 
@@ -3431,25 +3045,7 @@ export class WeaponSystem {
         p.spinAngle !== undefined ? p.spinAngle : Math.atan2(p.vy, p.vx);
       ctx.rotate(rot);
 
-      if (p.type === 'wand') {
-        ctx.fillStyle = p.isEvolved ? '#c084fc' : '#38bdf8';
-        ctx.beginPath();
-        ctx.arc(0, 0, p.radius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.arc(0, 0, p.radius * 0.45, 0, Math.PI * 2);
-        ctx.fill();
-      } else if (p.type === 'knife') {
-        ctx.fillStyle = p.isEvolved ? '#ef4444' : '#e2e8f0';
-        ctx.beginPath();
-        ctx.moveTo(13, 0);
-        ctx.lineTo(-6, -4.5);
-        ctx.lineTo(-4, 0);
-        ctx.lineTo(-6, 4.5);
-        ctx.closePath();
-        ctx.fill();
-      } else if (p.type === 'bow') {
+      if (p.type === 'bow') {
         ctx.strokeStyle = p.isEvolved ? '#fbbf24' : '#bef264';
         ctx.lineWidth = p.isEvolved ? 4 : 3.2;
         ctx.beginPath();
