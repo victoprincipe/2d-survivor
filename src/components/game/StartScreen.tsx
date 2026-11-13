@@ -12,6 +12,7 @@ import { countClaimableMissions, getAccountLevel } from '@/game/data/missions';
 import { WEAPON_REGISTRY } from '@/game/data/upgrades';
 import { EquipmentModal } from './EquipmentModal';
 import { MissionsTab } from './MissionsTab';
+import { HeroStatusTab } from './HeroStatusTab';
 import { AmazonGuideModal } from './AmazonGuideModal';
 import { renderWeaponIcon, renderNamedIcon } from './GameIcons';
 import {
@@ -82,7 +83,9 @@ const getSelectionMusicVolume = (characterId: string, masterVolume: number) =>
 
 export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame, onUpdateSave }) => {
   const [selectedCharIndex, setSelectedCharIndex] = useState(0);
-  const [activeTab, setActiveTab] = useState<'character' | 'shop' | 'missions'>('character');
+  const [activeTab, setActiveTab] = useState<'character' | 'shop' | 'missions' | 'status'>(
+    'character'
+  );
   const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyId>(
     savedData.difficulty ?? 'normal'
   );
@@ -382,6 +385,13 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
               </span>
             )}
           </button>
+          <button
+            onClick={() => setActiveTab('status')}
+            className={`tab-btn ${activeTab === 'status' ? 'tab-btn-active' : ''}`}
+          >
+            <span aria-hidden="true">📊</span>
+            Status
+          </button>
         </div>
 
         {/* TAB 1: Character Select */}
@@ -551,6 +561,9 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
             {activeTab === 'missions' && (
               <MissionsTab savedData={savedData} onUpdateSave={onUpdateSave} />
             )}
+
+            {/* TAB 4: Hero status */}
+            {activeTab === 'status' && <HeroStatusTab />}
 
             {/* Play Button */}
             <button
