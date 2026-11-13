@@ -23,8 +23,7 @@ const TABS: { id: GuideTab; label: string; icon: React.ReactNode }[] = [
   { id: 'fruits', label: '1. Frutas & Regras', icon: <Leaf className="h-4 w-4" /> },
   { id: 'fauna', label: '2. Fauna (21 Animais)', icon: <PawPrint className="h-4 w-4" /> },
   { id: 'bosses', label: '3. Chefes (10 Guardiões)', icon: <Crown className="h-4 w-4" /> },
-  { id: 'heroes', label: '4. Heróis & Atributos', icon: <Shield className="h-4 w-4" /> },
-  { id: 'guardians', label: '5. Guardiões de Arena', icon: <Skull className="h-4 w-4" /> },
+  { id: 'guardians', label: '4. Guardiões de Arena', icon: <Skull className="h-4 w-4" /> },
 ];
 
 type FaunaRank = 'Básico' | 'Médio' | 'Resistente' | 'Elite';
