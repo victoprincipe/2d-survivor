@@ -9,8 +9,8 @@ export class TribeHunter {
   private riseElapsed: number;
   private readonly riseDuration = 1.1;
   constructor(public readonly x: number, public readonly y: number, completed = false) {
-    this.sprite.src = '/sprites/tribe-hunter/seated.png';
-    this.riseSprite.src = '/sprites/tribe-hunter/stand-up.png';
+    this.sprite.src = '/sprites/tribe-hunter/seated-elder.png';
+    this.riseSprite.src = '/sprites/tribe-hunter/stand-up-elder.png';
     this.delivered = completed;
     this.riseElapsed = completed ? this.riseDuration : 0;
   }

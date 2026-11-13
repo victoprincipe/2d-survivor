@@ -80,13 +80,13 @@ assert.equal(player.maxHp, 115);
 assert.equal(player.projectileSpeedMultiplier, 1.15);
 player.takeDamage(20);
 assert.equal(player.hp, 96); // 20 * 0.95 = 19
-const weapons = new WeaponSystem('wand');
+const weapons = new WeaponSystem('bow');
 weapons.recalculatePlayerStats(player);
 assert.equal(player.maxHp, 115);
 assert.equal(player.projectileSpeedMultiplier, 1.15);
 const grid = { queryRadius: () => [] };
-weapons.fireWeapon(weapons.weapons.get('wand'), player, [], grid, {}, {}, { playShoot() {} }, () => {});
-assert(Math.abs(weapons.weapons.get('wand').cooldownTimer - 1.02 / 1.05) < 1e-8);
+weapons.fireWeapon(weapons.weapons.get('bow'), player, [], grid, {}, {}, { playShoot() {} }, () => {});
+assert(Math.abs(weapons.weapons.get('bow').cooldownTimer - 1.42 / 1.05) < 1e-8);
 
 // Real engine quest methods with an isolated in-memory save, no browser storage.
 saveGameData(getInitialSave());

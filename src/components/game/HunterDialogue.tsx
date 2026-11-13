@@ -16,7 +16,7 @@ export function HunterDialogue({ quest, onAccept, onDeliver, onClose }: {
       onCancel={event => { event.preventDefault(); onClose(); }}
       className="m-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-lg overflow-y-auto rounded-2xl border-2 border-amber-700 bg-stone-950 p-5 text-amber-50 shadow-2xl backdrop:bg-black/70">
       <div className="mb-3 flex items-center gap-4">
-        <Image src="/sprites/tribe-hunter/seated.png" alt="" width={92} height={92} unoptimized className="h-24 w-24 object-contain" />
+        <Image src="/sprites/tribe-hunter/seated-elder.png" alt="" width={92} height={92} unoptimized className="h-24 w-24 object-contain" />
         <div><p className="text-xs uppercase tracking-widest text-amber-400">Comida para a tribo</p>
           <h2 id="hunter-title" className="mt-1 text-2xl font-bold">Caçador da Tribo</h2></div>
       </div>
