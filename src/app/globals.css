@@ -369,19 +369,48 @@ body {
   91.75% { background-position: 100% 66.666667%; }
 }
 
-.lula-portrait {
+.character-atlas-portrait {
   background-repeat: no-repeat;
   image-rendering: pixelated;
   transform-origin: 50% 94%;
 }
 
-.lula-portrait-animated {
-  animation: kayru-selection-breathe 3.2s ease-in-out infinite,
-    lula-selection-attack 3s step-end infinite;
+.derson-selection-exhaust {
+  position: absolute;
+  left: 22%;
+  bottom: 15%;
+  pointer-events: none;
 }
 
-/* Rest for 2.2s, then the same 800ms gesture used in combat. */
-@keyframes lula-selection-attack {
+.derson-selection-exhaust::before,
+.derson-selection-exhaust::after {
+  content: '';
+  position: absolute;
+  width: 4px;
+  height: 3px;
+  border-radius: 50%;
+  background: #cbd0d5;
+  opacity: 0;
+  animation: derson-exhaust-drift 1.5s ease-out infinite;
+}
+
+.derson-selection-exhaust::after {
+  animation-delay: -0.75s;
+}
+
+@keyframes derson-exhaust-drift {
+  0% { opacity: 0; transform: translate(0, 0) scale(0.5); }
+  15% { opacity: 0.3; }
+  100% { opacity: 0; transform: translate(-12px, -8px) scale(2); }
+}
+
+.character-atlas-portrait-animated {
+  animation: kayru-selection-breathe 3.2s ease-in-out infinite,
+    atlas-selection-attack 3s step-end infinite;
+}
+
+/* Rest for 2.2s, then demonstrate the eight attack poses. */
+@keyframes atlas-selection-attack {
   0%, 100% { background-position: 0% 75%; }
   73.333333% { background-position: 0% 50%; }
   76.666667% { background-position: 14.285714% 50%; }
@@ -394,7 +423,8 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .lula-portrait-animated {
+  .derson-selection-exhaust { display: none; }
+  .character-atlas-portrait-animated {
     animation: none;
   }
   .kayru-selection-idle {

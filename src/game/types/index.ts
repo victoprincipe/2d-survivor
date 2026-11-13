@@ -128,6 +128,7 @@ export interface CharacterConfig {
     damageReduction?: number;
     critChance?: number;
     attackSpeed?: number;
+    projectileSpeed?: number;
     bonusAmount?: number;
     area?: number;
   };
@@ -220,9 +221,10 @@ export interface MissionRunStats {
 export type EquipmentSlot = 'armor' | 'boots' | 'gloves' | 'helmet' | 'weapon';
 
 /** Percent bonuses use fractions: 0.05 means 5%. */
-export type EquipmentStats = Partial<Record<'maxHp' | 'armor' | 'might' | 'speed' | 'recovery' | 'critChance' | 'attackSpeed' | 'bonusAmount' | 'damageReduction', number>>;
+export type EquipmentStats = Partial<Record<'maxHp' | 'armor' | 'might' | 'speed' | 'recovery' | 'critChance' | 'attackSpeed' | 'bonusAmount' | 'damageReduction' | 'projectileSpeed', number>>;
+export interface HunterQuestProgress { accepted: boolean; fish: number; completed: boolean; }
 export interface EquipmentItem { id: string; name: string; slot: EquipmentSlot; stats: EquipmentStats; }
-export interface CharacterInventory { items: EquipmentItem[]; equipped: Partial<Record<EquipmentSlot, string>>; kopenawaDefeated?: boolean; }
+export interface CharacterInventory { items: EquipmentItem[]; equipped: Partial<Record<EquipmentSlot, string>>; kopenawaDefeated?: boolean; hunterQuest?: HunterQuestProgress; }
 
 export interface SavedGameData {
   inventories: Record<string, CharacterInventory>;
@@ -294,6 +296,7 @@ export type EnemyType =
   | 'baby_black_caiman';
 
 export type DropType =
+  | 'quest_fish'
   | 'gem_blue'
   | 'gem_green'
   | 'gem_red'
@@ -328,6 +331,8 @@ export interface MissionObjectivesHUD {
 }
 
 export interface HUDState {
+  hunterQuest?: HunterQuestProgress;
+  hunterCanInteract?: boolean;
   mapId?: MapId;
   playerHp: number;
   playerMaxHp: number;

@@ -435,6 +435,16 @@ export class WorldSystem {
       this.generateForest();
       this.spawnInitialFruitTrees();
       this.spawnFieldPlants();
+      const outsideCamp = (prop: { x: number; y: number }) => !this.isInHunterClearing(prop.x, prop.y);
+      this.trees = this.trees.filter(outsideCamp);
+      this.decorTrees = this.decorTrees.filter(outsideCamp);
+      this.fruitTrees = this.fruitTrees.filter(outsideCamp);
+      this.thornBushes = this.thornBushes.filter(outsideCamp);
+      this.herbs = this.herbs.filter(outsideCamp);
+      this.rocks = this.rocks.filter(outsideCamp);
+      this.palms = this.palms.filter(outsideCamp);
+      this.ferns = this.ferns.filter(outsideCamp);
+      this.groundTufts = this.groundTufts.filter(outsideCamp);
     }
     this.loadFloorTexture();
     // Generation deliberately uses the original scans while the scenery is growing.
@@ -588,7 +598,7 @@ export class WorldSystem {
 
       if (this.isInWater(x, y)) continue;
       if (this.isOverPlateau(x, y, clearance + 40)) continue;
-      if (this.isInSageClearing(x, y, clearance + 40)) continue;
+      if (this.isInSageClearing(x, y, clearance + 40) || this.isInHunterClearing(x, y)) continue;
       if (this.isOnPlateauRamp(x, y, clearance + 40)) continue;
       if (this.collidesWithTree(x, y, clearance + 30)) continue;
 
@@ -1442,6 +1452,23 @@ export class WorldSystem {
       default:
         return 7 * tree.scale;
     }
+  }
+
+  public getHunterCampPosition(): { x: number; y: number } {
+    const x = 0;
+    return { x, y: this.riverCenterY(x) - this.getRiverHalfWidth(x, RIVER_HALF_WIDTH + RIVER_BANK) - 200 };
+  }
+
+  private isInHunterClearing(x: number, y: number): boolean {
+    if (this.mapId !== 'amazon_forest') return false;
+    const camp = this.getHunterCampPosition();
+    return Math.hypot(x - camp.x, y - camp.y) < 280;
+  }
+
+  /** Only the main river channel; lake basins and their connecting mouths do not qualify. */
+  public isMainRiverWater(x: number, y: number): boolean {
+    return this.mapId === 'amazon_forest' && Math.abs(x) <= FOREST_HALF_SIZE && Math.abs(y) <= FOREST_HALF_SIZE
+      && Math.abs(y - this.riverCenterY(x)) < this.getRiverHalfWidth(x, RIVER_HALF_WIDTH - 16);
   }
 
   private riverCenterY(x: number): number {

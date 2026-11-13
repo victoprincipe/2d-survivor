@@ -1,4 +1,5 @@
 import { CharacterConfig, CharacterInventory, EquipmentItem, EquipmentSlot, EquipmentStats } from '../types';
+import { getHunterQuest, TRIBE_HEADDRESS } from './hunterQuest';
 
 export const GUARDIAN_BOW: EquipmentItem = {
   id: 'guardian_bow', name: 'Arco do Guardião', slot: 'weapon',
@@ -7,6 +8,7 @@ export const GUARDIAN_BOW: EquipmentItem = {
 export const FOREST_ARMOR: EquipmentItem = { id: 'forest_armor', name: 'Armadura da Mata', slot: 'armor', stats: { armor: 3, maxHp: 20, recovery: 2, damageReduction: 0.05 } };
 export const ANACONDA_GLOVES: EquipmentItem = { id: 'anaconda_gloves', name: 'Luvas da Sucuri', slot: 'gloves', stats: {} };
 export function equipmentArtwork(id: string): string | undefined {
+  if (id === TRIBE_HEADDRESS.id) return '/sprites/tribe-hunter/headdress.png';
   if (id === ANACONDA_GLOVES.id) return '/sprites/equipment/anaconda-gloves.svg';
   if (id === FOREST_ARMOR.id) return '/sprites/equipment/forest-armor.png';
   return id === GUARDIAN_BOW.id ? '/sprites/equipment/guardian-bow.svg' : undefined;
@@ -22,6 +24,7 @@ export const EQUIPMENT_SLOTS: Record<EquipmentSlot, string> = {
   armor: 'Armadura', boots: 'Botas', gloves: 'Luvas', helmet: 'Capacete', weapon: 'Arma',
 };
 export const EQUIPMENT_STATS: Record<keyof EquipmentStats, { label: string; percent?: boolean }> = {
+  projectileSpeed: { label: 'Velocidade de projétil', percent: true },
   damageReduction: { label: 'Redução de dano', percent: true },
   maxHp: { label: 'Vida máxima' }, armor: { label: 'Armadura' },
   might: { label: 'Dano', percent: true }, speed: { label: 'Velocidade', percent: true },
@@ -57,6 +60,7 @@ export function normalizeInventories(value: unknown): Record<string, CharacterIn
       const equippedId = isRecord(source.equipped) ? source.equipped[slot] : undefined;
       if (inventory.items.some((item) => item.id === equippedId && item.slot === slot)) inventory.equipped[slot] = equippedId as string;
     }
+    inventory.hunterQuest = getHunterQuest({ ...inventory, hunterQuest: source.hunterQuest as CharacterInventory['hunterQuest'] });
     return [id, inventory];
   }));
 }

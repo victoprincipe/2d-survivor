@@ -4,8 +4,8 @@ import { useState } from 'react';
 import Image from 'next/image';
 import { CharacterConfig } from '@/game/types';
 
-/** Uses the same atlas as combat, with the original SVG beneath it while loading. */
-export function LulaPortrait({ character, animated = false }: {
+/** Uses the combat atlas, with the original portrait as a loading/error fallback. */
+export function CharacterAtlasPortrait({ character, animated = false }: {
   character: CharacterConfig;
   animated?: boolean;
 }) {
@@ -30,13 +30,16 @@ export function LulaPortrait({ character, animated = false }: {
           {ready && (
             <span
               aria-hidden="true"
-              className={`lula-portrait block h-full w-full ${animated ? 'lula-portrait-animated' : ''}`}
+              className={`character-atlas-portrait block h-full w-full ${animated ? 'character-atlas-portrait-animated' : ''}`}
               style={{
                 backgroundImage: `url("${atlas}")`,
                 backgroundSize: `${columns * 100}% ${rows * 100}%`,
                 backgroundPosition: `0% ${3 / (rows - 1) * 100}%`,
               }}
             />
+          )}
+          {ready && animated && character.id === 'derson' && (
+            <span aria-hidden="true" className="derson-selection-exhaust" />
           )}
         </>
       )}

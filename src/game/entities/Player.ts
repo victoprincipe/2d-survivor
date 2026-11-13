@@ -138,6 +138,8 @@ export class Player {
   public invulnerableTimer: number = 0;
   public walkAnimTimer: number = 0;
   private idleAnimTimer: number = 0;
+  private exhaustTimer: number = 0;
+  private exhaustPuffs: { x: number; y: number; vx: number; age: number; life: number }[] = [];
   public isMoving: boolean = false;
   // Set by the engine while the feet are on the Amazon river/lake surface.
   public isWadingInWater: boolean = false;
@@ -210,6 +212,7 @@ export class Player {
 
     // Apply character base modifiers
     const b = character.statBonuses;
+    this.projectileSpeedMultiplier += b.projectileSpeed ?? 0;
     if (b.maxHp) this.maxHp += b.maxHp;
     if (b.might) this.might += b.might;
     if (b.armor) this.armor += b.armor;
@@ -511,7 +514,52 @@ export class Player {
       this.walkAnimTimer = 0;
     }
 
+    this.updateExhaust(dt);
     return this.hp > 0;
+  }
+
+  private updateExhaust(dt: number): void {
+    if (this.character.id !== 'derson') return;
+    for (let i = this.exhaustPuffs.length - 1; i >= 0; i--) {
+      const puff = this.exhaustPuffs[i];
+      puff.age += dt;
+      puff.x += puff.vx * dt;
+      puff.y -= 12 * dt;
+      if (puff.age >= puff.life) this.exhaustPuffs.splice(i, 1);
+    }
+    if (this.hp <= 0) return;
+    const interval = this.dashTimer > 0 ? 0.035 : this.isMoving ? 0.11 : 0.28;
+    this.exhaustTimer += dt;
+    const flip = this.facingX < 0 ? -1 : 1;
+    while (this.exhaustTimer >= interval && this.exhaustPuffs.length < 24) {
+      this.exhaustTimer -= interval;
+      this.exhaustPuffs.push({
+        x: this.x - flip * 17,
+        y: this.y + 8 + this.jumpOffset,
+        vx: -flip * (15 + Math.random() * 8),
+        age: 0,
+        life: 0.65 + Math.random() * 0.25,
+      });
+    }
+    // Avoid a burst after a slow frame or when the particle cap is reached.
+    this.exhaustTimer = Math.min(this.exhaustTimer, interval);
+  }
+
+  private renderExhaust(ctx: CanvasRenderingContext2D, camera: Camera): void {
+    if (this.exhaustPuffs.length === 0) return;
+    ctx.save();
+    const opacity = ctx.globalAlpha;
+    for (const puff of this.exhaustPuffs) {
+      const progress = puff.age / puff.life;
+      const screen = camera.worldToScreen(puff.x, puff.y);
+      const radius = 2 + progress * 5;
+      ctx.globalAlpha = opacity * (1 - progress) * 0.3;
+      ctx.fillStyle = '#cbd0d5';
+      ctx.beginPath();
+      ctx.ellipse(screen.x, screen.y, radius, radius * 0.72, -0.3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
   }
 
   public triggerAttackAnimation(duration: number, facingX: number = this.facingX): void {
@@ -680,6 +728,7 @@ export class Player {
   }
 
   render(ctx: CanvasRenderingContext2D, camera: Camera): void {
+    this.renderExhaust(ctx, camera);
     const screen = camera.worldToScreen(this.x, this.y);
 
     // Flash white/transparent when invulnerable

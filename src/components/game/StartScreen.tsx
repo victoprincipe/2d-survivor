@@ -2,7 +2,7 @@
 
 import React, { useRef, useState } from 'react';
 import Image from 'next/image';
-import { LulaPortrait } from './LulaPortrait';
+import { CharacterAtlasPortrait } from './CharacterAtlasPortrait';
 import { CharacterConfig, DifficultyId, MapId, SavedGameData } from '@/game/types';
 import { CHARACTERS } from '@/game/data/characters';
 import { POWER_UP_DEFINITIONS, getPowerUpCost, saveGameData } from '@/game/data/persistence';
@@ -461,8 +461,8 @@ export const StartScreen: React.FC<StartScreenProps> = ({ savedData, onStartGame
                             : 'inset 0 2px 8px rgba(0,0,0,0.45)',
                         }}
                       >
-                        {char.id === 'lula' ? (
-                          <LulaPortrait character={char} animated />
+                        {char.animationColumns === 8 && char.animationRows === 5 ? (
+                          <CharacterAtlasPortrait key={char.id} character={char} animated />
                         ) : char.id === 'kayrurururu' && char.animationSprite ? (
                           <span
                             role="img"

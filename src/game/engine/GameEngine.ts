@@ -17,6 +17,9 @@ import {
   EnemyType,
 } from '../types';
 import { claimGuardianBow, emptyInventory, FOREST_ARMOR, GUARDIAN_BOW, ANACONDA_GLOVES, withEquipment } from '../data/inventory';
+import { CharacterInventory, HunterQuestProgress } from '../types';
+import { acceptHunterQuest, canDropHunterFish, collectHunterFish, deliverHunterFish, getHunterQuest, TRIBE_HEADDRESS } from '../data/hunterQuest';
+import { TribeHunter } from '../entities/TribeHunter';
 import { Camera } from './Camera';
 import { InputManager } from './Input';
 import { SoundEngine } from './SoundEngine';
@@ -53,6 +56,7 @@ import { getDifficulty } from '../data/difficulties';
 import { applyRunToMissions } from '../data/missions';
 
 export interface GameEngineCallbacks {
+  onHunterDialogue?: (quest: HunterQuestProgress) => void;
   onAnacondaDialogue?: () => void;
   onEquipmentReward: (item: EquipmentItem) => void;
   onGorillaDialogue?: () => void;
@@ -329,6 +333,8 @@ export class GameEngine {
 
   public enemies: Enemy[] = [];
   private readonly gorillaNpc: GorillaNpc | null;
+  private readonly tribeHunter: TribeHunter | null;
+  private hunterQuest: HunterQuestProgress;
   private readonly anacondaNpc: AnacondaNpc | null;
   private anacondaDefeated = false;
   private challengeBossSerial = -1;
@@ -542,6 +548,9 @@ export class GameEngine {
     this.spatialGrid = new SpatialGrid<Enemy>(110);
     this.vfx = new VFXManager();
     this.worldProps = new WorldSystem(mapId);
+    const camp = this.worldProps.getHunterCampPosition();
+    this.hunterQuest = getHunterQuest(savedData.inventories?.[character.id] ?? emptyInventory());
+    this.tribeHunter = mapId === 'amazon_forest' ? new TribeHunter(camp.x, camp.y, this.hunterQuest.completed) : null;
     this.gorillaNpc = mapId === 'amazon_forest' ? new GorillaNpc() : null;
     this.anacondaNpc = mapId === 'amazon_forest' ? new AnacondaNpc() : null;
     this.kopenawaNpc = mapId === 'amazon_forest' ? new KopenawaNpc() : null;
@@ -638,6 +647,44 @@ export class GameEngine {
    * Canvas pointer input. Tapping the floating fruit prompt harvests the tree;
    * every other tap keeps driving the virtual joystick.
    */
+  private canTalkToHunter(): boolean {
+    return !this.isGameOver && !this.bossEncounter && !this.insideCave
+      && !!this.tribeHunter?.canInteract(this.player);
+  }
+
+  public talkToHunter(): boolean {
+    if (this.isPaused || !this.canTalkToHunter() || !this.callbacks.onHunterDialogue) return false;
+    this.hunterQuest = getHunterQuest(loadSavedData().inventories[this.player.character.id] ?? emptyInventory());
+    this.pause(); this.input.handlePointerUp();
+    this.callbacks.onHunterDialogue({ ...this.hunterQuest });
+    return true;
+  }
+
+  private saveHunterProgress(change: (inventory: CharacterInventory) => CharacterInventory): boolean {
+    const data = loadSavedData();
+    const id = this.player.character.id;
+    const inventory = data.inventories[id] ?? emptyInventory();
+    const next = change(inventory);
+    this.hunterQuest = getHunterQuest(next);
+    if (next === inventory) return false;
+    saveGameData({ ...data, inventories: { ...data.inventories, [id]: next } });
+    this.syncHUD();
+    return true;
+  }
+
+  public acceptHunterMission(): void {
+    if (this.isPaused && this.canTalkToHunter()) this.saveHunterProgress(acceptHunterQuest);
+  }
+
+  public deliverHunterMission(): boolean {
+    if (!this.isPaused || !this.canTalkToHunter() || !this.saveHunterProgress(deliverHunterFish)) return false;
+    this.tribeHunter?.onFoodDelivered();
+    this.drops = this.drops.filter(drop => drop.type !== 'quest_fish');
+    this.sound.playMissionClaim();
+    this.callbacks.onEquipmentReward(TRIBE_HEADDRESS);
+    return true;
+  }
+
   public handlePointerDown(screenX: number, screenY: number): void {
     const fruit = this.worldProps.collectFruitTreeAtScreenPoint(
       screenX,
@@ -689,10 +736,12 @@ export class GameEngine {
   }
 
   private update(dt: number): void {
+    this.tribeHunter?.update(dt);
     this.anacondaNpc?.update(dt);
     this.kopenawaNpc?.update(dt);
     this.gorillaNpc?.update(dt);
     const interactRequested = this.input.consumeInteract();
+    if (interactRequested && this.talkToHunter()) return;
     if (this.insideCave) {
       this.player.isWadingInWater = false;
       this.player.isInMud = false;
@@ -2461,6 +2510,10 @@ export class GameEngine {
       this.vfx.addDeathBurst(enemy.x, enemy.y, '#c4b5fd', 18);
       return;
     }
+
+    if (this.tribeHunter && canDropHunterFish(this.hunterQuest, enemy, this.worldProps.isMainRiverWater(enemy.x, enemy.y))) {
+      this.drops.push(new Drop(Date.now() + Math.random(), 'quest_fish', enemy.x, enemy.y));
+    }
     if (enemy === this.bossEncounter?.boss) {
       if (this.bossEncounter.kind === 'gorilla') {
         this.gorillaDefeated = true;
@@ -2558,6 +2611,10 @@ export class GameEngine {
   }
 
   private handleDropCollected(drop: Drop): void {
+    if (drop.type === 'quest_fish') {
+      if (this.tribeHunter && this.saveHunterProgress(collectHunterFish)) this.sound.playGemPickup(3);
+      return;
+    }
     if (drop instanceof EquipmentDrop) {
       const data = loadSavedData();
       const id = this.player.character.id;
@@ -2913,6 +2970,8 @@ export class GameEngine {
       : undefined;
 
     this.callbacks.onHUDUpdate({
+      hunterQuest: this.tribeHunter ? { ...this.hunterQuest } : undefined,
+      hunterCanInteract: this.canTalkToHunter(),
       mapId: this.waveDirector.isAmazonForest ? 'amazon_forest' : 'night_plain',
       playerHp: Math.round(this.player.hp),
       playerMaxHp: Math.round(this.player.maxHp),
@@ -2982,6 +3041,7 @@ export class GameEngine {
     }
 
     // Match the player's depth at the NPC's feet without adding it to combat.
+    if (this.tribeHunter && this.player.y >= this.tribeHunter.y) this.tribeHunter.render(ctx, camera, this.hunterQuest.completed);
     if (this.anacondaAvailable && this.anacondaNpc && this.player.y >= this.anacondaNpc.y) this.anacondaNpc.render(ctx, camera);
     if (this.gorillaAvailable && this.gorillaNpc && this.player.y >= this.gorillaNpc.y) {
       this.gorillaNpc.render(ctx, camera);
@@ -2989,6 +3049,7 @@ export class GameEngine {
     if (this.kopenawaAvailable && this.kopenawaNpc && this.player.y >= this.kopenawaNpc.y) this.kopenawaNpc.render(ctx, camera);
     this.player.render(ctx, camera);
     if (this.anacondaAvailable && this.anacondaNpc && this.player.y < this.anacondaNpc.y) this.anacondaNpc.render(ctx, camera);
+    if (this.tribeHunter && this.player.y < this.tribeHunter.y) this.tribeHunter.render(ctx, camera, this.hunterQuest.completed);
     if (this.kopenawaAvailable && this.kopenawaNpc && this.player.y < this.kopenawaNpc.y) this.kopenawaNpc.render(ctx, camera);
     this.worldProps.renderForestCave(ctx, camera, this.player.y, true);
     if (!this.bossEncounter && Math.hypot(this.player.x + 1950, this.player.y - 1935) < 75) {
@@ -3100,6 +3161,7 @@ export class GameEngine {
     if (!this.isPaused && !this.isGameOver && this.gorillaAvailable && this.gorillaNpc?.canInteract(this.player)) {
       this.gorillaNpc.renderPrompt(ctx, camera);
     }
+    if (!this.isPaused && this.canTalkToHunter()) this.tribeHunter?.renderPrompt(ctx, camera);
 
     // 7.5. Render Debug Overlay (Hitboxes, Ranges, Spatial Grid)
     this.renderDebugOverlay();
@@ -3579,6 +3641,14 @@ export class GameEngine {
 
     const centerX = x + half;
     const centerY = y + half;
+    if (this.tribeHunter) {
+      const blipX = Math.max(x + 12, Math.min(x + size - 12, centerX + (this.tribeHunter.x - this.player.x) * scale));
+      const blipY = Math.max(y + 12, Math.min(y + size - 12, centerY + (this.tribeHunter.y - this.player.y) * scale));
+      ctx.save(); ctx.fillStyle = '#fbbf24'; ctx.strokeStyle = '#422006'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(blipX, blipY, 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#fff7ed';
+      ctx.fillText('Caçador', blipX, blipY - 10); ctx.restore();
+    }
 
     // Active São-Caetano herbs glow light green so the wounded hero can spot
     // the nearest antidote on the radar.

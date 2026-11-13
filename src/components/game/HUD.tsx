@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { HUDState } from '@/game/types';
+import { HUNTER_FISH_TARGET } from '@/game/data/hunterQuest';
 import { renderWeaponIcon, renderPassiveIcon } from './GameIcons';
 import {
   Skull,
@@ -12,6 +13,7 @@ import {
   Volume2,
   VolumeX,
   Pause,
+  Fish,
 } from 'lucide-react';
 
 interface HUDProps {
@@ -43,6 +45,22 @@ export const HUD: React.FC<HUDProps> = ({
 
   return (
     <div className="pointer-events-none absolute inset-0 select-none flex flex-col justify-between p-3 font-sans text-white">
+      {hud.hunterQuest?.accepted && !hud.hunterQuest.completed && (
+        <div role="status" className="absolute bottom-16 left-1/2 w-60 max-w-[72vw] -translate-x-1/2 rounded-xl border border-amber-600 bg-stone-950/95 px-4 py-3 text-amber-100 shadow-lg sm:bottom-6">
+          <div className="flex items-center justify-between gap-3">
+            <span className="flex items-center gap-2 text-sm font-bold"><Fish className="h-5 w-5 text-cyan-300" /> Peixes</span>
+            <span className="font-mono text-xl font-black tabular-nums">{hud.hunterQuest.fish}/{HUNTER_FISH_TARGET}</span>
+          </div>
+          <div role="progressbar" aria-label="Peixes coletados para a tribo" aria-valuemin={0}
+            aria-valuemax={HUNTER_FISH_TARGET} aria-valuenow={hud.hunterQuest.fish}
+            className="mt-2 h-2 overflow-hidden rounded-full bg-stone-800">
+            <div className="h-full rounded-full bg-cyan-400 transition-[width] duration-200 motion-reduce:transition-none"
+              style={{ width: `${Math.min(100, hud.hunterQuest.fish / HUNTER_FISH_TARGET * 100)}%` }} />
+          </div>
+          <p className="mt-2 text-center text-xs">{hud.hunterQuest.fish >= HUNTER_FISH_TARGET
+            ? 'Volte ao caçador para entregar' : 'Comida para a tribo'}</p>
+        </div>
+      )}
           {/* Timer anchored at the top of the viewport */}
           <div aria-label="Tempo de sobrevivência" className="absolute left-1/2 top-3 -translate-x-1/2 whitespace-nowrap bg-slate-900/90 border-2 border-slate-700 rounded-xl px-4 py-1.5 flex items-center gap-2 shadow-2xl backdrop-blur-md">
             <Clock className="w-5 h-5 text-amber-400" />

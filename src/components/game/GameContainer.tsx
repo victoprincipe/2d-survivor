@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { EquipmentItem, CharacterConfig, DifficultyId, GameEndSummary, HUDState, MapId, SavedGameData, UpgradeOption } from '@/game/types';
+import { EquipmentItem, CharacterConfig, DifficultyId, GameEndSummary, HUDState, HunterQuestProgress, MapId, SavedGameData, UpgradeOption } from '@/game/types';
 import { CHARACTERS } from '@/game/data/characters';
 import { loadSavedData } from '@/game/data/persistence';
 import { getDifficulty } from '@/game/data/difficulties';
@@ -18,8 +18,9 @@ import { DevTools } from './DevTools';
 import { GorillaDialogue } from './GorillaDialogue';
 import { AnacondaDialogue } from './AnacondaDialogue';
 import { EquipmentRewardModal } from './EquipmentRewardModal';
+import { HunterDialogue } from './HunterDialogue';
 
-type GameState = 'menu' | 'playing' | 'paused' | 'level_up' | 'chest' | 'game_over' | 'victory' | 'dialogue' | 'anaconda_dialogue' | 'equipment_reward';
+type GameState = 'menu' | 'playing' | 'paused' | 'level_up' | 'chest' | 'game_over' | 'victory' | 'dialogue' | 'anaconda_dialogue' | 'equipment_reward' | 'hunter_dialogue';
 
 const DEFAULT_HUD: HUDState = {
   playerHp: 100,
@@ -37,6 +38,7 @@ const DEFAULT_HUD: HUDState = {
 };
 
 export const GameContainer: React.FC = () => {
+  const [hunterQuest, setHunterQuest] = useState<HunterQuestProgress | null>(null);
   const [equipmentReward, setEquipmentReward] = useState<EquipmentItem | null>(null);
   const [gameState, setGameState] = useState<GameState>('menu');
   const [savedData, setSavedData] = useState<SavedGameData>(loadSavedData);
@@ -95,6 +97,10 @@ export const GameContainer: React.FC = () => {
       }
 
       const engine = new GameEngine(canvas, character, currentSavedData, difficulty, mapId, {
+        onHunterDialogue: quest => {
+          setHunterQuest(quest);
+          gameStateRef.current = 'hunter_dialogue'; setGameState('hunter_dialogue');
+        },
         onAnacondaDialogue: () => {
           gameStateRef.current = 'anaconda_dialogue'; setGameState('anaconda_dialogue');
         },
@@ -286,6 +292,12 @@ export const GameContainer: React.FC = () => {
     };
   }, [gameState]);
 
+  const closeHunterDialogue = () => {
+    setSavedData(loadSavedData());
+    engineRef.current?.resume();
+    gameStateRef.current = 'playing'; setGameState('playing');
+  };
+
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-black select-none touch-none">
       {/* 2D Canvas Viewport */}
@@ -319,6 +331,18 @@ export const GameContainer: React.FC = () => {
       )}
 
       {/* Overlays / Modals */}
+      {gameState === 'playing' && hud.hunterCanInteract && (
+        <button type="button" onClick={() => engineRef.current?.talkToHunter()}
+          className="absolute bottom-28 right-4 z-20 rounded-xl border border-amber-500 bg-stone-950/95 px-4 py-3 font-bold text-amber-100 shadow-lg">
+          Conversar com o caçador [E]
+        </button>
+      )}
+      {gameState === 'hunter_dialogue' && hunterQuest && <HunterDialogue quest={hunterQuest}
+        onClose={closeHunterDialogue} onAccept={() => {
+          engineRef.current?.acceptHunterMission(); closeHunterDialogue();
+        }} onDeliver={() => {
+          if (!engineRef.current?.deliverHunterMission()) closeHunterDialogue();
+        }} />}
       {gameState === 'anaconda_dialogue' && <AnacondaDialogue onStartCombat={() => {
         if (engineRef.current?.startAnacondaCombat()) {
           gameStateRef.current = 'playing'; setGameState('playing');

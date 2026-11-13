@@ -22,6 +22,10 @@ export class Drop {
     this.y = y;
 
     switch (type) {
+      case 'quest_fish':
+        this.value = 1;
+        this.radius = 10;
+        break;
       case 'gem_blue':
         this.value = value ?? 5;
         this.radius = 7;
@@ -92,7 +96,12 @@ export class Drop {
     ctx.save();
     ctx.translate(screen.x, screen.y + bob);
 
-    if (this.type === 'gem_blue') {
+    if (this.type === 'quest_fish') {
+      ctx.fillStyle = '#a5e6ed'; ctx.strokeStyle = '#0e7490'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(0, 0, 10, 5, -0.15, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-8, 0); ctx.lineTo(-16, -6); ctx.lineTo(-16, 6); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#164e63'; ctx.beginPath(); ctx.arc(5, -1, 1.5, 0, Math.PI * 2); ctx.fill();
+    } else if (this.type === 'gem_blue') {
       ctx.fillStyle = '#38bdf8';
       ctx.beginPath();
       ctx.moveTo(0, -7);

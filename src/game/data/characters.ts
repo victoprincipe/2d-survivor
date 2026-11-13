@@ -11,6 +11,9 @@ export const CHARACTERS: CharacterConfig[] = [
     color: '#c1121f',
     portraitColor: '#6a040f',
     sprite: '/derson.png',
+    animationSprite: '/derson-animations-v2.png',
+    animationColumns: 8,
+    animationRows: 5,
     statBonuses: {
       maxHp: 15,
       speed: 0.12,

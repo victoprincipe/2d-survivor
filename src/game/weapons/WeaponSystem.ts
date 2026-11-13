@@ -441,7 +441,7 @@ export class WeaponSystem {
     player.recoveryPerSec =
       (b.recovery || 0) + (perm.recovery || 0) * 0.5 + player.objectiveRecoveryBonus;
     player.cooldownReduction = b.cooldownReduction || 0;
-    player.projectileSpeedMultiplier = 1.0;
+    player.projectileSpeedMultiplier = 1.0 + (b.projectileSpeed || 0);
     player.areaMultiplier = 1.0 + (b.area || 0);
     player.durationMultiplier = 1.0;
     player.critChance = 0.05 + (b.critChance || 0);
@@ -851,6 +851,11 @@ export class WeaponSystem {
       }
       case 'bandeja_inox': {
         w.cooldownTimer = Math.max(0.78, 1.28 - w.level * 0.04) * cdFactor;
+        if (player.character.id === 'derson') {
+          const target = this.nearestAmazonTarget(player, grid);
+          const aimX = target ? target.x - player.x : player.facingX;
+          player.triggerAttackAnimation(0.4, Math.abs(aimX) > 0.01 ? aimX : player.facingX);
+        }
         this.triggerInoxTray(w, player, grid, sound);
         break;
       }
@@ -1065,6 +1070,10 @@ export class WeaponSystem {
       : facingAngle;
 
     const step = w.comboStep ?? 0;
+    if (player.character.id === 'derson') {
+      const aimX = Math.cos(aimAngle);
+      player.triggerAttackAnimation(0.4, Math.abs(aimX) > 0.01 ? aimX : player.facingX);
+    }
     w.comboStep = (step + 1) % 3;
 
     const fireCheeseBread = w.evolved || step === 0;
