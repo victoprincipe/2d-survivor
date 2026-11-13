@@ -3619,6 +3619,10 @@ export class GameEngine {
       ctx.arc(centerX + dx * scale, centerY + dy * scale, blipRadius, 0, Math.PI * 2);
       ctx.fill();
     }
+
+    // Fixed Amazon guardians keep dedicated radar icons. Defeated guardians are
+    // skipped until a new run reconstructs them at their fixed spawn points.
+    this.drawGuardianMinimapMarkers(ctx, centerX, centerY, scale, half);
     ctx.restore();
 
     // Hero is always at the center of the radar.
@@ -3645,6 +3649,175 @@ export class GameEngine {
     ctx.lineWidth = 1.5;
     ctx.stroke();
     ctx.restore();
+  }
+
+  /**
+   * Marks the three fixed Amazon guardians on the radar. Their icon sits on the
+   * exact world position while inside the scanned area; when the hero is far
+   * away a small bearing is pinned to the minimap edge instead, so all living
+   * guardians remain trackable.
+   */
+  private drawGuardianMinimapMarkers(
+    ctx: CanvasRenderingContext2D,
+    centerX: number,
+    centerY: number,
+    scale: number,
+    half: number
+  ): void {
+    const markers: Array<{
+      kind: 'anaconda' | 'gorilla' | 'kopenawa';
+      label: string;
+      x: number;
+      y: number;
+    }> = [];
+
+    if (this.anacondaNpc && !this.anacondaDefeated) {
+      const boss = this.bossEncounter?.kind === 'anaconda' ? this.bossEncounter.boss : null;
+      markers.push({
+        kind: 'anaconda',
+        label: 'SG',
+        x: boss?.x ?? this.anacondaNpc.x,
+        y: boss?.y ?? this.anacondaNpc.y,
+      });
+    }
+    if (this.gorillaNpc && !this.gorillaDefeated) {
+      const boss = this.bossEncounter?.kind === 'gorilla' ? this.bossEncounter.boss : null;
+      markers.push({
+        kind: 'gorilla',
+        label: 'GO',
+        x: boss?.x ?? this.gorillaNpc.x,
+        y: boss?.y ?? this.gorillaNpc.y,
+      });
+    }
+    if (this.kopenawaNpc && !this.kopenawaDefeated) {
+      const boss = this.bossEncounter?.kind === 'kopenawa' ? this.bossEncounter.boss : null;
+      markers.push({
+        kind: 'kopenawa',
+        label: 'AN',
+        x: boss?.x ?? this.kopenawaNpc.x,
+        y: boss?.y ?? this.kopenawaNpc.y,
+      });
+    }
+
+    const pulse = 0.5 + 0.5 * Math.sin(this.waveDirector.survivalTime * 5);
+    const margin = 9;
+    for (let i = 0; i < markers.length; i++) {
+      const marker = markers[i];
+      const projectedX = centerX + (marker.x - this.player.x) * scale;
+      const projectedY = centerY + (marker.y - this.player.y) * scale;
+      const inside =
+        Math.abs(projectedX - centerX) <= half - margin &&
+        Math.abs(projectedY - centerY) <= half - margin;
+      if (inside) {
+        this.drawGuardianMinimapIcon(ctx, projectedX, projectedY, marker.kind, marker.label, pulse, false);
+        continue;
+      }
+
+      const dx = projectedX - centerX;
+      const dy = projectedY - centerY;
+      const length = Math.hypot(dx, dy);
+      if (length < 0.001) continue;
+      const edge = half - margin - 4;
+      this.drawGuardianMinimapIcon(
+        ctx,
+        centerX + (dx / length) * edge,
+        centerY + (dy / length) * edge,
+        marker.kind,
+        marker.label,
+        pulse,
+        true
+      );
+    }
+  }
+
+  private drawGuardianMinimapIcon(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    kind: 'anaconda' | 'gorilla' | 'kopenawa',
+    label: string,
+    pulse: number,
+    edge: boolean
+  ): void {
+    const markerX = Math.round(x);
+    const markerY = Math.round(y);
+    const grow = (edge ? 0.82 : 1) * (0.9 + pulse * 0.16);
+
+    ctx.save();
+    ctx.translate(markerX, markerY);
+    if (edge) ctx.globalAlpha = 0.88;
+    ctx.scale(grow, grow);
+
+    if (kind === 'anaconda') {
+      // Dark-green serpent diamond with a violet core, inside a black pixel edge.
+      ctx.fillStyle = '#020617';
+      ctx.beginPath();
+      ctx.moveTo(0, -7); ctx.lineTo(7, 0); ctx.lineTo(0, 7); ctx.lineTo(-7, 0);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#166534';
+      ctx.beginPath();
+      ctx.moveTo(0, -5); ctx.lineTo(5, 0); ctx.lineTo(0, 5); ctx.lineTo(-5, 0);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#7e22ce';
+      ctx.fillRect(-1, -1, 2, 2);
+    } else if (kind === 'gorilla') {
+      // Dark-brown plateau square with an orange skull-like face.
+      ctx.fillStyle = '#020617';
+      ctx.fillRect(-6, -6, 12, 12);
+      ctx.fillStyle = '#9a3412';
+      ctx.fillRect(-4, -4, 8, 8);
+      ctx.fillStyle = '#fed7aa';
+      ctx.fillRect(-3, -2, 2, 2);
+      ctx.fillRect(1, -2, 2, 2);
+      ctx.fillStyle = '#f97316';
+      ctx.fillRect(-2, 1, 4, 1);
+    } else {
+      // Cyan spirit star with a golden staff core.
+      ctx.fillStyle = '#020617';
+      ctx.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const angle = -Math.PI / 2 + (i * Math.PI) / 5;
+        const radius = i % 2 === 0 ? 7 : 3.3;
+        const px = Math.cos(angle) * radius;
+        const py = Math.sin(angle) * radius;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#0891b2';
+      ctx.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const angle = -Math.PI / 2 + (i * Math.PI) / 5;
+        const radius = i % 2 === 0 ? 5 : 2.3;
+        const px = Math.cos(angle) * radius;
+        const py = Math.sin(angle) * radius;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#fbbf24';
+      ctx.fillRect(-1, -1, 2, 2);
+    }
+
+    ctx.restore();
+
+    // Quick initials beside nearby guardians; edge bearings rely on the shape
+    // and colour to avoid covering the surrounding map.
+    if (!edge) {
+      ctx.save();
+      ctx.font = 'bold 7px monospace';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = 'rgba(2, 6, 23, 0.95)';
+      const textX = markerX + 8;
+      const textY = markerY + 0.5;
+      ctx.strokeText(label, textX, textY);
+      ctx.fillStyle =
+        kind === 'anaconda' ? '#c084fc' : kind === 'gorilla' ? '#fdba74' : '#67e8f9';
+      ctx.fillText(label, textX, textY);
+      ctx.restore();
+    }
   }
 
   private renderBossHazards(): void {
