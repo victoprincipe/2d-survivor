@@ -1,8 +1,8 @@
 import { GameContainer } from '@/components/game/GameContainer';
 
 export const metadata = {
-  title: 'Teste',
-  description: 'Teste: um jogo roguelite de sobrevivência em Next.js, React e HTML5 Canvas.',
+  title: 'Sobreviventes da Horda',
+  description: 'Sobreviventes da Horda: um jogo roguelite de sobrevivência em Next.js, React e HTML5 Canvas.',
 };
 
 export default function Home() {

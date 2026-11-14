@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Teste",
-  description: "Teste: um jogo roguelite de sobrevivência.",
+  title: "Sobreviventes da Horda",
+  description: "Sobreviventes da Horda: um jogo roguelite de sobrevivência.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
