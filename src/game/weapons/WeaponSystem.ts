@@ -822,11 +822,8 @@ export class WeaponSystem {
         break;
       }
       case 'lula_power': {
-        const baseCd = w.evolved
-          ? 2.52
-          : w.level >= 5
-            ? 2.646
-            : LULA_SKILL.cooldown / 1000;
+        const baseCd = (LULA_SKILL.cooldown / 1000) *
+          (w.evolved ? 0.8 : w.level >= 5 ? 0.84 : 1);
         w.cooldownTimer = baseCd * cdFactor;
         this.triggerPoderDoL(w, player, grid, vfx, sound, onEnemyKilled);
         break;

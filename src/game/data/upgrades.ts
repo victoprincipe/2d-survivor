@@ -497,7 +497,7 @@ export const LULA_SKILL = {
   name: 'Poder do L',
   damage: 35,
   radius: 150,
-  cooldown: 3150,
+  cooldown: 2900,
   animationDuration: 800,
   // Frame 4 of the eight-frame gesture is the first fully formed L.
   releaseDelay: 400,
